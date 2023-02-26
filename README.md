@@ -1,2 +1,2 @@
-# py_recorder
-Record Blender data as Python code
+# Python Recorder addon for Blender
+Record Blender data as Python code.
