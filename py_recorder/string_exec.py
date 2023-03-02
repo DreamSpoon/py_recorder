@@ -16,8 +16,6 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-import traceback    # TODO: should this line be put in 'except:' statement?
-
 # separate file for exec_str(), for edge cases re: 'import' keyword (e.g. 'import bubble_pop_yay as bpy')
 # returns tuple (True, "") on success, returns tuple (False, error_msg) on error (exception raised)
 def exec_str(script_str, auto_import_bpy):
@@ -26,6 +24,7 @@ def exec_str(script_str, auto_import_bpy):
             import bpy
         exec(script_str)
     except:
+        import traceback
         tb = traceback.format_exc()
         print(tb)   # print(tb) replaces traceback.print_exc()
         return (False, tb)

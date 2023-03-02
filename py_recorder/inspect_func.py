@@ -32,7 +32,5 @@ def get_inspect_context_collection(context_name, inspect_context_collections):
 def get_inspect_context_panel(panel_num, context_name, inspect_context_collections):
     coll = get_inspect_context_collection(context_name, inspect_context_collections)
     if coll != None:
-        for panel in coll.inspect_context_panels:
-            if panel.inspect_panel_number == panel_num:
-                return panel
+        return coll.inspect_context_panels.get(str(panel_num))
     return None

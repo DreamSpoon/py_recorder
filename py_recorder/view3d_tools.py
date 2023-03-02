@@ -463,64 +463,6 @@ class PYREC_OT_VIEW3D_CopyInfoToObjectText(Operator):
                     (filter_line_count, thing_type, thing_name))
         return {'FINISHED'}
 
-# returns True if correct 'import bpy' line of Python code is found in text_str, else returns False
-def str_contains_import_bpy(text_str):
-    index = 0
-    # subtract 9 because 'import bpy' is 10 characters, therefore can not exist in last 9 characters of text_str
-    while index < len(text_str)-9:
-        index = text_str.find("import", index)
-        if index == -1:
-            # if 'import' is not in text_str, then by deduction, 'import bpy' is not in text_str
-            return False
-        if not text_str[index+6].isspace():
-            index = index + 6
-            continue
-        # descending order string check, if characters exist before 'import' location in text_str
-        goto_next_find = False
-        if index > 0:
-            for b in range(index-1, 0, -1):
-                if text_str[b] == "\n":
-                    break
-                # 'import' must be preceded by space before newline / file beginning
-                if not text_str[b].isspace():
-                    goto_next_find = True
-                    break
-            if goto_next_find:
-                index = index + 7
-                continue
-        # ascending order string check
-        for b in range(index+6, len(text_str)):
-            # if newline found before 'bpy' found then do next find()
-            if text_str[b] == "\n":
-                goto_next_find = True
-                break
-            # non-space character found, may be first character of 'bpy'
-            if not text_str[b].isspace():
-                break
-        index = b
-        if goto_next_find:
-            continue
-        if text_str[index:index+3] == "bpy":
-            # check for special case: 'bpy' is last 3 characters of text_str
-            if index+3 == len(text_str):
-                # this is end of text_str: so return True because 'import bpy' is found, with zero trailing space(s)
-                return True
-            # check for newline / trailing space after 'bpy'
-            adder = 3
-            for b in range(index+3, len(text_str)):
-                # if only space after 'bpy', then return True because correct 'import bpy' line found
-                if text_str[b] == "\n":
-                    return True
-                if not text_str[b].isspace():
-                    adder = b - index
-                    break
-            index = index + adder
-        else:
-            # ensure index is incremented to prevent infinite loop error
-            index = index + 1
-    # 'import bpy' not found
-    return False
-
 def create_error_text(error_text_name, error_msg):
     date_time = dt.now().strftime("Error date: %m/%d/%Y\nError time: %H:%M:%S\n")
     # create Text to receive error message string
@@ -528,14 +470,42 @@ def create_error_text(error_text_name, error_msg):
     error_text = bpy.data.texts.new(name=error_text_name)
     error_text.from_string(date_time+error_msg)
 
+def add_text_prepend_import_bpy(text):
+    # save state of Text current/select line/character, with plus one line because 'import bpy' will be prepended
+    old_data = (text.current_character, text.current_line_index+1,
+                text.select_end_character, text.select_end_line_index+1)
+    # write prepend to first character of first line of text
+    (text.current_character, text.current_line_index,
+     text.select_end_character, text.select_end_line_index) = (0, 0, 0, 0)
+    text.write("import bpy\n")
+    # restore state of Text current and select line/character
+    (text.current_character, text.current_line_index,
+     text.select_end_character, text.select_end_line_index) = old_data
+
+def remove_text_prepend_import_bpy(text):
+    # save state of Text current/select line/character, with minus one line because 'import bpy' will be removed
+    current_line_index = text.current_line_index-1
+    if current_line_index < 0:
+        current_line_index = 0
+    select_end_line_index = text.select_end_line_index-1
+    if select_end_line_index < 0:
+        select_end_line_index = 0
+    old_data = (text.current_character, current_line_index,
+                text.select_end_character, select_end_line_index)
+    # select first line of 'text'
+    (text.current_character, text.current_line_index,
+     text.select_end_character, text.select_end_line_index) = (0, 0, 0, 1)
+    # write empty string to 'delete' selected line
+    text.write("")
+    # restore state of Text current and select line/character
+    (text.current_character, text.current_line_index,
+     text.select_end_character, text.select_end_line_index) = old_data
+
 # returns False on error, otherwise returns True
 def run_script_in_text_editor(context, textblock, auto_import_bpy):
-    text_str = textblock.as_string()
-    prepended = False
-    # prepend 'import bpy' line if needed, and set boolean for undo later if prepended
-    if auto_import_bpy and not str_contains_import_bpy(text_str):
-        textblock.from_string("import bpy\n" + text_str)   # TODO find more efficient method to prepend line
-        prepended = True
+    # prepend 'import bpy' line if needed
+    if auto_import_bpy:
+        add_text_prepend_import_bpy(textblock)
     # switch context UI type to Text Editor
     prev_type = context.area.ui_type
     context.area.ui_type = 'TEXT_EDITOR'
@@ -558,8 +528,8 @@ def run_script_in_text_editor(context, textblock, auto_import_bpy):
     # change context to previous type
     context.area.ui_type = prev_type
     # remove 'import bpy' line if it was prepended
-    if prepended:
-        textblock.from_string(text_str)
+    if auto_import_bpy:
+        remove_text_prepend_import_bpy(textblock)
     # return True because script did not cause error
     return True
 
