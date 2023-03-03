@@ -17,33 +17,15 @@
 # ##### END GPL LICENSE BLOCK #####
 
 import bpy
-from bpy.types import (Operator, Panel, PropertyGroup, UIList)
+from bpy.types import (Operator, PropertyGroup, UIList)
 from bpy.props import (BoolProperty, IntProperty, StringProperty)
-from bpy.utils import (register_class, unregister_class)
 
 from .inspect_options import PYREC_OT_InspectOptions
-from .inspect_func import (get_dir, get_inspect_context_collection, get_inspect_context_panel)
-from .lex_py_attributes import lex_py_attributes
+from .inspect_func import (get_dir, get_inspect_context_collection, get_inspect_context_panel,
+    remove_last_py_attribute)
+from .inspect_exec import (get_inspect_exec_result, register_inspect_panel_exec, unregister_inspect_panel_exec)
 
-inspect_panel_classes = {}
-PANEL_REGISTER_EXEC_STR = "class PYREC_OBJECT_PT_Inspect%i(Panel):\n" \
-      "    bl_space_type = '%s'\n" \
-      "    bl_region_type = 'UI'\n" \
-      "    bl_category = \"Tool\"\n" \
-      "    bl_label = \"%s\"\n" \
-      "    panel_num = %i\n" \
-      "    def draw(self, context):\n" \
-      "        inspect_panel_draw(self, context)\n" \
-      "register_class(PYREC_OBJECT_PT_Inspect%i)\n" \
-      "global inspect_panel_classes\n" \
-      "inspect_panel_classes['PYREC_OBJECT_PT_Inspect%i'] = PYREC_OBJECT_PT_Inspect%i\n"
-PANEL_UNREGISTER_EXEC_STR = "global inspect_panel_classes\n" \
-                            "c = inspect_panel_classes[\"PYREC_OBJECT_PT_Inspect%i\"]\n" \
-                            "del inspect_panel_classes[\"PYREC_OBJECT_PT_Inspect%i\"]\n" \
-                            "unregister_class(c)\n"
-inspect_exec_result = {}
-
-def display_panel_dir_attribute_value(layout, panel_props, panel_options):
+def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
     # display value selector, if enabled and value is available
     result_value = None
     result_error = None
@@ -75,7 +57,7 @@ def display_panel_dir_attribute_value(layout, panel_props, panel_options):
                 pass
     layout.label(text="Value: " + panel_props.dir_item_value_str)
 
-def inspect_panel_draw(self, context):
+def draw_inspect_panel(self, context):
     context_name = context.space_data.type
     ic_panel = get_inspect_context_panel(self.panel_num, context_name,
                                          context.scene.py_rec.inspect_context_collections)
@@ -148,7 +130,7 @@ def inspect_panel_draw(self, context):
     if panel_props.dir_inspect_exec_str != "":
         box.label(text="Exec: " + panel_props.dir_item_exec_str)
         box.label(text="Type: " + panel_props.dir_item_value_typename_str)
-        display_panel_dir_attribute_value(box, panel_props, panel_options)
+        draw_panel_dir_attribute_value(box, panel_props, panel_options)
         # display documentation / description
         if panel_options.display_attr_doc:
             box.label(text="__doc__:")
@@ -160,32 +142,6 @@ def inspect_panel_draw(self, context):
             split = box.split(factor=0.95)
             split.template_list("PYREC_UL_StringList", "", panel_props, "dir_item_bl_description_lines", panel_props,
                               "dir_item_bl_description_lines_index", rows=2)
-
-def register_inspect_panel_exec(context, index, panel_label):
-    exec_str = PANEL_REGISTER_EXEC_STR % (index, context.space_data.type, panel_label, index, index, index,
-                                          index)
-    exec(exec_str)
-
-def unregister_inspect_panel_exec(index):
-    if inspect_panel_classes.get("PYREC_OBJECT_PT_Inspect%i" % index) is None:
-        return
-    # remove from list of classes before unregistering class, to prevent reference errors
-    exec_str = PANEL_UNREGISTER_EXEC_STR % (index, index)
-    exec(exec_str)
-
-# returns 2-tuple of (output value, error string)
-# error string is None if no error occurred during exec
-def get_inspect_exec_result(inspect_exec_str):
-    if inspect_exec_str == "":
-        return None, "empty inspect exec string"
-    ie_str = "global inspect_exec_result\ninspect_exec_result['result'] = %s" % inspect_exec_str
-    try:
-        exec(ie_str)
-    except:
-        return None, "exception raised during exec"
-    r = inspect_exec_result["result"]
-    del inspect_exec_result["result"]
-    return r, None
 
 def get_dir_attribute_exec_str(base, attr_name):
     # if exec str is '.', which means 'self' is selected, then do not append attribute name
@@ -237,6 +193,8 @@ def update_dir_attributes(self, value):
 def add_inspect_context_panel_prop_grp(context_name, inspect_context_collections):
     # add PropertyGroup for inspect context panel
     ic_coll = get_inspect_context_collection(context_name, inspect_context_collections)
+    # if context does not have a collection yet, then create collection and name it with context_name
+    # (Py Inspect panels are grouped by context type/name, because panel classes are registered to context type)
     if ic_coll is None:
         ic_coll = inspect_context_collections.add()
         ic_coll.name = context_name
@@ -258,7 +216,7 @@ def create_context_inspect_panel(context, add_inspect_panel_name, add_inspect_pa
         if count > 0:
             panel_label = panel_label + "." + str(count).zfill(3)
     # create class for Panel, and register class to add Panel to UI
-    register_inspect_panel_exec(context, count, panel_label)
+    return register_inspect_panel_exec(context, count, panel_label)
 
 class PYREC_OT_AddInspectPanel(Operator):
     bl_idname = "py_rec.add_inspect_panel"
@@ -274,11 +232,11 @@ class PYREC_OT_AddInspectPanel(Operator):
         "name. Number is incremented after new panel is created", default=True)
 
     def execute(self, context):
-        create_context_inspect_panel(context, self.add_inspect_panel_name, self.add_inspect_panel_auto_number)
+        if not create_context_inspect_panel(context, self.add_inspect_panel_name, self.add_inspect_panel_auto_number):
+            self.report({'ERROR'}, "Add Inspect Panel: Unable to add panel to context type '" +
+                        context.space_data.type + "'")
+            return {'CANCELLED'}
         return {'FINISHED'}
-
-def remove_context_inspect_panel(panel_num):
-    unregister_inspect_panel_exec(panel_num)
 
 class PYREC_OT_RemoveInspectPanel(Operator):
     bl_idname = "py_rec.remove_inspect_panel"
@@ -291,7 +249,7 @@ class PYREC_OT_RemoveInspectPanel(Operator):
     def execute(self, context):
         if self.panel_num == -1:
             return {'CANCELLED'}
-        remove_context_inspect_panel(self.panel_num)
+        unregister_inspect_panel_exec(context, self.panel_num)
         return {'FINISHED'}
 
     def draw(self, context):
@@ -312,12 +270,13 @@ def inspect_datablock_refresh(context, panel_num):
         return
     if panel_props.inspect_datablock == "":
         return
-    panel_props.inspect_exec_str = "bpy.data.%s[\"%s\"]" % (panel_props.inspect_data_type, panel_props.inspect_datablock)
+    panel_props.inspect_exec_str = "bpy.data.%s[\"%s\"]" % (panel_props.inspect_data_type,
+                                                            panel_props.inspect_datablock)
     inspect_exec_refresh(context, panel_num)
 
 class PYREC_OT_InspectDatablockRefresh(Operator):
     bl_idname = "py_rec.inspect_datablock_refresh"
-    bl_label = "Datablock Refresh"
+    bl_label = "Inspect Datablock"
     bl_description = "Refresh inspect attributes from 'Inspect Datablock'"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -458,7 +417,7 @@ def inspect_exec_refresh(context, panel_num):
 
 class PYREC_OT_InspectExecRefresh(Operator):
     bl_idname = "py_rec.inspect_exec_refresh"
-    bl_label = "Exec Refresh"
+    bl_label = "Inspect Exec"
     bl_description = "Refresh inspect attributes from 'Inspect Exec' string"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -506,15 +465,6 @@ class PYREC_OT_InspectPanelAttrZoomIn(Operator):
         inspect_attr_zoom_in(context, self.panel_num)
         return {'FINISHED'}
 
-# returns 2-tuple of (exec_str less last attribute, last attribute)
-def remove_last_py_attribute(exec_str):
-    output, e = lex_py_attributes(exec_str)
-    # cannot remove last attribute if error, or no output, or too few output attributes
-    if e != None or output is None or len(output) < 2:
-        return None, None
-    # use end_position of last output item to return exec_str up to, and including, end of second last attribute
-    return exec_str[ : output[-2][1]+1 ], exec_str[ output[-1][0] : output[-1][1]+1 ]
-
 def inspect_zoom_out(context, panel_num):
     ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
                                          context.scene.py_rec.inspect_context_collections)
@@ -534,8 +484,7 @@ def inspect_zoom_out(context, panel_num):
 class PYREC_OT_InspectPanelAttrZoomOut(Operator):
     bl_idname = "py_rec.inspect_attr_zoom_out"
     bl_label = "Zoom Out"
-    bl_description = "Zoom out of current Inspect object to inspect parent object, and refresh 'Value" \
-        "Attributes' list"
+    bl_description = "Zoom out of current Inspect object to inspect parent object, and refresh 'Attributes' list"
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
@@ -615,7 +564,6 @@ class PYREC_OT_InspectPanelIndexIntZoomIn(Operator):
             return {'CANCELLED'}
         inspect_index_int_zoom_in(context, self.panel_num)
         return {'FINISHED'}
-
 
 def inspect_index_str_zoom_in(context, panel_num):
     ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,

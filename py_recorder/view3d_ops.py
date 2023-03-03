@@ -21,7 +21,6 @@ from datetime import datetime as dt
 
 import bpy
 from bpy.types import Operator
-from bpy.props import (EnumProperty, PointerProperty)
 
 from .object_custom_prop import CPROP_NAME_INIT_PY
 from .string_exec import exec_str
@@ -387,7 +386,7 @@ class PYREC_OT_VIEW3D_StartRecordInfoLine(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.info_report
+        pr_ir = context.scene.py_rec.record_info_options
         pr_ir.record_info_line = True
         pr_ir.record_info_start_line_offset = get_current_info_line_count(context)
         self.report({'INFO'}, "Start Record: begin at Info line number %i" % pr_ir.record_info_start_line_offset)
@@ -402,7 +401,7 @@ class PYREC_OT_VIEW3D_StopRecordInfoLine(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.info_report
+        pr_ir = context.scene.py_rec.record_info_options
         line_start = pr_ir.record_info_start_line_offset
         line_end, filter_line_count, output_thing = copy_filtered_info_lines(context,
                                                                              get_copy_info_options(pr_ir, line_start))
@@ -439,7 +438,7 @@ class PYREC_OT_VIEW3D_CopyInfoToObjectText(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.info_report
+        pr_ir = context.scene.py_rec.record_info_options
         line_end, filter_line_count, output_thing = copy_filtered_info_lines(context,
                                                                              get_copy_info_options(pr_ir, None))
         if output_thing is None:
@@ -571,14 +570,14 @@ def run_object_init(context, ob, use_temp_text, auto_import_bpy):
 
 class PYREC_OT_VIEW3D_RunObjectScript(Operator):
     bl_idname = "py_rec.view3d_run_object_script"
-    bl_label = "Run Object Script"
+    bl_label = "Exec Object"
     bl_description = "Run selected Objects' Custom Property '"+CPROP_NAME_INIT_PY+"' as script. If property is " \
         "Text Object type: Text Object body is copied to temporary Text, and Text is run as script. If property is " \
         "Text type: Text is run as script using '.run_script()'"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.info_report
+        pr_ir = context.scene.py_rec.record_info_options
         for ob in context.selected_objects:
             # if run results in error, then halt and print name of Object that has script with error
             if not run_object_init(context, ob, pr_ir.use_temp_text, pr_ir.run_auto_import_bpy):

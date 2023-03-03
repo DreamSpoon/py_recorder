@@ -16,6 +16,8 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+from .lex_py_attributes import lex_py_attributes
+
 # returns dir(val) without duplicates (e.g. '__doc__' duplicates)
 def get_dir(val):
     temp_dict = {}
@@ -34,3 +36,12 @@ def get_inspect_context_panel(panel_num, context_name, inspect_context_collectio
     if coll != None:
         return coll.inspect_context_panels.get(str(panel_num))
     return None
+
+# returns 2-tuple of (exec_str less last attribute, last attribute)
+def remove_last_py_attribute(exec_str):
+    output, e = lex_py_attributes(exec_str)
+    # cannot remove last attribute if error, or no output, or too few output attributes
+    if e != None or output is None or len(output) < 2:
+        return None, None
+    # use end_position of last output item to return exec_str up to, and including, end of second last attribute
+    return exec_str[ : output[-2][1]+1 ], exec_str[ output[-1][0] : output[-1][1]+1 ]
