@@ -386,7 +386,7 @@ class PYREC_OT_VIEW3D_StartRecordInfoLine(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         pr_ir.record_info_line = True
         pr_ir.record_info_start_line_offset = get_current_info_line_count(context)
         self.report({'INFO'}, "Start Record: begin at Info line number %i" % pr_ir.record_info_start_line_offset)
@@ -401,7 +401,7 @@ class PYREC_OT_VIEW3D_StopRecordInfoLine(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         line_start = pr_ir.record_info_start_line_offset
         line_end, filter_line_count, output_thing = copy_filtered_info_lines(context,
                                                                              get_copy_info_options(pr_ir, line_start))
@@ -438,7 +438,7 @@ class PYREC_OT_VIEW3D_CopyInfoToObjectText(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         line_end, filter_line_count, output_thing = copy_filtered_info_lines(context,
                                                                              get_copy_info_options(pr_ir, None))
         if output_thing is None:
@@ -577,10 +577,12 @@ class PYREC_OT_VIEW3D_RunObjectScript(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         for ob in context.selected_objects:
+            # get Object name before running init, to prevent errors in case Object is removed by running init
+            o_name = ob.name
             # if run results in error, then halt and print name of Object that has script with error
             if not run_object_init(context, ob, pr_ir.use_temp_text, pr_ir.run_auto_import_bpy):
-                self.report({'ERROR'}, "Error, see System Console for details of run of Object named: " + ob.name)
+                self.report({'ERROR'}, "Error, see System Console for details of run of Object named: " + o_name)
                 return {'CANCELLED'}
         return {'FINISHED'}

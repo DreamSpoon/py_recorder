@@ -23,7 +23,7 @@ from bpy.props import IntProperty
 from .inspect_func import get_inspect_context_panel
 
 class PYREC_OT_InspectOptions(Operator):
-    bl_description = "Open Inspect panel Options window"
+    bl_description = "Open Py Inspect panel Options window"
     bl_idname = "py_rec.inspect_options"
     bl_label = "Options"
     bl_options = {'REGISTER', 'UNDO'}
@@ -41,7 +41,7 @@ class PYREC_OT_InspectOptions(Operator):
         context_name = context.space_data.type
         p_r = context.scene.py_rec
         ic_panel = get_inspect_context_panel(self.panel_num, context_name, p_r.inspect_context_collections)
-        panel_options = ic_panel.panel_props.panel_options
+        panel_options = ic_panel.panel_options
         layout = self.layout
 
         box = layout.box()
@@ -63,7 +63,6 @@ class PYREC_OT_InspectOptions(Operator):
         box.label(text="Attribute Description")
         row = box.row()
         row.prop(panel_options, "display_attr_doc")
-        row.prop(panel_options, "display_attr_bl_description")
 
         box = layout.box()
         box.label(text="Attribute Type")

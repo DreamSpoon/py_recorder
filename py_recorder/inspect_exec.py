@@ -16,8 +16,11 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+import traceback
 import bpy
 from bpy.utils import (register_class, unregister_class)
+
+from .log_text import log_text_append
 
 inspect_panel_classes = {}
 PANEL_REGISTER_EXEC_STR = "class PYREC_PT_%s_Inspect%i(bpy.types.Panel):\n" \
@@ -46,8 +49,7 @@ def register_inspect_exec_panel_draw_func(draw_func):
     inspect_exec_panel_draw_func.clear()
     inspect_exec_panel_draw_func.append(draw_func)
 
-def register_inspect_panel_exec(context, index, panel_label):
-    context_name = context.space_data.type
+def register_inspect_panel_exec(context_name, index, panel_label):
     exec_str = PANEL_REGISTER_EXEC_STR % (context_name, index, context_name, panel_label, index, context_name, index,
                                           context_name, index, context_name, index)
     try:
@@ -56,11 +58,9 @@ def register_inspect_panel_exec(context, index, panel_label):
         return False
     return True
 
-def unregister_inspect_panel_exec(context, index):
-    context_name = context.space_data.type
+def unregister_inspect_panel_exec(context_name, index):
     if inspect_panel_classes.get("PYREC_PT_%s_Inspect%i" % (context_name, index)) is None:
         return
-    # remove from list of classes before unregistering class, to prevent reference errors
     exec_str = PANEL_UNREGISTER_EXEC_STR % (context_name, index, context_name, index)
     try:
         exec(exec_str)
@@ -75,14 +75,21 @@ def unregister_all_inspect_panel_classes():
 
 # returns 2-tuple of (output value, error string)
 # error string is None if no error occurred during exec
-def get_inspect_exec_result(inspect_exec_str):
+def get_inspect_exec_result(inspect_exec_str, enable_log):
     if inspect_exec_str == "":
-        return None, "empty inspect exec string"
+        return None, "Empty Inspect Exec string"
     ie_str = "global inspect_exec_result\ninspect_exec_result['result'] = %s" % inspect_exec_str
     try:
         exec(ie_str)
     except:
-        return None, "exception raised during exec"
+        if enable_log:
+            # append newline to ie_str, only if ie_str does not already end with newline character
+            end_newline = ""
+            if ie_str[-1] != "\n":
+                end_newline = "\n"
+            log_text_append("Exception raised during Inspect Exec of string:\n%s%s\n%s" %
+                            (ie_str, end_newline, traceback.format_exc()))
+        return None, "Exception raised during Inspect Exec of string"
     r = inspect_exec_result["result"]
     del inspect_exec_result["result"]
     return r, None

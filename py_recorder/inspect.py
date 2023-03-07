@@ -16,14 +16,20 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+import mathutils
+import traceback
+
 import bpy
 from bpy.types import (Operator, PropertyGroup, UIList)
 from bpy.props import (BoolProperty, IntProperty, StringProperty)
 
 from .inspect_options import PYREC_OT_InspectOptions
-from .inspect_func import (get_dir, get_inspect_context_collection, get_inspect_context_panel,
-    remove_last_py_attribute)
+from .inspect_func import (get_dir, get_inspect_context_panel, remove_last_py_attribute)
 from .inspect_exec import (get_inspect_exec_result, register_inspect_panel_exec, unregister_inspect_panel_exec)
+from .bpy_value_string import bpy_value_to_string
+from .log_text import (LOG_TEXT_NAME, log_text_append)
+
+RECORD_ATTRIBUTE_TEXT_NAME = "pyrec_attribute.py"
 
 def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
     # display value selector, if enabled and value is available
@@ -35,14 +41,14 @@ def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
         if attr_name == ".":
             first_part, last_part = remove_last_py_attribute(panel_props.dir_inspect_exec_str)
             if first_part != None and last_part != None:
-                result_value, result_error = get_inspect_exec_result(first_part)
+                result_value, result_error = get_inspect_exec_result(first_part, False)
                 # if last part is indexed then force value to be displayed as label
                 if (last_part[0]+last_part[-1]) == "[]":
                     result_value = None
                 else:
                     attr_name = last_part
         else:
-            result_value, result_error = get_inspect_exec_result(panel_props.dir_inspect_exec_str)
+            result_value, result_error = get_inspect_exec_result(panel_props.dir_inspect_exec_str, False)
     # try to use a real-time entry field (selector), and display label string if real-time entry field fails
     if result_error is None and result_value != None and attr_name != "bl_rna" and not attr_name.startswith("__") and \
         hasattr(result_value, attr_name):
@@ -58,14 +64,12 @@ def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
     layout.label(text="Value: " + panel_props.dir_item_value_str)
 
 def draw_inspect_panel(self, context):
-    context_name = context.space_data.type
-    ic_panel = get_inspect_context_panel(self.panel_num, context_name,
+    ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
                                          context.scene.py_rec.inspect_context_collections)
     if ic_panel is None:
         return
-    panel_props = ic_panel.panel_props
-    panel_options = panel_props.panel_options
-    if panel_props is None or panel_options is None:
+    panel_options = ic_panel.panel_options
+    if panel_options is None:
         return
 
     layout = self.layout
@@ -75,37 +79,38 @@ def draw_inspect_panel(self, context):
     row.operator(PYREC_OT_RemoveInspectPanel.bl_idname, icon='REMOVE', text="").panel_num = self.panel_num
     row.separator()
     row.operator(PYREC_OT_InspectOptions.bl_idname, icon='OPTIONS', text="").panel_num = self.panel_num
+
     if panel_options.display_datablock_refresh:
         box = layout.box()
         row = box.row(align=True)
-        row.prop(panel_props, "inspect_data_type", text="")
-        row.prop_search(panel_props, "inspect_datablock", bpy.data, panel_props.inspect_data_type, text="")
+        row.prop(ic_panel, "inspect_data_type", text="")
+        row.prop_search(ic_panel, "inspect_datablock", bpy.data, ic_panel.inspect_data_type, text="")
         layout.operator(PYREC_OT_InspectDatablockRefresh.bl_idname).panel_num = self.panel_num
     if panel_options.display_exec_refresh:
         box = layout.box()
-        box.prop(panel_props, "inspect_exec_str", text="")
+        box.prop(ic_panel, "inspect_exec_str", text="")
         box.operator(PYREC_OT_InspectExecRefresh.bl_idname).panel_num = self.panel_num
     if panel_options.display_value_attributes:
         box = layout.box()
 
-        index_type = panel_props.index_type
+        index_type = ic_panel.index_type
         if index_type == "int" or index_type == "str" or index_type == "int_str":
             sub_box = box.box()
             sub_box.label(text="Index")
-            sub_box.label(text="Item Count: "+str(max(len(panel_props.index_str_coll), panel_props.index_max_int+1)))
+            sub_box.label(text="Item Count: "+str(max(len(ic_panel.index_str_coll), ic_panel.index_max_int+1)))
         if index_type == "int" or index_type == "int_str":
             row = sub_box.row()
-            row.prop(panel_props, "index_int", text="")
+            row.prop(ic_panel, "index_int", text="")
             row.operator(PYREC_OT_InspectPanelIndexIntZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
                 self.panel_num
         if index_type == "str" or index_type == "int_str":
             row = sub_box.row()
-            row.prop(panel_props, "index_str_enum", text="")
+            row.prop(ic_panel, "index_str_enum", text="")
             row.operator(PYREC_OT_InspectPanelIndexStrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
                 self.panel_num
 
         sub_box = box.box()
-        sub_box.label(text="Attributes")
+        sub_box.label(text="Inspect Attributes")
         row = sub_box.row()
         split_denominator = 1
         if panel_options.display_dir_attribute_type:
@@ -120,28 +125,28 @@ def draw_inspect_panel(self, context):
             split.label(text="Value")
 
         row = sub_box.row()
-        row.template_list("PYREC_UL_DirAttributeList", "", panel_props, "dir_attributes", panel_props,
+        row.template_list("PYREC_UL_DirAttributeList", "", ic_panel, "dir_attributes", ic_panel,
                           "dir_attributes_index", rows=5)
-        col = row.column(align=True)
-        col.operator(PYREC_OT_InspectPanelAttrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = self.panel_num
-        col.operator(PYREC_OT_InspectPanelAttrZoomOut.bl_idname, icon='ZOOM_OUT', text="").panel_num = self.panel_num
+        col = row.column()
+        sub_col = col.column(align=True)
+        sub_col.operator(PYREC_OT_InspectPanelAttrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = self.panel_num
+        sub_col.operator(PYREC_OT_InspectPanelAttrZoomOut.bl_idname, icon='ZOOM_OUT', text="").panel_num = \
+            self.panel_num
+        col.operator(PYREC_OT_InspectRecordAttribute.bl_idname, icon='DOCUMENTS', text="").panel_num = self.panel_num
+        col.operator(PYREC_OT_InspectCopyAttribute.bl_idname, icon='COPY_ID', text="").panel_num = self.panel_num
+        col.operator(PYREC_OT_InspectPasteAttribute.bl_idname, icon='PASTEDOWN', text="").panel_num = self.panel_num
 
     box = layout.box()
-    if panel_props.dir_inspect_exec_str != "":
-        box.label(text="Exec: " + panel_props.dir_item_exec_str)
-        box.label(text="Type: " + panel_props.dir_item_value_typename_str)
-        draw_panel_dir_attribute_value(box, panel_props, panel_options)
+    if ic_panel.dir_inspect_exec_str != "":
+        box.label(text="Exec: " + ic_panel.dir_item_exec_str)
+        box.label(text="Type: " + ic_panel.dir_item_value_typename_str)
+        draw_panel_dir_attribute_value(box, ic_panel, panel_options)
         # display documentation / description
         if panel_options.display_attr_doc:
             box.label(text="__doc__:")
             split = box.split(factor=0.95)
-            split.template_list("PYREC_UL_StringList", "", panel_props, "dir_item_doc_lines", panel_props,
+            split.template_list("PYREC_UL_StringList", "", ic_panel, "dir_item_doc_lines", ic_panel,
                               "dir_item_doc_lines_index", rows=2)
-        if panel_options.display_attr_bl_description:
-            box.label(text="bl_description:")
-            split = box.split(factor=0.95)
-            split.template_list("PYREC_UL_StringList", "", panel_props, "dir_item_bl_description_lines", panel_props,
-                              "dir_item_bl_description_lines_index", rows=2)
 
 def get_dir_attribute_exec_str(base, attr_name):
     # if exec str is '.', which means 'self' is selected, then do not append attribute name
@@ -155,6 +160,11 @@ def string_to_lines_collection(input_str, lines_coll):
         new_item = lines_coll.add()
         new_item.name = str_line
 
+def has_relevant_doc(value):
+    return value != None and hasattr(value, "__doc__") and value.__doc__ != None and \
+        not isinstance(value, (bool, dict, float, int, list, set, str, tuple, mathutils.Color, mathutils.Euler, \
+                       mathutils.Matrix, mathutils.Quaternion, mathutils.Vector) )
+
 def update_dir_attributes(self, value):
     # self, e.g.  PYREC_PG_InspectPanelProps
     # value, e.g. bpy.types.Context
@@ -163,7 +173,6 @@ def update_dir_attributes(self, value):
     panel_props.dir_item_value_str = ""
     panel_props.dir_item_value_typename_str = ""
     panel_props.dir_item_doc_lines.clear()
-    panel_props.dir_item_bl_description_lines.clear()
     # quit if dir() listing is empty
     if len(panel_props.dir_attributes) < 1:
         return
@@ -171,7 +180,7 @@ def update_dir_attributes(self, value):
     panel_props.dir_item_exec_str = get_dir_attribute_exec_str(panel_props.dir_inspect_exec_str,
         panel_props.dir_attributes[panel_props.dir_attributes_index].name)
     # exec the string to get the attribute's value
-    result_value, result_error = get_inspect_exec_result(panel_props.dir_item_exec_str)
+    result_value, result_error = get_inspect_exec_result(panel_props.dir_item_exec_str, False)
     if result_error is None:
         panel_props.dir_item_value_str = str(result_value)
     # remaining attribute info is blank if attribute value is None
@@ -180,43 +189,37 @@ def update_dir_attributes(self, value):
     # set 'type name' label
     panel_props.dir_item_value_typename_str = type(result_value).__name__
     # set '__doc__' label, if available as string type
-    if hasattr(result_value, "__doc__"):
+    if has_relevant_doc(result_value):
         doc_value = getattr(result_value, "__doc__")
         if isinstance(doc_value, str):
             string_to_lines_collection(doc_value, panel_props.dir_item_doc_lines)
-    # set 'bl_description' label, if available as string type
-    if hasattr(result_value, "bl_description"):
-        bl_desc = getattr(result_value, "bl_description")
-        if isinstance(bl_desc, str):
-            string_to_lines_collection(bl_desc, panel_props.dir_item_bl_description_lines)
 
-def add_inspect_context_panel_prop_grp(context_name, inspect_context_collections):
-    # add PropertyGroup for inspect context panel
-    ic_coll = get_inspect_context_collection(context_name, inspect_context_collections)
-    # if context does not have a collection yet, then create collection and name it with context_name
+def create_context_inspect_panel(context_name, inspect_context_collections, panel_label, auto_number):
+    ic_coll = inspect_context_collections.get(context_name)
+    if ic_coll is None:
+        count = 0
+    else:
+        count = ic_coll.inspect_context_panel_next_num
+    # exec string to add panel class, and register the new class
+    if panel_label == "":
+        panel_label = "Py Inspect"
+    if auto_number:
+        if count > 0:
+            panel_label = panel_label + "." + str(count).zfill(3)
+    # create and register class for panel, to add panel to UI
+    if not register_inspect_panel_exec(context_name, count, panel_label):
+        return False
+    # if context does not have a panel collection yet, then create new panel collection and name it with context_name
     # (Py Inspect panels are grouped by context type/name, because panel classes are registered to context type)
     if ic_coll is None:
         ic_coll = inspect_context_collections.add()
         ic_coll.name = context_name
-    # create new panel
+    # create new panel in collection
     i_panel = ic_coll.inspect_context_panels.add()
     i_panel.name = str(ic_coll.inspect_context_panel_next_num)
+    i_panel.panel_label = panel_label
     ic_coll.inspect_context_panel_next_num = ic_coll.inspect_context_panel_next_num + 1
-    return ic_coll.inspect_context_panel_next_num - 1
-
-def create_context_inspect_panel(context, add_inspect_panel_name, add_inspect_panel_auto_number):
-    p_r = context.scene.py_rec
-    context_name = context.space_data.type
-    count = add_inspect_context_panel_prop_grp(context_name, p_r.inspect_context_collections)
-    # exec string to add panel class, and register the new class
-    panel_label = add_inspect_panel_name
-    if panel_label == "":
-        panel_label = "Py Inspect"
-    if add_inspect_panel_auto_number:
-        if count > 0:
-            panel_label = panel_label + "." + str(count).zfill(3)
-    # create class for Panel, and register class to add Panel to UI
-    return register_inspect_panel_exec(context, count, panel_label)
+    return True
 
 class PYREC_OT_AddInspectPanel(Operator):
     bl_idname = "py_rec.add_inspect_panel"
@@ -226,13 +229,13 @@ class PYREC_OT_AddInspectPanel(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
-    add_inspect_panel_name: StringProperty(name="Name", description="Next Inspect panel created is given this name",
-        default="Py Inspect")
-    add_inspect_panel_auto_number: BoolProperty(name="Auto-number", description="Append number to Inspect panel " +
-        "name. Number is incremented after new panel is created", default=True)
+    panel_name_default: StringProperty(name="Name", description="New Py Inspect panel name", default="Py Inspect")
+    panel_name_auto_number: BoolProperty(name="Auto-number", description="Append number to Inspect panel name. " +
+        "Number is incremented after new panel is created", default=True)
 
     def execute(self, context):
-        if not create_context_inspect_panel(context, self.add_inspect_panel_name, self.add_inspect_panel_auto_number):
+        if not create_context_inspect_panel(context.space_data.type, context.scene.py_rec.inspect_context_collections,
+                                            self.panel_name_default, self.panel_name_auto_number):
             self.report({'ERROR'}, "Add Inspect Panel: Unable to add panel to context type '" +
                         context.space_data.type + "'")
             return {'CANCELLED'}
@@ -248,8 +251,13 @@ class PYREC_OT_RemoveInspectPanel(Operator):
 
     def execute(self, context):
         if self.panel_num == -1:
+            self.report({'ERROR'}, "Unable to Remove Inspect Panel because panel_num is less than zero")
             return {'CANCELLED'}
-        unregister_inspect_panel_exec(context, self.panel_num)
+        context_name = context.space_data.type
+        unregister_inspect_panel_exec(context_name, self.panel_num)
+        panels = context.scene.py_rec.inspect_context_collections[context_name].inspect_context_panels
+        # remove panel by finding its index first, then passing index to '.remove()' function
+        panels.remove(panels.find(str(self.panel_num)))
         return {'FINISHED'}
 
     def draw(self, context):
@@ -265,59 +273,59 @@ def inspect_datablock_refresh(context, panel_num):
                                          context.scene.py_rec.inspect_context_collections)
     if ic_panel is None:
         return
-    panel_props = ic_panel.panel_props
-    if panel_props is None:
+    if ic_panel.inspect_datablock == "":
         return
-    if panel_props.inspect_datablock == "":
-        return
-    panel_props.inspect_exec_str = "bpy.data.%s[\"%s\"]" % (panel_props.inspect_data_type,
-                                                            panel_props.inspect_datablock)
-    inspect_exec_refresh(context, panel_num)
+    ic_panel.inspect_exec_str = "bpy.data.%s[\"%s\"]" % (ic_panel.inspect_data_type,
+                                                            ic_panel.inspect_datablock)
+    return inspect_exec_refresh(context, panel_num)
 
 class PYREC_OT_InspectDatablockRefresh(Operator):
     bl_idname = "py_rec.inspect_datablock_refresh"
     bl_label = "Inspect Datablock"
-    bl_description = "Refresh inspect attributes from 'Inspect Datablock'"
+    bl_description = "Refresh Inspect Attributes from Inspect Datablock"
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
     def execute(self, context):
         if self.panel_num == -1:
+            self.report({'ERROR'}, "Unable to refresh Inspect Datablock because panel_num is less than zero")
             return {'CANCELLED'}
-        inspect_datablock_refresh(context, self.panel_num)
-        return {'FINISHED'}
+        ret_val, report_val = inspect_datablock_refresh(context, self.panel_num)
+        if ret_val == 'FINISHED':
+            return {'FINISHED'}
+        self.report({'ERROR'}, report_val)
+        return { ret_val }
 
 def inspect_exec_refresh(context, panel_num):
     ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
                                          context.scene.py_rec.inspect_context_collections)
     if ic_panel is None:
-        return
-    panel_props = ic_panel.panel_props
-    panel_options = panel_props.panel_options
-    if panel_props is None or panel_options is None:
-        return
+        return 'CANCELLED', "Unable to refresh Inspect Value, because cannot get Inspect Panel"
+    panel_options = ic_panel.panel_options
+    if panel_options is None:
+        return 'CANCELLED', "Unable to refresh Inspect Value, because cannot get Inspect Panel Options"
     # clear index, and dir() attribute listing
-    panel_props.index_type = "none"
-    panel_props.index_int = 0
-    panel_props.index_max_int = 0
-    panel_props.index_str_coll.clear()
-    panel_props.dir_inspect_exec_str = ""
-    panel_props.dir_attributes.clear()
+    ic_panel.index_type = "none"
+    ic_panel.index_int = 0
+    ic_panel.index_max_int = 0
+    ic_panel.index_str_coll.clear()
+    ic_panel.dir_inspect_exec_str = ""
+    ic_panel.dir_attributes.clear()
     # clear label strings
-    panel_props.dir_item_exec_str = ""
-    panel_props.dir_item_value_str = ""
-    panel_props.dir_item_value_typename_str = ""
-    panel_props.dir_item_doc_lines.clear()
-    panel_props.dir_item_bl_description_lines.clear()
+    ic_panel.dir_item_exec_str = ""
+    ic_panel.dir_item_value_str = ""
+    ic_panel.dir_item_value_typename_str = ""
+    ic_panel.dir_item_doc_lines.clear()
 
     # if Inspect Exec string is empty then quit
-    if panel_props.inspect_exec_str == "":
-        return
+    if ic_panel.inspect_exec_str == "":
+        return 'CANCELLED', "Unable to refresh Inspect Value, because Inspect Exec string is empty"
     # get 'Inspect Exec' result value, and update label strings based on result
-    inspect_value, inspect_error = get_inspect_exec_result(panel_props.inspect_exec_str)
+    inspect_value, inspect_error = get_inspect_exec_result(ic_panel.inspect_exec_str, True)
     if inspect_error != None:
-        return
+        return 'CANCELLED', "Unable to refresh Inspect Value, because exception raised during exec, see " \
+            "details in log Text named '%s'" % LOG_TEXT_NAME
 
     # update index props
     if inspect_value != None and hasattr(inspect_value, "__len__") and len(inspect_value) > 0:
@@ -329,7 +337,7 @@ def inspect_exec_refresh(context, panel_num):
             for key_name in inspect_value.keys():
                 if not isinstance(key_name, str):
                     continue
-                index_str_item = panel_props.index_str_coll.add()
+                index_str_item = ic_panel.index_str_coll.add()
                 index_str_item.name = key_name
         # check for integer type index
         has_index_int = False
@@ -337,17 +345,17 @@ def inspect_exec_refresh(context, panel_num):
             x = inspect_value[0]    # this line will raise exception if inspect_value cannot be indexed with integer
             # the following lines in the 'try' block will be run only if inspect_value can be indexed with integer
             has_index_int = True
-            panel_props.index_max_int = len(inspect_value)-1
-            panel_props.index_int = 0
+            ic_panel.index_max_int = len(inspect_value)-1
+            ic_panel.index_int = 0
         except:
             pass
         # set prop to indicate available index types
         if has_index_int and has_index_str:
-            panel_props.index_type = "int_str"
+            ic_panel.index_type = "int_str"
         elif has_index_int:
-            panel_props.index_type = "int"
+            ic_panel.index_type = "int"
         elif has_index_str:
-            panel_props.index_type = "str"
+            ic_panel.index_type = "str"
 
     # dir listing can only be performed if 'inspect_value' is not None, because None does not have attributes
     if inspect_value is None:
@@ -356,12 +364,12 @@ def inspect_exec_refresh(context, panel_num):
         # get current dir() array, and quit if array is empty
         dir_array = get_dir(inspect_value)
     # update dir() listing
-    panel_props.dir_inspect_exec_str = panel_props.inspect_exec_str
-    panel_props.dir_attributes_index = 0
+    ic_panel.dir_inspect_exec_str = ic_panel.inspect_exec_str
+    ic_panel.dir_attributes_index = 0
 
     # prepend two items in dir_attributes, to include self value and indexed value, so these values are in same format
     # as dir() attributes, because self is attribute of its parent object, and indexed values are dynamic attributes
-    dir_item = panel_props.dir_attributes.add()
+    dir_item = ic_panel.dir_attributes.add()
     dir_item.name = "."
     dir_item.type_name = ". Self value"
     for attr_name in dir_array:
@@ -383,7 +391,7 @@ def inspect_exec_refresh(context, panel_num):
             if not panel_options.display_attr_type_bl and attr_name.startswith("bl_"):
                 continue
         # create item and set item info
-        dir_item = panel_props.dir_attributes.add()
+        dir_item = ic_panel.dir_attributes.add()
         dir_item.name = attr_name
         item_value = getattr(inspect_value, attr_name)
         if item_value is None:
@@ -393,104 +401,93 @@ def inspect_exec_refresh(context, panel_num):
         dir_item.value_str = str(item_value)
 
     # set dir listing attribute info label strings from attribute value information
-    panel_props.dir_item_exec_str = get_dir_attribute_exec_str(panel_props.dir_inspect_exec_str,
-                                                               panel_props.dir_attributes[0].name)
-    inspect_value, inspect_error = get_inspect_exec_result(panel_props.dir_item_exec_str)
+    ic_panel.dir_item_exec_str = get_dir_attribute_exec_str(ic_panel.dir_inspect_exec_str,
+                                                            ic_panel.dir_attributes[0].name)
+    inspect_value, inspect_error = get_inspect_exec_result(ic_panel.dir_item_exec_str, False)
     if inspect_error != None:
-        return
-    panel_props.dir_item_value_str = str(inspect_value)
+        return 'FINISHED', ""
+    ic_panel.dir_item_value_str = str(inspect_value)
     # remaining attribute info is blank if attribute value is None
     if inspect_value is None:
-        return
+        return 'FINISHED', ""
     # set 'type name' label
-    panel_props.dir_item_value_typename_str = type(inspect_value).__name__
+    ic_panel.dir_item_value_typename_str = type(inspect_value).__name__
     # set '__doc__' lines, if available as string type
-    if hasattr(inspect_value, "__doc__"):
+    if has_relevant_doc(inspect_value):
         doc_value = getattr(inspect_value, "__doc__")
         if isinstance(doc_value, str):
-            string_to_lines_collection(doc_value, panel_props.dir_item_doc_lines)
-    # set 'bl_description' lines, if available as string type
-    if hasattr(inspect_value, "bl_description"):
-        bl_desc = getattr(inspect_value, "bl_description")
-        if isinstance(bl_desc, str):
-            string_to_lines_collection(bl_desc, panel_props.dir_item_bl_description_lines)
+            string_to_lines_collection(doc_value, ic_panel.dir_item_doc_lines)
+    return 'FINISHED', ""
 
 class PYREC_OT_InspectExecRefresh(Operator):
     bl_idname = "py_rec.inspect_exec_refresh"
     bl_label = "Inspect Exec"
-    bl_description = "Refresh inspect attributes from 'Inspect Exec' string"
+    bl_description = "Refresh Inspect Attributes from Inspect Exec string"
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
     def execute(self, context):
         if self.panel_num == -1:
+            self.report({'ERROR'}, "Unable to refresh Inspect Exec because panel_num is less than zero")
             return {'CANCELLED'}
-        inspect_exec_refresh(context, self.panel_num)
-        return {'FINISHED'}
+        ret_val, report_val = inspect_exec_refresh(context, self.panel_num)
+        if ret_val == 'FINISHED':
+            return {'FINISHED'}
+        self.report({'ERROR'}, report_val)
+        return { ret_val }
 
-def inspect_attr_zoom_in(context, panel_num):
-    ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
-                                         context.scene.py_rec.inspect_context_collections)
-    if ic_panel is None:
-        return
-    panel_props = ic_panel.panel_props
-    if panel_props is None:
-        return
-
-    if len(panel_props.dir_attributes) < 1:
-        return
-    attr_item = panel_props.dir_attributes[panel_props.dir_attributes_index]
+def inspect_attr_zoom_in(context, ic_panel, panel_num):
+    attr_item = ic_panel.dir_attributes[ic_panel.dir_attributes_index]
     if attr_item is None:
         return
     attr_name = attr_item.name
     if attr_name == "" or attr_name == ".":
         return
     # zoom in to attribute
-    panel_props.inspect_exec_str = panel_props.dir_inspect_exec_str + "." + attr_name
+    ic_panel.inspect_exec_str = ic_panel.dir_inspect_exec_str + "." + attr_name
     # do refresh using modified 'inspect_exec_str'
     inspect_exec_refresh(context, panel_num)
 
 class PYREC_OT_InspectPanelAttrZoomIn(Operator):
     bl_idname = "py_rec.inspect_attr_zoom_in"
     bl_label = "Zoom In"
-    bl_description = "Zoom in to selected attribute to make it current Inspect object, and refresh 'Attributes' list"
+    bl_description = "Zoom in to selected attribute to make it current Inspect object, and refresh Inspect " \
+        "Attributes list"
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
     def execute(self, context):
-        if self.panel_num == -1:
+        ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
+                                             context.scene.py_rec.inspect_context_collections)
+        if ic_panel is None or len(ic_panel.dir_attributes) < 1:
+            self.report({'ERROR'}, "Unable to Zoom In to Attribute because Inspect Panel reference is missing")
             return {'CANCELLED'}
-        inspect_attr_zoom_in(context, self.panel_num)
+        inspect_attr_zoom_in(context, ic_panel, self.panel_num)
         return {'FINISHED'}
 
-def inspect_zoom_out(context, panel_num):
-    ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
-                                         context.scene.py_rec.inspect_context_collections)
-    if ic_panel is None:
-        return
-    panel_props = ic_panel.panel_props
-    if panel_props is None:
-        return
-
+def inspect_zoom_out(context, ic_panel, panel_num):
     # try remove last attribute of inspect object, and if success, then update exec string and refresh attribute list
-    first_part, _ = remove_last_py_attribute(panel_props.dir_inspect_exec_str)
+    first_part, _ = remove_last_py_attribute(ic_panel.dir_inspect_exec_str)
     if first_part is None:
         return
-    panel_props.inspect_exec_str = first_part
+    ic_panel.inspect_exec_str = first_part
     inspect_exec_refresh(context, panel_num)
 
 class PYREC_OT_InspectPanelAttrZoomOut(Operator):
     bl_idname = "py_rec.inspect_attr_zoom_out"
     bl_label = "Zoom Out"
-    bl_description = "Zoom out of current Inspect object to inspect parent object, and refresh 'Attributes' list"
+    bl_description = "Zoom out of current Inspect object to inspect parent object, and refresh Inspect Attributes list"
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
     def execute(self, context):
-        if self.panel_num == -1:
+        ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
+                                             context.scene.py_rec.inspect_context_collections)
+        if ic_panel is None:
+            self.report({'ERROR'}, "Unable to Zoom Out from Attribute because Inspect Panel reference is missing")
             return {'CANCELLED'}
         inspect_zoom_out(context, self.panel_num)
         return {'FINISHED'}
@@ -520,7 +517,7 @@ class PYREC_UL_DirAttributeList(UIList):
             # display value selector, if possible
             if panel_options.display_value_selector and data.dir_inspect_exec_str != "" and item.name != "." and \
                 not item.name.startswith("__") and item.name != "bl_rna":
-                result_value, result_error = get_inspect_exec_result(data.dir_inspect_exec_str)
+                result_value, result_error = get_inspect_exec_result(data.dir_inspect_exec_str, False)
                 if result_error is None and result_value != None and hasattr(result_value, item.name):
                     attr_val = getattr(result_value, item.name)
                     # do not display if attribute value is None or if it is a zero-length list/tuple
@@ -538,15 +535,8 @@ class PYREC_UL_StringList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         layout.label(text=item.name)
 
-def inspect_index_int_zoom_in(context, panel_num):
-    ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
-                                         context.scene.py_rec.inspect_context_collections)
-    if ic_panel is None:
-        return
-    panel_props = ic_panel.panel_props
-    if panel_props is None:
-        return
-    panel_props.inspect_exec_str = "%s[%i]" % (panel_props.dir_inspect_exec_str, panel_props.index_int)
+def inspect_index_int_zoom_in(context, ic_panel, panel_num):
+    ic_panel.inspect_exec_str = "%s[%i]" % (ic_panel.dir_inspect_exec_str, ic_panel.index_int)
     # do refresh using modified 'inspect_exec_str'
     inspect_exec_refresh(context, panel_num)
 
@@ -554,26 +544,22 @@ class PYREC_OT_InspectPanelIndexIntZoomIn(Operator):
     bl_idname = "py_rec.inspect_index_int_zoom_in"
     bl_label = "Zoom In"
     bl_description = "Zoom in to selected Integer Index by appending Integer Index to current exec string, and " \
-        "refresh 'Attributes' list"
+        "refresh Inspect Attributes list"
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
     def execute(self, context):
-        if self.panel_num == -1:
+        ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
+                                             context.scene.py_rec.inspect_context_collections)
+        if ic_panel is None:
+            self.report({'ERROR'}, "Unable to Zoom In to Integer Index because Inspect Panel reference is missing")
             return {'CANCELLED'}
         inspect_index_int_zoom_in(context, self.panel_num)
         return {'FINISHED'}
 
-def inspect_index_str_zoom_in(context, panel_num):
-    ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
-                                         context.scene.py_rec.inspect_context_collections)
-    if ic_panel is None:
-        return
-    panel_props = ic_panel.panel_props
-    if panel_props is None:
-        return
-    panel_props.inspect_exec_str = "%s[\"%s\"]" % (panel_props.dir_inspect_exec_str, panel_props.index_str_enum)
+def inspect_index_str_zoom_in(context, ic_panel, panel_num):
+    ic_panel.inspect_exec_str = "%s[\"%s\"]" % (ic_panel.dir_inspect_exec_str, ic_panel.index_str_enum)
     # do refresh using modified 'inspect_exec_str'
     inspect_exec_refresh(context, panel_num)
 
@@ -581,13 +567,199 @@ class PYREC_OT_InspectPanelIndexStrZoomIn(Operator):
     bl_idname = "py_rec.inspect_index_str_zoom_in"
     bl_label = "Zoom In"
     bl_description = "Zoom in to selected String Index by appending String Index to current exec string, and " \
-        "refresh 'Attributes' list"
+        "refresh Inspect Attributes list"
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
     def execute(self, context):
-        if self.panel_num == -1:
+        ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
+                                             context.scene.py_rec.inspect_context_collections)
+        if ic_panel is None:
+            self.report({'ERROR'}, "Unable to Zoom In to String Index because Inspect Panel reference is missing")
             return {'CANCELLED'}
-        inspect_index_str_zoom_in(context, self.panel_num)
+        inspect_index_str_zoom_in(context, ic_panel, self.panel_num)
+        return {'FINISHED'}
+
+def restore_inspect_context_panels(inspect_context_collections):
+    for icc in inspect_context_collections:
+        context_name = icc.name
+        for icc_panel in icc.inspect_context_panels:
+            # check if Py Inspect panel class has been registered
+            if hasattr(bpy.types, "PYREC_PT_%s_Inspect%s" % (context_name, icc_panel.name)):
+                continue
+            # create and register class for panel, to add panel to UI
+            register_inspect_panel_exec(context_name, int(icc_panel.name), icc_panel.panel_label)
+
+class PYREC_OT_RestoreInspectContextPanels(Operator):
+    bl_idname = "py_rec.restore_inspect_context_panels"
+    bl_label = "Restore Context Inspect Panels"
+    bl_description = "Restore 'Py Inspect' panels in current .blend file. Use this if context 'Py Inspect' panels " \
+        "are missing, e.g. after .blend file is loaded"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        restore_inspect_context_panels(context.scene.py_rec.inspect_context_collections)
+        return {'FINISHED'}
+
+def get_commented_splitlines(input_str):
+    if input_str is None or input_str == "":
+        return ""
+    out_str = ""
+    for l in input_str.splitlines():
+        out_str = out_str + "#  " + l + "\n"
+    return out_str
+
+def get_attribute_python_str(inspect_str, attr_name, attr_record_options):
+    if attr_name != ".":
+        inspect_str = inspect_str + "." + attr_name
+    out_first_str = ""
+    out_last_str = inspect_str
+    # append attribute value to output, if needed
+    if attr_record_options.include_value:
+        result_value, result_error = get_inspect_exec_result(inspect_str, False)
+        if result_value is None:
+            out_last_str = out_last_str + " = None\n"
+        else:
+            py_val_str = bpy_value_to_string(result_value)
+            if py_val_str != None:
+                out_last_str = out_last_str + " = " + py_val_str + "\n"
+                if attr_record_options.comment_type:
+                    out_first_str = out_first_str + "# Type: " + type(result_value).__name__ + "\n"
+                if attr_record_options.comment_doc and has_relevant_doc(result_value):
+                    out_first_str = out_first_str + "# __doc__:\n" + \
+                        get_commented_splitlines(str(result_value.__doc__))
+            else:
+                out_last_str = out_last_str + "  # = " + str(result_value) + "\n"
+    return out_first_str + out_last_str
+
+class PYREC_OT_InspectRecordAttribute(Operator):
+    bl_description = "Record single/all attributes to Python code with from/to/output options"
+    bl_idname = "py_rec.inspect_record_attribute"
+    bl_label = "Record Attribute"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    panel_num: IntProperty(default=-1, options={'HIDDEN'})
+
+    def execute(self, context):
+        p_r = context.scene.py_rec
+        ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type, p_r.inspect_context_collections)
+        if ic_panel is None or len(ic_panel.dir_attributes) == 0:
+            self.report({'ERROR'}, "Error: Unable to Record Attribute because Attributes list is empty")
+            return {'CANCELLED'}
+        return self.inspect_record_attribute(context, ic_panel, p_r.record_options.attribute)
+
+    def draw(self, context):
+        attr_record_options = context.scene.py_rec.record_options.attribute
+        layout = self.layout
+        box = layout.box()
+        box.prop(attr_record_options, "copy_from")
+        row = box.row()
+        row.prop(attr_record_options, "copy_to")
+        if attr_record_options.copy_to == "text":
+            row.prop(attr_record_options, "copy_to_text", text="")
+        box.prop(attr_record_options, "comment_type")
+        box.prop(attr_record_options, "comment_doc")
+
+    def invoke(self, context, event):
+        ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
+                                             context.scene.py_rec.inspect_context_collections)
+        # do not invoke if zero attributes available to record
+        if len(ic_panel.dir_attributes) == 0:
+            return {'FINISHED'}
+        # open window to set options before operator execute
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+    def inspect_record_attribute(self, context, ic_panel, attr_record_options):
+        if len(ic_panel.dir_attributes) == 0:
+            return
+        out_str = ""
+        # get single inspect value Python attribute
+        if attr_record_options.copy_from == "single_attribute":
+            attr_name = ic_panel.dir_attributes[ic_panel.dir_attributes_index].name
+            out_str = get_attribute_python_str(ic_panel.dir_inspect_exec_str, attr_name, attr_record_options)
+        # get all inspect value Python attributes
+        else:
+            for attr_item in ic_panel.dir_attributes:
+                if attr_item.name == ".":
+                    continue
+                out_str = out_str + get_attribute_python_str(ic_panel.dir_inspect_exec_str, attr_item.name,
+                                                             attr_record_options)
+                out_str = out_str + "\n"
+        # append final newline to output
+        out_str = out_str + "\n"
+        # write output to users choice
+        if attr_record_options.copy_to == "clipboard":
+            context.window_manager.clipboard = out_str
+        elif attr_record_options.copy_to == "new_text":
+            new_text = bpy.data.texts.new(name=RECORD_ATTRIBUTE_TEXT_NAME)
+            new_text.write(out_str)
+        elif attr_record_options.copy_to == "text":
+            if attr_record_options.copy_to_text != None:
+                attr_record_options.copy_to_text.write(out_str)
+            else:
+                self.report({'ERROR'}, "Error: Unable to write to existing Text")
+                return {'CANCELLED'}
+        return {'FINISHED'}
+
+copy_attribute_ref = {}
+class PYREC_OT_InspectCopyAttribute(Operator):
+    bl_description = "Create a reference copy from selected attribute"
+    bl_idname = "py_rec.inspect_copy_attribute"
+    bl_label = "Copy"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    panel_num: IntProperty(default=-1, options={'HIDDEN'})
+
+    def execute(self, context):
+        ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
+                                             context.scene.py_rec.inspect_context_collections)
+        if ic_panel is None or len(ic_panel.dir_attributes) == 0:
+            self.report({'ERROR'}, "Unable to Copy Attribute Reference because Attributes list is empty")
+            return {'CANCELLED'}
+        return self.copy_attribute_ref(ic_panel)
+
+    def copy_attribute_ref(self, ic_panel):
+        out_str = ic_panel.dir_inspect_exec_str
+        attr_name = ic_panel.dir_attributes[ic_panel.dir_attributes_index].name
+        if attr_name != ".":
+            out_str = out_str + "." + attr_name
+        copy_attribute_ref["attribute_ref"] = out_str
+        return {'FINISHED'}
+
+class PYREC_OT_InspectPasteAttribute(Operator):
+    bl_description = "Paste a reference copy to selected attribute. WARNING: may cause Blender to crash! " \
+        "Save your work, if needed, before using this function"
+    bl_idname = "py_rec.inspect_paste_attribute"
+    bl_label = "Paste"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    panel_num: IntProperty(default=-1, options={'HIDDEN'})
+
+    def execute(self, context):
+        ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
+                                             context.scene.py_rec.inspect_context_collections)
+        if ic_panel is None or len(ic_panel.dir_attributes) == 0:
+            self.report({'ERROR'}, "Unable to Paste Attribute Reference because Attributes list is empty")
+            return {'CANCELLED'}
+        if copy_attribute_ref.get("attribute_ref") is None:
+            self.report({'ERROR'}, "Unable to Paste Attribute Reference because Copy reference is empty")
+            return {'CANCELLED'}
+        return self.paste_attribute_ref(ic_panel)
+
+    def paste_attribute_ref(self, ic_panel):
+        set_val_str = ic_panel.dir_inspect_exec_str
+        attr_name = ic_panel.dir_attributes[ic_panel.dir_attributes_index].name
+        if attr_name != ".":
+            set_val_str = set_val_str + "." + attr_name
+        get_val_str = copy_attribute_ref["attribute_ref"]
+        try:
+            exec(set_val_str + " = " + get_val_str)
+        except:
+            log_text_append("Exception raised during Paste Attribute exec of:\n  %s\n%s" %
+                            (set_val_str + " = " + get_val_str, traceback.format_exc()) )
+            self.report({'ERROR'}, "Unable to Paste Attribute, exception raised during exec() with paste " \
+                "reference string. See Text named '%s' for details" % LOG_TEXT_NAME)
+            return {'CANCELLED'}
         return {'FINISHED'}

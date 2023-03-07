@@ -21,6 +21,8 @@ from mathutils import (Color, Vector)
 import bpy
 from bpy.types import Operator
 
+from .bpy_value_string import bpy_value_to_string
+
 RECORD_NODETREE_TEXT_NAME = "pyrec_nodetree.py"
 
 uni_attr_default_list = {
@@ -65,61 +67,6 @@ def get_output_num_for_link(tr_link):
         if tr_link.from_socket.node.outputs[c] == tr_link.from_socket:
             return c
     return None
-
-def bpy_value_to_string(value):
-    # write attribute, if it matches a known type
-    if isinstance(value, str):
-        return "\"%s\"" % value
-    elif isinstance(value, bool):
-        return "%s" % value
-    elif isinstance(value, int):
-        return "%d" % value
-    elif isinstance(value, float):
-        return "%f" % value
-    # if attribute has a length then it is a Vector, Color, etc., so write elements of attribute in a tuple,
-    # unless it is a set
-    elif hasattr(value, '__len__'):
-        vec_str = ""
-        # is it a set?
-        if isinstance(value, set):
-            for item in value:
-                if vec_str != "":
-                    vec_str = vec_str + ", "
-                if isinstance(item, str):
-                    vec_str = vec_str + "\"" + str(item) + "\""
-                else:
-                    vec_str = vec_str + str(item)
-            return "{" + vec_str + "}"
-        else:
-            for val_index in range(len(value)):
-                if vec_str != "":
-                    vec_str = vec_str + ", "
-                if isinstance(value[val_index], str):
-                    vec_str = vec_str + "\"" + str(value[val_index]) + "\""
-                else:
-                    vec_str = vec_str + str(value[val_index])
-            return "(" + vec_str + ")"
-    # if the attribute's value has attribute 'name', then check if it is in a Blender built-in data list
-    elif hasattr(value, 'name'):
-        if type(value) == bpy.types.Image:
-            return "bpy.data.images.get(\"" + value.name + "\")"
-        elif type(value) == bpy.types.Mask:
-            return "bpy.data.masks.get(\"" + value.name + "\")"
-        elif type(value) == bpy.types.Scene:
-            return "bpy.data.scenes.get(\"" + value.name + "\")"
-        elif type(value) == bpy.types.Material:
-            return "bpy.data.materials.get(\"" + value.name + "\")"
-        elif type(value) == bpy.types.Object:
-            return "bpy.data.objects.get(\"" + value.name + "\")"
-        elif type(value) == bpy.types.Collection:
-            return "bpy.data.collections.get(\"" + value.name + "\")"
-        elif type(value) == bpy.types.GeometryNodeTree or type(value) == bpy.types.ShaderNodeTree:
-            return "bpy.data.node_groups.get(\"" + value.name + "\")"
-        elif type(value) == bpy.types.Text:
-            return "bpy.data.texts.get(\"" + value.name + "\")"
-    # return None, because attribute type is unknown
-    else:
-        return None
 
 def bpy_compare_to_value(blender_value, va):
     if hasattr(blender_value, '__len__') and hasattr(va, '__len__'):
@@ -504,6 +451,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     # scroll to top of lines of text, so user sees start of script immediately upon opening the textblock
     out_text.current_line_index = 0
     out_text.cursor_set(0)
+    return out_text
 
 class PYREC_OT_RecordNodetree(Operator):
     bl_idname = "py_rec.node_editor_record_nodetree"
@@ -520,7 +468,7 @@ class PYREC_OT_RecordNodetree(Operator):
         return False
 
     def execute(self, context):
-        ntr = context.scene.py_rec.record_nodetree_options
+        ntr = context.scene.py_rec.record_options.nodetree
         uni_node_options = {
             LOC_DEC_PLACES_UNI_NODE_OPT: ntr.write_loc_decimal_places,
             WRITE_DEFAULTS_UNI_NODE_OPT: ntr.write_default_values,
@@ -529,6 +477,7 @@ class PYREC_OT_RecordNodetree(Operator):
             WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT: ntr.write_attrib_width_and_height,
             WRITE_ATTR_SELECT_UNI_NODE_OPT: ntr.write_attrib_select,
         }
-        create_code_text(context, ntr.num_space_pad, ntr.keep_links, ntr.make_function, ntr.delete_existing,
-                         ntr.ng_output_min_max_def, uni_node_options)
+        text = create_code_text(context, ntr.num_space_pad, ntr.keep_links, ntr.make_function, ntr.delete_existing,
+                                ntr.ng_output_min_max_def, uni_node_options)
+        self.report({'INFO'}, "Nodetree recorded to Python in Text named '%s'" % text.name)
         return {'FINISHED'}

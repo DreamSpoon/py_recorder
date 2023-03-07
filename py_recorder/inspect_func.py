@@ -25,17 +25,13 @@ def get_dir(val):
         temp_dict[attr] = True
     return temp_dict.keys()
 
-def get_inspect_context_collection(context_name, inspect_context_collections):
-    for coll in inspect_context_collections:
-        if coll.name == context_name:
-            return coll
-    return None
-
 def get_inspect_context_panel(panel_num, context_name, inspect_context_collections):
-    coll = get_inspect_context_collection(context_name, inspect_context_collections)
-    if coll != None:
-        return coll.inspect_context_panels.get(str(panel_num))
-    return None
+    if panel_num < 0 or context_name == "" or inspect_context_collections is None:
+        return None
+    coll = inspect_context_collections.get(context_name)
+    if coll is None:
+        return None
+    return coll.inspect_context_panels.get(str(panel_num))
 
 # returns 2-tuple of (exec_str less last attribute, last attribute)
 def remove_last_py_attribute(exec_str):

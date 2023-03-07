@@ -235,6 +235,7 @@ def create_driver_py_from_data_item(space_pad, make_into_function, animdata_bool
     # scroll to top of lines of text, so user sees start of script immediately upon opening the textblock
     out_text.current_line_index = 0
     out_text.cursor_set(0)
+    return out_text
 
 class PYREC_OT_DriversToPython(bpy.types.Operator):
     bl_description = "Convert all drivers of selected data sources to Python code, available in the Text Editor"
@@ -243,8 +244,9 @@ class PYREC_OT_DriversToPython(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        dr = context.scene.py_rec.record_driver_options
-        create_driver_py_from_data_item(dr.num_space_pad, dr.make_function, dr.animdata_bool_vec)
+        dr = context.scene.py_rec.record_options.driver
+        text = create_driver_py_from_data_item(dr.num_space_pad, dr.make_function, dr.animdata_bool_vec)
+        self.report({'INFO'}, "Driver(s) recorded to Python in Text named '%s'" % text.name)
         return {'FINISHED'}
 
 def set_bool_vec_state(bool_vec, state):
@@ -258,7 +260,7 @@ class PYREC_OT_SelectAnimdataSrcAll(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        dr = context.scene.py_rec.record_driver_options
+        dr = context.scene.py_rec.record_options.driver
         set_bool_vec_state(dr.animdata_bool_vec, True)
         return {'FINISHED'}
 
@@ -269,6 +271,6 @@ class PYREC_OT_SelectAnimdataSrcNone(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        dr = context.scene.py_rec.record_driver_options
+        dr = context.scene.py_rec.record_options.driver
         set_bool_vec_state(dr.animdata_bool_vec, False)
         return {'FINISHED'}

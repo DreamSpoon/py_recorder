@@ -21,7 +21,7 @@ bl_info = {
     "description": "Inspect Python object attributes. Record Blender data to Python code. Record Info lines to " \
         "Text / Text Object script so that user actions in Blender can be recreated later by running the script",
     "author": "Dave",
-    "version": (0, 2, 0),
+    "version": (0, 3, 0),
     "blender": (2, 80, 0),
     "location": "3DView -> Tools -> Tool -> Py Record, Py Exec, Py Inspect / right-click Context menu -> " \
         "Add Inspect Panel",
@@ -33,24 +33,26 @@ import re
 import numpy
 
 import bpy
+from bpy.app.handlers import persistent
 from bpy.types import (Collection, Object, Panel, PropertyGroup, Text)
 from bpy.props import (BoolProperty, BoolVectorProperty, CollectionProperty, EnumProperty, IntProperty,
     PointerProperty, StringProperty)
 from bpy.utils import (register_class, unregister_class)
 
+from .inspect import (PYREC_OT_AddInspectPanel, PYREC_OT_RemoveInspectPanel, PYREC_OT_InspectExecRefresh,
+    PYREC_OT_InspectDatablockRefresh, PYREC_UL_DirAttributeList, PYREC_PG_DirAttributeItem, PYREC_OT_InspectOptions,
+    PYREC_OT_InspectPanelAttrZoomIn, PYREC_OT_InspectPanelAttrZoomOut, PYREC_OT_InspectPanelIndexIntZoomIn,
+    PYREC_OT_InspectPanelIndexStrZoomIn, PYREC_UL_StringList, PYREC_OT_RestoreInspectContextPanels,
+    PYREC_OT_InspectRecordAttribute, PYREC_OT_InspectCopyAttribute, PYREC_OT_InspectPasteAttribute,
+    draw_inspect_panel, update_dir_attributes)
+from .inspect_exec import (register_inspect_exec_panel_draw_func, unregister_all_inspect_panel_classes)
 from .object_custom_prop import (CPROP_NAME_INIT_PY, PYREC_OT_OBJ_AddCP_Data, PYREC_OT_OBJ_ModifyInit)
+from .driver_editor_ops import (PYREC_OT_DriversToPython, PYREC_OT_SelectAnimdataSrcAll,
+    PYREC_OT_SelectAnimdataSrcNone, get_animdata_bool_names)
+from .node_editor_ops import PYREC_OT_RecordNodetree
 from .view3d_ops import (CP_DATA_TYPE_ITEMS, MODIFY_DATA_TYPE_ITEMS, PYREC_OT_VIEW3D_CopyInfoToObjectText,
     PYREC_OT_VIEW3D_StartRecordInfoLine, PYREC_OT_VIEW3D_StopRecordInfoLine, PYREC_OT_VIEW3D_RunObjectScript,
     get_datablock_for_type)
-from .inspect import (PYREC_OT_AddInspectPanel, PYREC_OT_RemoveInspectPanel,
-    PYREC_OT_InspectExecRefresh, PYREC_OT_InspectDatablockRefresh, PYREC_UL_DirAttributeList,
-    PYREC_PG_DirAttributeItem, update_dir_attributes, PYREC_OT_InspectOptions, PYREC_OT_InspectPanelAttrZoomIn,
-    PYREC_OT_InspectPanelAttrZoomOut, PYREC_OT_InspectPanelIndexIntZoomIn, PYREC_OT_InspectPanelIndexStrZoomIn,
-    PYREC_UL_StringList, draw_inspect_panel)
-from .inspect_exec import (register_inspect_exec_panel_draw_func, unregister_all_inspect_panel_classes)
-from .node_editor_ops import PYREC_OT_RecordNodetree
-from .driver_editor_ops import (PYREC_OT_DriversToPython, PYREC_OT_SelectAnimdataSrcAll,
-    PYREC_OT_SelectAnimdataSrcNone, get_animdata_bool_names)
 
 ANIMDATA_BOOL_NAMES = get_animdata_bool_names()
 
@@ -65,7 +67,7 @@ class PYREC_PT_OBJ_AdjustCustomProp(Panel):
         return context.active_object != None
 
     def draw(self, context):
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         layout = self.layout
         act_ob = context.active_object
 
@@ -94,7 +96,7 @@ class PYREC_PT_VIEW3D_RecordInfo(Panel):
     bl_label = "Py Record Info"
 
     def draw(self, context):
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         layout = self.layout
 
         box = layout.box()
@@ -163,7 +165,7 @@ class PYREC_PT_VIEW3D_RecordInfo(Panel):
         else:
             sub_box.prop(pr_ir, "output_text")
 
-class PYREC_PT_VIEW3D_Play(Panel):
+class PYREC_PT_VIEW3D_ExecObject(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "Tool"
@@ -171,7 +173,7 @@ class PYREC_PT_VIEW3D_Play(Panel):
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         layout = self.layout
         box = layout.box()
         box.label(text="Run Object '__init__'")
@@ -188,8 +190,7 @@ class PYREC_PT_RecordNodetree(Panel):
     bl_label = "Py Record Nodetree"
 
     def draw(self, context):
-        #scn = context.scene
-        ntr = context.scene.py_rec.record_nodetree_options
+        ntr = context.scene.py_rec.record_options.nodetree
         layout = self.layout
         box = layout.box()
         box.operator(PYREC_OT_RecordNodetree.bl_idname)
@@ -222,7 +223,7 @@ class PYREC_PT_RecordDriver(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        dr = context.scene.py_rec.record_driver_options
+        dr = context.scene.py_rec.record_options.driver
 
         box = layout.box()
         box.label(text="Driver Data Source")
@@ -237,10 +238,123 @@ class PYREC_PT_RecordDriver(bpy.types.Panel):
 
 ########################
 
+class PYREC_PG_InspectPanelOptions(PropertyGroup):
+    display_attr_doc: BoolProperty(name="__doc__", description="Display '__doc__' attribute, which may contain " +
+        "relevant information about current value", default=True, options={'HIDDEN'})
+    display_attr_type_only: BoolProperty(name="Display only", description="Display only selected types of " +
+        "attributes in Value Attributes area", default=False, options={'HIDDEN'})
+    display_attr_type_function: BoolProperty(name="Function", description="Display 'function' type attributes in " +
+        "Value Attributes area", default=True, options={'HIDDEN'})
+    display_attr_type_builtin: BoolProperty(name="Builtin", description="Display 'builtin' type attributes in " +
+        "Value Attributes area ('builtin' types have names beginning, and ending, with '__' , e.g. '__doc__')",
+        default=True, options={'HIDDEN'})
+    display_attr_type_bl: BoolProperty(name="bl_", description="Display 'Blender builtin' type attributes in " +
+        "Value Attributes area. 'Blender builtin' type attributes have names beginning with 'bl_' ", default=True,
+        options={'HIDDEN'})
+    display_datablock_refresh: BoolProperty(name="Inspect Datablock", description="Display 'Inspect Datablock' " +
+        "area, to inspect Datablock (e.g. by Camera, Image, Object)", default=True, options={'HIDDEN'})
+    display_exec_refresh: BoolProperty(name="Inspect Exec", description="Display 'Inspect Exec' area, to inspect " +
+        "custom string exec() result", default=True, options={'HIDDEN'})
+    display_value_attributes: BoolProperty(name="Value Attributes", description="Display 'Value Attributes' area, " +
+        "to inspect attributes of current Inspect value (i.e. view result of dir() in list format)", default=True,
+        options={'HIDDEN'})
+    display_value_selector: BoolProperty(name="Try value entry", description="Try to display attribute value entry " +
+        "box, to allow real-time editing of attribute value. Display value as string if try fails", default=True,
+        options={'HIDDEN'})
+    display_dir_attribute_type: BoolProperty(name="Type", description="Display Type column in Attribute list",
+        default=True, options={'HIDDEN'})
+    display_dir_attribute_value: BoolProperty(name="Value", description="Display Value column in Attribute list",
+        default=True, options={'HIDDEN'})
+
+INDEX_TYPE_ITEMS = [
+    ("none", "None", "", 1),
+    ("int", "Integer", "", 2),
+    ("str", "String", "", 3),
+    ("int_str", "Integer and String", "", 4),
+]
+def populate_index_strings(self, context):
+    # if index string collection is not empty then create array for use with EnumProperty
+    if len(self.index_str_coll) > 0:
+        output = []
+        for index_str in self.index_str_coll:
+            output.append( (index_str.name, index_str.name, "") )
+        return output
+    # return empty
+    return [ (" ", "", "") ]
+
+def set_index_int(self, value):
+    if value < 0 or value > self.index_max_int:
+        return
+    self["index_int"] = value
+    return
+
+def get_index_int(self):
+    return self.get("index_int", 0)
+
+class PYREC_PG_InspectPanel(PropertyGroup):
+    panel_label: StringProperty()
+
+    inspect_data_type: EnumProperty(name="Type", items=CP_DATA_TYPE_ITEMS, default="objects",
+        description="Type of data to inspect. Includes 'bpy.data' sources")
+    inspect_datablock: StringProperty(name="Inspect datablock Name", description="Name of datablock instance to " +
+        "inspect. Includes 'bpy.data' sources", default="")
+    inspect_exec_str: StringProperty(name="Inspect Exec", description="Python string that will be run and result " +
+        "returned when 'Inspect Exec' is used", default="bpy.data.objects")
+
+    index_int: IntProperty(set=set_index_int, get=get_index_int, description="Integer index for Zoom In. Uses " +
+        "zero-based indexing, i.e. first item is number 0 ")
+    index_max_int: IntProperty()
+    index_str_coll: CollectionProperty(type=PropertyGroup)
+
+    index_str_enum: EnumProperty(items=populate_index_strings, description="String index for Zoom In. Uses 'key()' " +
+        "function to get available key names for indexing")
+    index_type: EnumProperty(items=INDEX_TYPE_ITEMS, default="none")
+
+    dir_inspect_exec_str: StringProperty()
+    dir_attributes: CollectionProperty(type=PYREC_PG_DirAttributeItem)
+    dir_attributes_index: IntProperty(update=update_dir_attributes)
+
+    dir_item_exec_str: StringProperty()
+    dir_item_value_str: StringProperty()
+    dir_item_value_typename_str: StringProperty()
+
+    dir_item_doc_lines: CollectionProperty(type=PropertyGroup)
+    dir_item_doc_lines_index: IntProperty()
+
+    panel_options: PointerProperty(type=PYREC_PG_InspectPanelOptions)
+
+class PYREC_PG_InspectPanelCollection(PropertyGroup):
+    inspect_context_panels: CollectionProperty(type=PYREC_PG_InspectPanel)
+    inspect_context_panel_next_num: IntProperty()
+
+class PYREC_PG_AttributeRecordOptions(PropertyGroup):
+    copy_from: EnumProperty(name = "From", description="Record Python code of Single Attribute or All Attributes of " +
+        "current inspect value", items=[ ("single_attribute", "Single Attribute", ""),
+                                         ("all_attributes", "All Attributes", "") ], default="single_attribute")
+    copy_to: EnumProperty(name="To", description="Record attribute(s) as Python code to this", items=[
+            ("clipboard", "Clipboard", "Record Python code to clipboard. Paste with 'Ctrl-V'"),
+            ("new_text", "New Text", "Record Python code to new Text"),
+            ("text", "Text", "Record Python code to existing Text"), ], default="clipboard")
+    copy_to_text: PointerProperty(description="Text (in Text Editor) to receive output", type=Text)
+    include_value: BoolProperty(name="Value", description="Include attribute value in recorded Python output " +
+        "(with '=')", default=True)
+    comment_type: BoolProperty(name="Type Comment", description="Include Python code with attribute value's type",
+        default=True)
+    comment_doc: BoolProperty(name="__doc__ Comment", description="Include Python code with attribute value's " +
+        "'__doc__' attribute value (if it exists)", default=True)
+
+class PYREC_PG_DriverRecordOptions(PropertyGroup):
+    num_space_pad: IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +
+        "line of code output in text-block", default=4, min=0)
+    make_function: BoolProperty(name="Make into Function", description="Add lines of Python code to " +
+        "create runnable script (instead of just the bare essential code)", default=True)
+    animdata_bool_vec: BoolVectorProperty(size=len(ANIMDATA_BOOL_NAMES),
+                                           default=tuple(numpy.ones((len(ANIMDATA_BOOL_NAMES)), dtype=int)))
+
 def text_object_poll(self, object):
     return object.type == 'FONT'
 
-class PYREC_PG_RecordInfoOptions(PropertyGroup):
+class PYREC_PG_InfoRecordOptions(PropertyGroup):
     create_root_object: BoolProperty(name="Create Root", description="New root Object will be created, instead of " +
         "using active Object as root (Text / Text Object will be linked to root Object)",
         default=False)
@@ -309,98 +423,7 @@ class PYREC_PG_RecordInfoOptions(PropertyGroup):
     use_temp_text: BoolProperty(name="Run Temp Text", description="Copy text from Text Object to a Text (in Text " +
         "Editor) before running script", default=True)
 
-class PYREC_PG_InspectPanelOptions(PropertyGroup):
-    display_attr_doc: BoolProperty(name="__doc__", description="Display '__doc__' attribute, which may contain " +
-        "relevant information about current value", default=True)
-    display_attr_bl_description: BoolProperty(name="bl_description", description="Display 'bl_description' " +
-        "attribute, which may contain relevant information about current value", default=True)
-    display_attr_type_only: BoolProperty(name="Display only", description="Display only selected types of " +
-        "attributes in Value Attributes area", default=False)
-    display_attr_type_function: BoolProperty(name="Function", description="Display 'function' type attributes in " +
-        "Value Attributes area", default=True)
-    display_attr_type_builtin: BoolProperty(name="Builtin", description="Display 'builtin' type attributes in " +
-        "Value Attributes area ('builtin' types have names beginning, and ending, with '__' , e.g. '__doc__')",
-        default=True)
-    display_attr_type_bl: BoolProperty(name="bl_", description="Display 'Blender builtin' type attributes in " +
-        "Value Attributes area. 'Blender builtin' type attributes have names beginning with 'bl_' ", default=True)
-    display_datablock_refresh: BoolProperty(name="Inspect Datablock", description="Display 'Inspect Datablock' " +
-        "area, to inspect Datablock (e.g. by Camera, Image, Object)", default=True)
-    display_exec_refresh: BoolProperty(name="Inspect Exec", description="Display 'Inspect Exec' area, to inspect " +
-        "custom string exec() result", default=True)
-    display_value_attributes: BoolProperty(name="Value Attributes", description="Display 'Value Attributes' area, " +
-        "to inspect attributes of current Inspect value (i.e. view result of dir() in list format)", default=True)
-    display_value_selector: BoolProperty(name="Try value entry", description="Try to display attribute value entry " +
-        "box, to allow real-time editing of attribute value. Display value as string if try fails", default=True)
-    display_dir_attribute_type: BoolProperty(name="Type", description="Display Type column in Attribute list",
-        default=True)
-    display_dir_attribute_value: BoolProperty(name="Value", description="Display Value column in Attribute list",
-        default=True)
-
-INDEX_TYPE_ITEMS = [
-    ("none", "None", "", 1),
-    ("int", "Integer", "", 2),
-    ("str", "String", "", 3),
-    ("int_str", "Integer and String", "", 4),
-]
-def populate_index_strings(self, context):
-    # if index string collection is not empty then create array for use with EnumProperty
-    if len(self.index_str_coll) > 0:
-        output = []
-        for index_str in self.index_str_coll:
-            output.append( (index_str.name, index_str.name, "") )
-        return output
-    # return empty
-    return [ (" ", "", "") ]
-
-def set_index_int(self, value):
-    if value < 0 or value > self.index_max_int:
-        return
-    self["index_int"] = value
-    return
-
-def get_index_int(self):
-    return self.get("index_int", 0)
-
-class PYREC_PG_InspectPanelProps(PropertyGroup):
-    inspect_data_type: EnumProperty(name="Type", items=CP_DATA_TYPE_ITEMS, default="objects",
-        description="Type of data to inspect. Includes 'bpy.data' sources")
-    inspect_datablock: StringProperty(name="Inspect datablock Name", description="Name of datablock instance to " +
-        "inspect. Includes 'bpy.data' sources", default="")
-    inspect_exec_str: StringProperty(name="Inspect Exec", description="Python string that will be run and result " +
-        "returned when 'Inspect Exec' is used", default="bpy.data.objects")
-
-    index_int: IntProperty(set=set_index_int, get=get_index_int, description="Integer index for Zoom In. Uses " +
-        "zero-based indexing, i.e. first item is number 0 ")
-    index_max_int: IntProperty()
-    index_str_coll: CollectionProperty(type=PropertyGroup)
-
-    index_str_enum: EnumProperty(items=populate_index_strings, description="String index for Zoom In. Uses 'key()' " +
-        "function to get available key names for indexing")
-    index_type: EnumProperty(items=INDEX_TYPE_ITEMS, default="none")
-
-    dir_inspect_exec_str: StringProperty()
-    dir_attributes: CollectionProperty(type=PYREC_PG_DirAttributeItem)
-    dir_attributes_index: IntProperty(update=update_dir_attributes)
-
-    dir_item_exec_str: StringProperty()
-    dir_item_value_str: StringProperty()
-    dir_item_value_typename_str: StringProperty()
-
-    dir_item_doc_lines: CollectionProperty(type=PropertyGroup)
-    dir_item_doc_lines_index: IntProperty()
-    dir_item_bl_description_lines: CollectionProperty(type=PropertyGroup)
-    dir_item_bl_description_lines_index: IntProperty()
-
-    panel_options: PointerProperty(type=PYREC_PG_InspectPanelOptions)
-
-class PYREC_PG_InspectPanel(PropertyGroup):
-    panel_props: PointerProperty(type=PYREC_PG_InspectPanelProps)
-
-class PYREC_PG_InspectPanelCollection(PropertyGroup):
-    inspect_context_panels: CollectionProperty(type=PYREC_PG_InspectPanel)
-    inspect_context_panel_next_num: IntProperty()
-
-class PYREC_PG_RecordNodetreeOptions(PropertyGroup):
+class PYREC_PG_NodetreeRecordOptions(PropertyGroup):
     num_space_pad: IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +
         "line of code output in text-block", default=4, min=0)
     keep_links: BoolProperty(name="Keep Links List", description="Add created links to a list variable",
@@ -424,19 +447,15 @@ class PYREC_PG_RecordNodetreeOptions(PropertyGroup):
     ng_output_min_max_def: BoolProperty(name="Output Min/Max/Default", description="Include Minimum, Maximum, " +
         "and Default value for each node group output", default=False)
 
-class PYREC_PG_RecordDriverOptions(PropertyGroup):
-    num_space_pad: IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +
-        "line of code output in text-block", default=4, min=0)
-    make_function: BoolProperty(name="Make into Function", description="Add lines of Python code to " +
-        "create runnable script (instead of just the bare essential code)", default=True)
-    animdata_bool_vec: BoolVectorProperty(size=len(ANIMDATA_BOOL_NAMES),
-                                           default=tuple(numpy.ones((len(ANIMDATA_BOOL_NAMES)), dtype=int)))
+class PYREC_PG_RecordOptions(PropertyGroup):
+    attribute: PointerProperty(type=PYREC_PG_AttributeRecordOptions)
+    driver: PointerProperty(type=PYREC_PG_DriverRecordOptions)
+    info: PointerProperty(type=PYREC_PG_InfoRecordOptions)
+    nodetree: PointerProperty(type=PYREC_PG_NodetreeRecordOptions)
 
 class PYREC_PG_PyRec(PropertyGroup):
     inspect_context_collections: CollectionProperty(type=PYREC_PG_InspectPanelCollection)
-    record_info_options: PointerProperty(type=PYREC_PG_RecordInfoOptions)
-    record_nodetree_options: PointerProperty(type=PYREC_PG_RecordNodetreeOptions)
-    record_driver_options: PointerProperty(type=PYREC_PG_RecordDriverOptions)
+    record_options: PointerProperty(type=PYREC_PG_RecordOptions)
 
 classes = [
     PYREC_OT_RecordNodetree,
@@ -449,7 +468,7 @@ classes = [
     PYREC_OT_VIEW3D_CopyInfoToObjectText,
     PYREC_PT_VIEW3D_RecordInfo,
     PYREC_OT_VIEW3D_RunObjectScript,
-    PYREC_PT_VIEW3D_Play,
+    PYREC_PT_VIEW3D_ExecObject,
     PYREC_OT_AddInspectPanel,
     PYREC_OT_RemoveInspectPanel,
     PYREC_OT_InspectOptions,
@@ -462,17 +481,22 @@ classes = [
     PYREC_OT_DriversToPython,
     PYREC_OT_SelectAnimdataSrcAll,
     PYREC_OT_SelectAnimdataSrcNone,
+    PYREC_OT_RestoreInspectContextPanels,
+    PYREC_OT_InspectRecordAttribute,
+    PYREC_OT_InspectCopyAttribute,
+    PYREC_OT_InspectPasteAttribute,
     PYREC_PT_RecordDriver,
     PYREC_PG_DirAttributeItem,
     PYREC_UL_DirAttributeList,
     PYREC_UL_StringList,
     PYREC_PG_InspectPanelOptions,
-    PYREC_PG_InspectPanelProps,
     PYREC_PG_InspectPanel,
     PYREC_PG_InspectPanelCollection,
-    PYREC_PG_RecordInfoOptions,
-    PYREC_PG_RecordNodetreeOptions,
-    PYREC_PG_RecordDriverOptions,
+    PYREC_PG_AttributeRecordOptions,
+    PYREC_PG_DriverRecordOptions,
+    PYREC_PG_InfoRecordOptions,
+    PYREC_PG_NodetreeRecordOptions,
+    PYREC_PG_RecordOptions,
     PYREC_PG_PyRec,
 ]
 
@@ -500,6 +524,10 @@ def remove_inspect_context_menu_all():
     for d in context_type_draw_removes:
         d.remove(draw_inspect_context_menu)
 
+@persistent
+def inspect_panel_reload(dummy):
+    bpy.ops.py_rec.restore_inspect_context_panels()
+
 def register():
     register_inspect_exec_panel_draw_func(draw_inspect_panel)
     for cls in classes:
@@ -507,7 +535,13 @@ def register():
     bpy.types.Scene.py_rec = PointerProperty(type=PYREC_PG_PyRec)
     append_inspect_context_menu_all()
 
+    if not inspect_panel_reload in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(inspect_panel_reload)
+
 def unregister():
+    if inspect_panel_reload in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(inspect_panel_reload)
+
     unregister_all_inspect_panel_classes()
     for cls in reversed(classes):
         unregister_class(cls)

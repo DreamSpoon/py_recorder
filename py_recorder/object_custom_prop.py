@@ -33,7 +33,7 @@ class PYREC_OT_OBJ_ModifyInit(Operator):
 
     def execute(self, context):
         act_ob = context.active_object
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         delete_init = False
         if pr_ir.modify_data_type == "texts":
             if pr_ir.modify_data_text is None:
@@ -51,7 +51,7 @@ class PYREC_OT_OBJ_ModifyInit(Operator):
 
     def draw(self, context):
         layout = self.layout
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         layout.prop(pr_ir, "modify_data_type")
         if pr_ir.modify_data_type == "texts":
             layout.prop(pr_ir, "modify_data_text")
@@ -70,13 +70,13 @@ class PYREC_OT_OBJ_AddCP_Data(Operator):
 
     @classmethod
     def poll(cls, context):
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         return context.active_object != None and pr_ir.add_cp_data_name not in [None, ""] and \
             pr_ir.add_cp_datablock not in [None, ""]
 
     def execute(self, context):
         act_ob = context.active_object
-        pr_ir = context.scene.py_rec.record_info_options
+        pr_ir = context.scene.py_rec.record_options.info
         v = getattr(bpy.data, pr_ir.add_cp_data_type).get(pr_ir.add_cp_datablock)
         if v != None:
             act_ob[pr_ir.add_cp_data_name] = v
