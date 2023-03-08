@@ -39,12 +39,12 @@ from bpy.props import (BoolProperty, BoolVectorProperty, CollectionProperty, Enu
     PointerProperty, StringProperty)
 from bpy.utils import (register_class, unregister_class)
 
-from .inspect import (PYREC_OT_AddInspectPanel, PYREC_OT_RemoveInspectPanel, PYREC_OT_InspectExecRefresh,
-    PYREC_OT_InspectDatablockRefresh, PYREC_UL_DirAttributeList, PYREC_PG_DirAttributeItem, PYREC_OT_InspectOptions,
-    PYREC_OT_InspectPanelAttrZoomIn, PYREC_OT_InspectPanelAttrZoomOut, PYREC_OT_InspectPanelIndexIntZoomIn,
-    PYREC_OT_InspectPanelIndexStrZoomIn, PYREC_UL_StringList, PYREC_OT_RestoreInspectContextPanels,
-    PYREC_OT_InspectRecordAttribute, PYREC_OT_InspectCopyAttribute, PYREC_OT_InspectPasteAttribute,
-    draw_inspect_panel, update_dir_attributes)
+from .inspect import (PYREC_OT_AddInspectPanel, PYREC_OT_RemoveInspectPanel, PYREC_UL_DirAttributeList,
+    PYREC_PG_DirAttributeItem, PYREC_OT_InspectOptions, PYREC_OT_InspectPanelAttrZoomIn,
+    PYREC_OT_InspectPanelAttrZoomOut, PYREC_OT_InspectPanelIndexIntZoomIn, PYREC_OT_InspectPanelIndexStrZoomIn,
+    PYREC_UL_StringList, PYREC_OT_RestoreInspectContextPanels, PYREC_OT_InspectRecordAttribute,
+    PYREC_OT_InspectCopyAttribute, PYREC_OT_InspectPasteAttribute, PYREC_OT_InspectChoosePy, draw_inspect_panel,
+    update_dir_attributes)
 from .inspect_exec import (register_inspect_exec_panel_draw_func, unregister_all_inspect_panel_classes)
 from .object_custom_prop import (CPROP_NAME_INIT_PY, PYREC_OT_OBJ_AddCP_Data, PYREC_OT_OBJ_ModifyInit)
 from .driver_editor_ops import (PYREC_OT_DriversToPython, PYREC_OT_SelectAnimdataSrcAll,
@@ -242,22 +242,18 @@ class PYREC_PG_InspectPanelOptions(PropertyGroup):
     display_attr_doc: BoolProperty(name="__doc__", description="Display '__doc__' attribute, which may contain " +
         "relevant information about current value", default=True, options={'HIDDEN'})
     display_attr_type_only: BoolProperty(name="Display only", description="Display only selected types of " +
-        "attributes in Value Attributes area", default=False, options={'HIDDEN'})
+        "attributes in Inspect Attributes area", default=False, options={'HIDDEN'})
     display_attr_type_function: BoolProperty(name="Function", description="Display 'function' type attributes in " +
-        "Value Attributes area", default=True, options={'HIDDEN'})
+        "Inspect Attributes area", default=True, options={'HIDDEN'})
     display_attr_type_builtin: BoolProperty(name="Builtin", description="Display 'builtin' type attributes in " +
-        "Value Attributes area ('builtin' types have names beginning, and ending, with '__' , e.g. '__doc__')",
+        "Inspect Attributes area ('builtin' types have names beginning, and ending, with '__' , e.g. '__doc__')",
         default=True, options={'HIDDEN'})
     display_attr_type_bl: BoolProperty(name="bl_", description="Display 'Blender builtin' type attributes in " +
-        "Value Attributes area. 'Blender builtin' type attributes have names beginning with 'bl_' ", default=True,
+        "Inspect Attributes area. 'Blender builtin' type attributes have names beginning with 'bl_' ", default=True,
         options={'HIDDEN'})
-    display_datablock_refresh: BoolProperty(name="Inspect Datablock", description="Display 'Inspect Datablock' " +
-        "area, to inspect Datablock (e.g. by Camera, Image, Object)", default=True, options={'HIDDEN'})
-    display_exec_refresh: BoolProperty(name="Inspect Exec", description="Display 'Inspect Exec' area, to inspect " +
-        "custom string exec() result", default=True, options={'HIDDEN'})
-    display_value_attributes: BoolProperty(name="Value Attributes", description="Display 'Value Attributes' area, " +
-        "to inspect attributes of current Inspect value (i.e. view result of dir() in list format)", default=True,
-        options={'HIDDEN'})
+    display_value_attributes: BoolProperty(name="Attributes List", description="Display Inspect Attributes area, " +
+        "to inspect list of attributes of current Inspect value (i.e. view result of dir() in list format)",
+        default=True, options={'HIDDEN'})
     display_value_selector: BoolProperty(name="Try value entry", description="Try to display attribute value entry " +
         "box, to allow real-time editing of attribute value. Display value as string if try fails", default=True,
         options={'HIDDEN'})
@@ -266,12 +262,6 @@ class PYREC_PG_InspectPanelOptions(PropertyGroup):
     display_dir_attribute_value: BoolProperty(name="Value", description="Display Value column in Attribute list",
         default=True, options={'HIDDEN'})
 
-INDEX_TYPE_ITEMS = [
-    ("none", "None", "", 1),
-    ("int", "Integer", "", 2),
-    ("str", "String", "", 3),
-    ("int_str", "Integer and String", "", 4),
-]
 def populate_index_strings(self, context):
     # if index string collection is not empty then create array for use with EnumProperty
     if len(self.index_str_coll) > 0:
@@ -294,6 +284,22 @@ def get_index_int(self):
 class PYREC_PG_InspectPanel(PropertyGroup):
     panel_label: StringProperty()
 
+    pre_inspect_type: EnumProperty(name="Pre-Inspect Exec Type", items=[
+        ("none", "None", "Only inspect value Python code will be run to get inspect value"),
+        ("single_line", "One Line", "Single line of Python code will be run before inspect value code is run"),
+        ("textblock", "Text", "Text (in Text-Editor) with one or more lines of Python code to run before " \
+         "inspect value code is run") ], default="none")
+    pre_inspect_single_line: StringProperty(name="Pre-Inspect Exec", description="Single line of Python code to run " +
+        "before running inspect value code")
+    pre_inspect_text: PointerProperty(name="Pre-Inspect Text", description="Text (in Text Editor) with line(s) of " +
+        "Python code to run before running inspect value code", type=Text)
+
+    inspect_py_type: EnumProperty(name="Py Type", items=[
+        ("active", "Active", "Active thing will be inspected (e.g. active Object in View3D context). Not yet " +
+         "available in all contexts"),
+        ("custom", "Custom", "Custom string of code will be run, and run result will be inspected"),
+        ("datablock", "Datablock", "Datablock includes all data collections under 'bpy.data'") ],
+        description="Type of Python object to inspect", default="custom")
     inspect_data_type: EnumProperty(name="Type", items=CP_DATA_TYPE_ITEMS, default="objects",
         description="Type of data to inspect. Includes 'bpy.data' sources")
     inspect_datablock: StringProperty(name="Inspect datablock Name", description="Name of datablock instance to " +
@@ -308,13 +314,15 @@ class PYREC_PG_InspectPanel(PropertyGroup):
 
     index_str_enum: EnumProperty(items=populate_index_strings, description="String index for Zoom In. Uses 'key()' " +
         "function to get available key names for indexing")
-    index_type: EnumProperty(items=INDEX_TYPE_ITEMS, default="none")
+    index_type: EnumProperty(items=[("none", "None", "", 1),
+        ("int", "Integer", "", 2),
+        ("str", "String", "", 3),
+        ("int_str", "Integer and String", "", 4) ], default="none")
 
     dir_inspect_exec_str: StringProperty()
     dir_attributes: CollectionProperty(type=PYREC_PG_DirAttributeItem)
     dir_attributes_index: IntProperty(update=update_dir_attributes)
 
-    dir_item_exec_str: StringProperty()
     dir_item_value_str: StringProperty()
     dir_item_value_typename_str: StringProperty()
 
@@ -472,8 +480,6 @@ classes = [
     PYREC_OT_AddInspectPanel,
     PYREC_OT_RemoveInspectPanel,
     PYREC_OT_InspectOptions,
-    PYREC_OT_InspectExecRefresh,
-    PYREC_OT_InspectDatablockRefresh,
     PYREC_OT_InspectPanelAttrZoomIn,
     PYREC_OT_InspectPanelAttrZoomOut,
     PYREC_OT_InspectPanelIndexIntZoomIn,
@@ -485,6 +491,7 @@ classes = [
     PYREC_OT_InspectRecordAttribute,
     PYREC_OT_InspectCopyAttribute,
     PYREC_OT_InspectPasteAttribute,
+    PYREC_OT_InspectChoosePy,
     PYREC_PT_RecordDriver,
     PYREC_PG_DirAttributeItem,
     PYREC_UL_DirAttributeList,

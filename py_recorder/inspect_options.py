@@ -46,9 +46,8 @@ class PYREC_OT_InspectOptions(Operator):
 
         box = layout.box()
         box.label(text="Inspect Panel")
-        box.prop(panel_options, "display_datablock_refresh")
-        box.prop(panel_options, "display_exec_refresh")
         box.prop(panel_options, "display_value_attributes")
+        box.prop(panel_options, "display_attr_doc")
 
         row = layout.row()
         box = row.box()
@@ -58,11 +57,6 @@ class PYREC_OT_InspectOptions(Operator):
         box = row.box()
         box.label(text="Attribute Value")
         box.prop(panel_options, "display_value_selector")
-
-        box = layout.box()
-        box.label(text="Attribute Description")
-        row = box.row()
-        row.prop(panel_options, "display_attr_doc")
 
         box = layout.box()
         box.label(text="Attribute Type")

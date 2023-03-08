@@ -75,10 +75,10 @@ def unregister_all_inspect_panel_classes():
 
 # returns 2-tuple of (output value, error string)
 # error string is None if no error occurred during exec
-def get_inspect_exec_result(inspect_exec_str, enable_log):
+def get_inspect_exec_result(pre_exec_str, inspect_exec_str, enable_log):
     if inspect_exec_str == "":
         return None, "Empty Inspect Exec string"
-    ie_str = "global inspect_exec_result\ninspect_exec_result['result'] = %s" % inspect_exec_str
+    ie_str = pre_exec_str + "global inspect_exec_result\ninspect_exec_result['result'] = %s" % inspect_exec_str
     try:
         exec(ie_str)
     except:
