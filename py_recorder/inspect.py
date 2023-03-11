@@ -26,7 +26,7 @@ from bpy.utils import unregister_class
 
 from .inspect_options import PYREC_OT_InspectOptions
 from .inspect_func import (get_dir, get_inspect_context_panel, remove_last_py_attribute, match_inspect_panel_name,
-    get_active_thing_name, get_active_thing_inspect_str)
+    get_active_thing_inspect_str)
 from .inspect_exec import (get_inspect_exec_result, register_inspect_panel_exec, unregister_inspect_panel_exec)
 from .bpy_value_string import bpy_value_to_string
 from .log_text import (LOG_TEXT_NAME, log_text_append)
@@ -68,7 +68,7 @@ def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
 
 def draw_inspect_panel(self, context):
     ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                         context.scene.py_rec.inspect_context_collections)
+                                         context.window_manager.py_rec.inspect_context_collections)
     if ic_panel is None:
         return
     panel_options = ic_panel.panel_options
@@ -87,19 +87,20 @@ def draw_inspect_panel(self, context):
     if panel_options.display_value_attributes:
         box = layout.box()
 
-        index_type = ic_panel.index_type
-        if index_type == "int" or index_type == "str" or index_type == "int_str":
+        array_index_key_type = ic_panel.array_index_key_type
+        if array_index_key_type == "int" or array_index_key_type == "str" or array_index_key_type == "int_str":
             sub_box = box.box()
-            sub_box.label(text="Index Item Count: "+str(max(len(ic_panel.index_str_coll), ic_panel.index_max_int+1)))
-        if index_type == "int" or index_type == "int_str":
+            sub_box.label(text="Index Item Count: "+str(max(len(ic_panel.array_key_set),
+                                                            ic_panel.array_index_max+1)))
+        if array_index_key_type == "int" or array_index_key_type == "int_str":
             row = sub_box.row()
-            row.prop(ic_panel, "index_int", text="")
-            row.operator(PYREC_OT_InspectPanelIndexIntZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
+            row.prop(ic_panel, "array_index", text="")
+            row.operator(PYREC_OT_InspectPanelArrayIndexZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
                 self.panel_num
-        if index_type == "str" or index_type == "int_str":
+        if array_index_key_type == "str" or array_index_key_type == "int_str":
             row = sub_box.row()
-            row.prop(ic_panel, "index_str_enum", text="")
-            row.operator(PYREC_OT_InspectPanelIndexStrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
+            row.prop(ic_panel, "array_key", text="")
+            row.operator(PYREC_OT_InspectPanelArrayKeyZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
                 self.panel_num
 
     sub_box = box.box()
@@ -226,7 +227,7 @@ class PYREC_OT_AddInspectPanel(Operator):
         "Number is incremented after new panel is created", default=True)
 
     def execute(self, context):
-        if not create_context_inspect_panel(context.space_data.type, context.scene.py_rec.inspect_context_collections,
+        if not create_context_inspect_panel(context.space_data.type, context.window_manager.py_rec.inspect_context_collections,
                                             self.panel_name_default, self.panel_name_auto_number):
             self.report({'ERROR'}, "Add Inspect Panel: Unable to add panel to context type '" +
                         context.space_data.type + "'")
@@ -247,7 +248,7 @@ class PYREC_OT_RemoveInspectPanel(Operator):
             return {'CANCELLED'}
         context_name = context.space_data.type
         unregister_inspect_panel_exec(context_name, self.panel_num)
-        panels = context.scene.py_rec.inspect_context_collections[context_name].inspect_context_panels
+        panels = context.window_manager.py_rec.inspect_context_collections[context_name].inspect_context_panels
         # remove panel by finding its index first, then passing index to '.remove()' function
         panels.remove(panels.find(str(self.panel_num)))
         return {'FINISHED'}
@@ -270,17 +271,17 @@ def get_pre_exec_str(ic_panel):
 
 def inspect_exec_refresh(context, panel_num):
     ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
-                                         context.scene.py_rec.inspect_context_collections)
+                                         context.window_manager.py_rec.inspect_context_collections)
     if ic_panel is None:
         return 'CANCELLED', "Unable to refresh Inspect Value, because cannot get Inspect Panel"
     panel_options = ic_panel.panel_options
     if panel_options is None:
         return 'CANCELLED', "Unable to refresh Inspect Value, because cannot get Inspect Panel Options"
     # clear index, and dir() attribute listing
-    ic_panel.index_type = "none"
-    ic_panel.index_int = 0
-    ic_panel.index_max_int = 0
-    ic_panel.index_str_coll.clear()
+    ic_panel.array_index_key_type = "none"
+    ic_panel.array_index = 0
+    ic_panel.array_index_max = 0
+    ic_panel.array_key_set.clear()
     ic_panel.dir_inspect_exec_str = ""
     ic_panel.dir_attributes.clear()
     # clear label strings
@@ -311,25 +312,25 @@ def inspect_exec_refresh(context, panel_num):
             for key_name in inspect_value.keys():
                 if not isinstance(key_name, str):
                     continue
-                index_str_item = ic_panel.index_str_coll.add()
+                index_str_item = ic_panel.array_key_set.add()
                 index_str_item.name = key_name
         # check for integer type index
-        has_index_int = False
+        has_array_index = False
         try:
             x = inspect_value[0]    # this line will raise exception if inspect_value cannot be indexed with integer
             # the following lines in the 'try' block will be run only if inspect_value can be indexed with integer
-            has_index_int = True
-            ic_panel.index_max_int = len(inspect_value)-1
-            ic_panel.index_int = 0
+            has_array_index = True
+            ic_panel.array_index_max = len(inspect_value)-1
+            ic_panel.array_index = 0
         except:
             pass
         # set prop to indicate available index types
-        if has_index_int and has_index_str:
-            ic_panel.index_type = "int_str"
-        elif has_index_int:
-            ic_panel.index_type = "int"
+        if has_array_index and has_index_str:
+            ic_panel.array_index_key_type = "int_str"
+        elif has_array_index:
+            ic_panel.array_index_key_type = "int"
         elif has_index_str:
-            ic_panel.index_type = "str"
+            ic_panel.array_index_key_type = "str"
 
     # dir listing can only be performed if 'inspect_value' is not None, because None does not have attributes
     if inspect_value is None:
@@ -393,21 +394,21 @@ def inspect_exec_refresh(context, panel_num):
 
 def inspect_datablock_refresh(context, panel_num):
     ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
-                                         context.scene.py_rec.inspect_context_collections)
+                                         context.window_manager.py_rec.inspect_context_collections)
     if ic_panel is None:
         return 'CANCELLED', "Unable to refresh Inspect Value, because cannot get Inspect Panel"
-    if ic_panel.inspect_datablock == "":
+    if ic_panel.inspect_datablock_name == "":
         return 'CANCELLED', "Unable to refresh Inspect Value, because Datablock is empty"
-    ic_panel.inspect_exec_str = "bpy.data.%s[\"%s\"]" % (ic_panel.inspect_data_type,
-                                                            ic_panel.inspect_datablock)
+    ic_panel.inspect_exec_str = "bpy.data.%s[\"%s\"]" % (ic_panel.inspect_datablock_type,
+                                                            ic_panel.inspect_datablock_name)
     return inspect_exec_refresh(context, panel_num)
 
 def inspect_active_refresh(context, panel_num):
     ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
-                                         context.scene.py_rec.inspect_context_collections)
+                                         context.window_manager.py_rec.inspect_context_collections)
     if ic_panel is None:
         return 'CANCELLED', "Unable to refresh Inspect Active, because cannot get Inspect Panel"
-    inspect_str = get_active_thing_inspect_str(context)
+    inspect_str = get_active_thing_inspect_str(context, ic_panel.inspect_active_type)
     if inspect_str == "":
         return 'CANCELLED', "Unable to refresh Inspect Active, because active thing not found in context type '%s'" % \
             context.space_data.type
@@ -437,7 +438,7 @@ class PYREC_OT_InspectPanelAttrZoomIn(Operator):
 
     def execute(self, context):
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                             context.scene.py_rec.inspect_context_collections)
+                                             context.window_manager.py_rec.inspect_context_collections)
         if ic_panel is None or len(ic_panel.dir_attributes) == 0:
             self.report({'ERROR'}, "Unable to Zoom In to Attribute because Attributes List is empty")
             return {'CANCELLED'}
@@ -462,7 +463,7 @@ class PYREC_OT_InspectPanelAttrZoomOut(Operator):
 
     def execute(self, context):
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                             context.scene.py_rec.inspect_context_collections)
+                                             context.window_manager.py_rec.inspect_context_collections)
         if ic_panel is None or len(ic_panel.dir_attributes) == 0:
             self.report({'ERROR'}, "Unable to Zoom Out from Attribute because Attributes List is empty")
             return {'CANCELLED'}
@@ -513,13 +514,13 @@ class PYREC_UL_StringList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         layout.label(text=item.name)
 
-def inspect_index_int_zoom_in(context, ic_panel, panel_num):
-    ic_panel.inspect_exec_str = "%s[%i]" % (ic_panel.dir_inspect_exec_str, ic_panel.index_int)
+def inspect_array_index_zoom_in(context, ic_panel, panel_num):
+    ic_panel.inspect_exec_str = "%s[%i]" % (ic_panel.dir_inspect_exec_str, ic_panel.array_index)
     # do refresh using modified 'inspect_exec_str'
     inspect_exec_refresh(context, panel_num)
 
-class PYREC_OT_InspectPanelIndexIntZoomIn(Operator):
-    bl_idname = "py_rec.inspect_index_int_zoom_in"
+class PYREC_OT_InspectPanelArrayIndexZoomIn(Operator):
+    bl_idname = "py_rec.inspect_array_index_zoom_in"
     bl_label = "Zoom In"
     bl_description = "Zoom in to selected Integer Index by appending Integer Index to current exec string, and " \
         "refresh Inspect Attributes list"
@@ -529,20 +530,20 @@ class PYREC_OT_InspectPanelIndexIntZoomIn(Operator):
 
     def execute(self, context):
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                             context.scene.py_rec.inspect_context_collections)
+                                             context.window_manager.py_rec.inspect_context_collections)
         if ic_panel is None:
             self.report({'ERROR'}, "Unable to Zoom In to Integer Index because Inspect Panel reference is missing")
             return {'CANCELLED'}
-        inspect_index_int_zoom_in(context, ic_panel, self.panel_num)
+        inspect_array_index_zoom_in(context, ic_panel, self.panel_num)
         return {'FINISHED'}
 
-def inspect_index_str_zoom_in(context, ic_panel, panel_num):
-    ic_panel.inspect_exec_str = "%s[\"%s\"]" % (ic_panel.dir_inspect_exec_str, ic_panel.index_str_enum)
+def inspect_array_key_zoom_in(context, ic_panel, panel_num):
+    ic_panel.inspect_exec_str = "%s[\"%s\"]" % (ic_panel.dir_inspect_exec_str, ic_panel.array_key)
     # do refresh using modified 'inspect_exec_str'
     inspect_exec_refresh(context, panel_num)
 
-class PYREC_OT_InspectPanelIndexStrZoomIn(Operator):
-    bl_idname = "py_rec.inspect_index_str_zoom_in"
+class PYREC_OT_InspectPanelArrayKeyZoomIn(Operator):
+    bl_idname = "py_rec.inspect_array_key_zoom_in"
     bl_label = "Zoom In"
     bl_description = "Zoom in to selected String Index by appending String Index to current exec string, and " \
         "refresh Inspect Attributes list"
@@ -552,11 +553,11 @@ class PYREC_OT_InspectPanelIndexStrZoomIn(Operator):
 
     def execute(self, context):
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                             context.scene.py_rec.inspect_context_collections)
+                                             context.window_manager.py_rec.inspect_context_collections)
         if ic_panel is None:
             self.report({'ERROR'}, "Unable to Zoom In to String Index because Inspect Panel reference is missing")
             return {'CANCELLED'}
-        inspect_index_str_zoom_in(context, ic_panel, self.panel_num)
+        inspect_array_key_zoom_in(context, ic_panel, self.panel_num)
         return {'FINISHED'}
 
 def restore_inspect_context_panels(inspect_context_collections):
@@ -584,7 +585,7 @@ class PYREC_OT_RestoreInspectContextPanels(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        restore_inspect_context_panels(context.scene.py_rec.inspect_context_collections)
+        restore_inspect_context_panels(context.window_manager.py_rec.inspect_context_collections)
         return {'FINISHED'}
 
 def get_commented_splitlines(input_str):
@@ -627,7 +628,7 @@ class PYREC_OT_InspectRecordAttribute(Operator):
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
     def execute(self, context):
-        p_r = context.scene.py_rec
+        p_r = context.window_manager.py_rec
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type, p_r.inspect_context_collections)
         if ic_panel is None or len(ic_panel.dir_attributes) == 0:
             self.report({'ERROR'}, "Error: Unable to Record Attribute because Attributes list is empty")
@@ -635,7 +636,7 @@ class PYREC_OT_InspectRecordAttribute(Operator):
         return self.inspect_record_attribute(context, ic_panel, p_r.record_options.attribute)
 
     def draw(self, context):
-        attr_record_options = context.scene.py_rec.record_options.attribute
+        attr_record_options = context.window_manager.py_rec.record_options.attribute
         layout = self.layout
         box = layout.box()
         box.prop(attr_record_options, "copy_from")
@@ -648,7 +649,7 @@ class PYREC_OT_InspectRecordAttribute(Operator):
 
     def invoke(self, context, event):
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                             context.scene.py_rec.inspect_context_collections)
+                                             context.window_manager.py_rec.inspect_context_collections)
         # do not invoke if zero attributes available to record
         if ic_panel is None or len(ic_panel.dir_attributes) == 0:
             self.report({'ERROR'}, "Error: Unable to Record Attribute because Attributes list is empty")
@@ -706,7 +707,7 @@ class PYREC_OT_InspectCopyAttribute(Operator):
 
     def execute(self, context):
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                             context.scene.py_rec.inspect_context_collections)
+                                             context.window_manager.py_rec.inspect_context_collections)
         if ic_panel is None or len(ic_panel.dir_attributes) == 0:
             self.report({'ERROR'}, "Unable to Copy Attribute Reference because Attributes list is empty")
             return {'CANCELLED'}
@@ -732,7 +733,7 @@ class PYREC_OT_InspectPasteAttribute(Operator):
 
     def execute(self, context):
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                             context.scene.py_rec.inspect_context_collections)
+                                             context.window_manager.py_rec.inspect_context_collections)
         if ic_panel is None or len(ic_panel.dir_attributes) == 0:
             self.report({'ERROR'}, "Unable to Paste Attribute Reference because Attributes list is empty")
             return {'CANCELLED'}
@@ -767,7 +768,7 @@ class PYREC_OT_InspectChoosePy(Operator):
 
     def execute(self, context):
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                             context.scene.py_rec.inspect_context_collections)
+                                             context.window_manager.py_rec.inspect_context_collections)
         if ic_panel is None:
             return {'CANCELLED'}
         if ic_panel.inspect_py_type == "active":
@@ -791,7 +792,7 @@ class PYREC_OT_InspectChoosePy(Operator):
 
     def draw(self, context):
         ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
-                                             context.scene.py_rec.inspect_context_collections)
+                                             context.window_manager.py_rec.inspect_context_collections)
         if ic_panel is None:
             return
         layout = self.layout
@@ -808,14 +809,13 @@ class PYREC_OT_InspectChoosePy(Operator):
         box.label(text="Inspect Exec")
         box.prop(ic_panel, "inspect_py_type", text="")
         if ic_panel.inspect_py_type == "active":
-            thing_name = get_active_thing_name(context)
-            box.label(text="Active: " + thing_name)
+            box.prop(ic_panel, "inspect_active_type", text="")
         elif ic_panel.inspect_py_type == "custom":
             box.prop(ic_panel, "inspect_exec_str", text="")
         elif ic_panel.inspect_py_type == "datablock":
             row = box.row(align=True)
-            row.prop(ic_panel, "inspect_data_type", text="")
-            row.prop_search(ic_panel, "inspect_datablock", bpy.data, ic_panel.inspect_data_type, text="")
+            row.prop(ic_panel, "inspect_datablock_type", text="")
+            row.prop_search(ic_panel, "inspect_datablock_name", bpy.data, ic_panel.inspect_datablock_type, text="")
 
     def invoke(self, context, event):
         # open window to set options before operator execute

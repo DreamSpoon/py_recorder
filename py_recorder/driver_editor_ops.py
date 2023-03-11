@@ -244,7 +244,7 @@ class PYREC_OT_DriversToPython(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        dr = context.scene.py_rec.record_options.driver
+        dr = context.window_manager.py_rec.record_options.driver
         text = create_driver_py_from_data_item(dr.num_space_pad, dr.make_function, dr.animdata_bool_vec)
         self.report({'INFO'}, "Driver(s) recorded to Python in Text named '%s'" % text.name)
         return {'FINISHED'}
@@ -260,7 +260,7 @@ class PYREC_OT_SelectAnimdataSrcAll(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        dr = context.scene.py_rec.record_options.driver
+        dr = context.window_manager.py_rec.record_options.driver
         set_bool_vec_state(dr.animdata_bool_vec, True)
         return {'FINISHED'}
 
@@ -271,6 +271,6 @@ class PYREC_OT_SelectAnimdataSrcNone(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        dr = context.scene.py_rec.record_options.driver
+        dr = context.window_manager.py_rec.record_options.driver
         set_bool_vec_state(dr.animdata_bool_vec, False)
         return {'FINISHED'}

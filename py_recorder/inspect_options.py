@@ -39,7 +39,7 @@ class PYREC_OT_InspectOptions(Operator):
 
     def draw(self, context):
         context_name = context.space_data.type
-        p_r = context.scene.py_rec
+        p_r = context.window_manager.py_rec
         ic_panel = get_inspect_context_panel(self.panel_num, context_name, p_r.inspect_context_collections)
         panel_options = ic_panel.panel_options
         layout = self.layout

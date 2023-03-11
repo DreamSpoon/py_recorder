@@ -189,7 +189,7 @@ def filter_info_lines(info_lines, copy_start_line_offset, filter_end_line_offset
                 if is_dup and not include_prev_dup:
                     continue
                 filtered_lines.append( (LINETYPE_PY_REC, is_dup, l) )
-        elif l.startswith("bpy.context.scene.py_rec"):
+        elif l.startswith("bpy.context.window_manager.py_rec"):
             if include_py_rec:
                 is_dup = check_add_prev_lines(l, "=", prev_lines)
                 if is_dup and not include_prev_dup:
@@ -386,7 +386,7 @@ class PYREC_OT_VIEW3D_StartRecordInfoLine(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.record_options.info
+        pr_ir = context.window_manager.py_rec.record_options.info
         pr_ir.record_info_line = True
         pr_ir.record_info_start_line_offset = get_current_info_line_count(context)
         self.report({'INFO'}, "Start Record: begin at Info line number %i" % pr_ir.record_info_start_line_offset)
@@ -401,7 +401,7 @@ class PYREC_OT_VIEW3D_StopRecordInfoLine(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.record_options.info
+        pr_ir = context.window_manager.py_rec.record_options.info
         line_start = pr_ir.record_info_start_line_offset
         line_end, filter_line_count, output_thing = copy_filtered_info_lines(context,
                                                                              get_copy_info_options(pr_ir, line_start))
@@ -438,7 +438,7 @@ class PYREC_OT_VIEW3D_CopyInfoToObjectText(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.record_options.info
+        pr_ir = context.window_manager.py_rec.record_options.info
         line_end, filter_line_count, output_thing = copy_filtered_info_lines(context,
                                                                              get_copy_info_options(pr_ir, None))
         if output_thing is None:
@@ -577,7 +577,7 @@ class PYREC_OT_VIEW3D_RunObjectScript(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        pr_ir = context.scene.py_rec.record_options.info
+        pr_ir = context.window_manager.py_rec.record_options.info
         for ob in context.selected_objects:
             # get Object name before running init, to prevent errors in case Object is removed by running init
             o_name = ob.name

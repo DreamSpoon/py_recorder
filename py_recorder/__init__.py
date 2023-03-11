@@ -21,7 +21,7 @@ bl_info = {
     "description": "Inspect Python object attributes. Record Blender data to Python code. Record Info lines to " \
         "Text / Text Object script so that user actions in Blender can be recreated later by running the script",
     "author": "Dave",
-    "version": (0, 3, 0),
+    "version": (0, 4, 0),
     "blender": (2, 80, 0),
     "location": "3DView -> Tools -> Tool -> Py Record, Py Exec, Py Inspect / right-click Context menu -> " \
         "Add Inspect Panel",
@@ -41,11 +41,12 @@ from bpy.utils import (register_class, unregister_class)
 
 from .inspect import (PYREC_OT_AddInspectPanel, PYREC_OT_RemoveInspectPanel, PYREC_UL_DirAttributeList,
     PYREC_PG_DirAttributeItem, PYREC_OT_InspectOptions, PYREC_OT_InspectPanelAttrZoomIn,
-    PYREC_OT_InspectPanelAttrZoomOut, PYREC_OT_InspectPanelIndexIntZoomIn, PYREC_OT_InspectPanelIndexStrZoomIn,
+    PYREC_OT_InspectPanelAttrZoomOut, PYREC_OT_InspectPanelArrayIndexZoomIn, PYREC_OT_InspectPanelArrayKeyZoomIn,
     PYREC_UL_StringList, PYREC_OT_RestoreInspectContextPanels, PYREC_OT_InspectRecordAttribute,
     PYREC_OT_InspectCopyAttribute, PYREC_OT_InspectPasteAttribute, PYREC_OT_InspectChoosePy, draw_inspect_panel,
     update_dir_attributes)
 from .inspect_exec import (register_inspect_exec_panel_draw_func, unregister_all_inspect_panel_classes)
+from .inspect_func import get_inspect_active_type_items
 from .object_custom_prop import (CPROP_NAME_INIT_PY, PYREC_OT_OBJ_AddCP_Data, PYREC_OT_OBJ_ModifyInit)
 from .driver_editor_ops import (PYREC_OT_DriversToPython, PYREC_OT_SelectAnimdataSrcAll,
     PYREC_OT_SelectAnimdataSrcNone, get_animdata_bool_names)
@@ -67,7 +68,7 @@ class PYREC_PT_OBJ_AdjustCustomProp(Panel):
         return context.active_object != None
 
     def draw(self, context):
-        pr_ir = context.scene.py_rec.record_options.info
+        pr_ir = context.window_manager.py_rec.record_options.info
         layout = self.layout
         act_ob = context.active_object
 
@@ -96,7 +97,7 @@ class PYREC_PT_VIEW3D_RecordInfo(Panel):
     bl_label = "Py Record Info"
 
     def draw(self, context):
-        pr_ir = context.scene.py_rec.record_options.info
+        pr_ir = context.window_manager.py_rec.record_options.info
         layout = self.layout
 
         box = layout.box()
@@ -173,7 +174,7 @@ class PYREC_PT_VIEW3D_ExecObject(Panel):
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
-        pr_ir = context.scene.py_rec.record_options.info
+        pr_ir = context.window_manager.py_rec.record_options.info
         layout = self.layout
         box = layout.box()
         box.label(text="Run Object '__init__'")
@@ -190,7 +191,7 @@ class PYREC_PT_RecordNodetree(Panel):
     bl_label = "Py Record Nodetree"
 
     def draw(self, context):
-        ntr = context.scene.py_rec.record_options.nodetree
+        ntr = context.window_manager.py_rec.record_options.nodetree
         layout = self.layout
         box = layout.box()
         box.operator(PYREC_OT_RecordNodetree.bl_idname)
@@ -223,7 +224,7 @@ class PYREC_PT_RecordDriver(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        dr = context.scene.py_rec.record_options.driver
+        dr = context.window_manager.py_rec.record_options.driver
 
         box = layout.box()
         box.label(text="Driver Data Source")
@@ -264,25 +265,26 @@ class PYREC_PG_InspectPanelOptions(PropertyGroup):
 
 def populate_index_strings(self, context):
     # if index string collection is not empty then create array for use with EnumProperty
-    if len(self.index_str_coll) > 0:
+    if len(self.array_key_set) > 0:
         output = []
-        for index_str in self.index_str_coll:
+        for index_str in self.array_key_set:
             output.append( (index_str.name, index_str.name, "") )
         return output
     # return empty
     return [ (" ", "", "") ]
 
-def set_index_int(self, value):
-    if value < 0 or value > self.index_max_int:
+def set_array_index(self, value):
+    if value < 0 or value > self.array_index_max:
         return
-    self["index_int"] = value
+    self["array_index"] = value
     return
 
-def get_index_int(self):
-    return self.get("index_int", 0)
+def get_array_index(self):
+    return self.get("array_index", 0)
 
 class PYREC_PG_InspectPanel(PropertyGroup):
     panel_label: StringProperty()
+    panel_options: PointerProperty(type=PYREC_PG_InspectPanelOptions)
 
     pre_inspect_type: EnumProperty(name="Pre-Inspect Exec Type", items=[
         ("none", "None", "Only inspect value Python code will be run to get inspect value"),
@@ -300,21 +302,21 @@ class PYREC_PG_InspectPanel(PropertyGroup):
         ("custom", "Custom", "Custom string of code will be run, and run result will be inspected"),
         ("datablock", "Datablock", "Datablock includes all data collections under 'bpy.data'") ],
         description="Type of Python object to inspect", default="custom")
-    inspect_data_type: EnumProperty(name="Type", items=CP_DATA_TYPE_ITEMS, default="objects",
+    inspect_active_type: EnumProperty(name="Active Type", items=get_inspect_active_type_items)
+    inspect_datablock_type: EnumProperty(name="Type", items=CP_DATA_TYPE_ITEMS, default="objects",
         description="Type of data to inspect. Includes 'bpy.data' sources")
-    inspect_datablock: StringProperty(name="Inspect datablock Name", description="Name of datablock instance to " +
-        "inspect. Includes 'bpy.data' sources", default="")
+    inspect_datablock_name: StringProperty(name="Inspect datablock Name", description="Name of datablock instance " +
+        "to inspect. Includes 'bpy.data' sources", default="")
     inspect_exec_str: StringProperty(name="Inspect Exec", description="Python string that will be run and result " +
         "returned when 'Inspect Exec' is used", default="bpy.data.objects")
 
-    index_int: IntProperty(set=set_index_int, get=get_index_int, description="Integer index for Zoom In. Uses " +
-        "zero-based indexing, i.e. first item is number 0 ")
-    index_max_int: IntProperty()
-    index_str_coll: CollectionProperty(type=PropertyGroup)
-
-    index_str_enum: EnumProperty(items=populate_index_strings, description="String index for Zoom In. Uses 'key()' " +
-        "function to get available key names for indexing")
-    index_type: EnumProperty(items=[("none", "None", "", 1),
+    array_index_max: IntProperty()
+    array_index: IntProperty(set=set_array_index, get=get_array_index, description="Array index integer for Zoom " +
+        "In. Uses zero-based indexing, i.e. first item is number 0 ")
+    array_key_set: CollectionProperty(type=PropertyGroup)
+    array_key: EnumProperty(items=populate_index_strings, description="Array key string for Zoom In. Uses 'key()' " +
+        "function to get available key names for array")
+    array_index_key_type: EnumProperty(items=[("none", "None", "", 1),
         ("int", "Integer", "", 2),
         ("str", "String", "", 3),
         ("int_str", "Integer and String", "", 4) ], default="none")
@@ -328,8 +330,6 @@ class PYREC_PG_InspectPanel(PropertyGroup):
 
     dir_item_doc_lines: CollectionProperty(type=PropertyGroup)
     dir_item_doc_lines_index: IntProperty()
-
-    panel_options: PointerProperty(type=PYREC_PG_InspectPanelOptions)
 
 class PYREC_PG_InspectPanelCollection(PropertyGroup):
     inspect_context_panels: CollectionProperty(type=PYREC_PG_InspectPanel)
@@ -482,8 +482,8 @@ classes = [
     PYREC_OT_InspectOptions,
     PYREC_OT_InspectPanelAttrZoomIn,
     PYREC_OT_InspectPanelAttrZoomOut,
-    PYREC_OT_InspectPanelIndexIntZoomIn,
-    PYREC_OT_InspectPanelIndexStrZoomIn,
+    PYREC_OT_InspectPanelArrayIndexZoomIn,
+    PYREC_OT_InspectPanelArrayKeyZoomIn,
     PYREC_OT_DriversToPython,
     PYREC_OT_SelectAnimdataSrcAll,
     PYREC_OT_SelectAnimdataSrcNone,
@@ -531,29 +531,82 @@ def remove_inspect_context_menu_all():
     for d in context_type_draw_removes:
         d.remove(draw_inspect_context_menu)
 
+def duplicate_prop(to_prop, from_prop):
+    if isinstance(from_prop, bpy.types.PropertyGroup):
+        for attr_name in dir(from_prop):
+            attr_value = getattr(from_prop, attr_name)
+            if attr_name in [ "bl_rna", "rna_type", "id_data" ] or callable(attr_value) or attr_name.startswith("__"):
+                continue
+            if isinstance(attr_value, bpy.types.PropertyGroup) or \
+                (hasattr(attr_value, "__len__") and not isinstance(attr_value, str)):
+                duplicate_prop(getattr(to_prop, attr_name), attr_value)
+            else:
+                setattr(to_prop, attr_name, attr_value)
+    elif hasattr(from_prop, "__len__"):
+        if hasattr(to_prop, "clear") and callable(getattr(to_prop, "clear")):
+            to_prop.clear()
+        for index, from_item in enumerate(from_prop):
+            if hasattr(to_prop, "clear") and callable(getattr(to_prop, "clear")):
+                to_item = to_prop.add()
+                to_item.name = from_item.name
+            if isinstance(from_item, bpy.types.PropertyGroup) or \
+                (hasattr(from_item, "__len__") and not isinstance(from_item, str)):
+                duplicate_prop(to_item, from_item)
+            else:
+                to_prop[index] = from_item
+
+def load_py_rec_from_scene():
+    # copy to WindowManager (singleton, only one) from first Scene (one or more, never zero)
+    duplicate_prop(bpy.data.window_managers[0].py_rec, bpy.data.scenes[0].py_rec)
+
+def save_py_rec_to_scene():
+    # copy to first Scene (one or more, never zero) from WindowManager (singleton, only one)
+    duplicate_prop(bpy.data.scenes[0].py_rec, bpy.data.window_managers[0].py_rec)
+
 @persistent
-def inspect_panel_reload(dummy):
+def load_post_handler_func(dummy):
+    # restore state of py_rec before restoring context panels, because restore requires data from py_rec
+    load_py_rec_from_scene()
+    # register Py Inspect panel UI classes, using data from (now) loaded .blend file
     bpy.ops.py_rec.restore_inspect_context_panels()
+
+@persistent
+def save_pre_handler_func(dummy):
+    # save state of py_rec before saving .blend file, so Py Inspect panel info is saved
+    save_py_rec_to_scene()
 
 def register():
     register_inspect_exec_panel_draw_func(draw_inspect_panel)
     for cls in classes:
         register_class(cls)
+    # Scene property is used so py_rec state is saved with .blend file data, because WindowManager properties are not
+    # saved with .blend file.
     bpy.types.Scene.py_rec = PointerProperty(type=PYREC_PG_PyRec)
+    # WindowManager property is used so the same Py Inspect panel properties are available across all Scenes in loaded
+    # .blend file. Creating new Scenes, and switching active Scenes, causes difficulties linking data for Py Inspect
+    # panels with UI classes for Py Inspect panels - because UI classes (Py Inspect panels) are the same across all
+    # Scenes, but py_rec properties data is different for each Scene.
+    bpy.types.WindowManager.py_rec = PointerProperty(type=PYREC_PG_PyRec)
+    if not load_post_handler_func in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(load_post_handler_func)
+    if not save_pre_handler_func in bpy.app.handlers.save_pre:
+        bpy.app.handlers.save_pre.append(save_pre_handler_func)
+    # append 'Add Inspect Panel' button to all Context menus (all Context types)
     append_inspect_context_menu_all()
 
-    if not inspect_panel_reload in bpy.app.handlers.load_post:
-        bpy.app.handlers.load_post.append(inspect_panel_reload)
-
 def unregister():
-    if inspect_panel_reload in bpy.app.handlers.load_post:
-        bpy.app.handlers.load_post.remove(inspect_panel_reload)
-
+    # remove 'Add Inspect Panel' button from all Context menus (all Context types)
+    remove_inspect_context_menu_all()
+    # unregister Py Inspect panel UI classes
     unregister_all_inspect_panel_classes()
+    if save_pre_handler_func in bpy.app.handlers.save_pre:
+        bpy.app.handlers.save_pre.remove(save_pre_handler_func)
+    if load_post_handler_func in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(load_post_handler_func)
+    del bpy.types.WindowManager.py_rec
+    del bpy.types.Scene.py_rec
     for cls in reversed(classes):
         unregister_class(cls)
-    del bpy.types.Scene.py_rec
-    remove_inspect_context_menu_all()
 
 if __name__ == "__main__":
     register()

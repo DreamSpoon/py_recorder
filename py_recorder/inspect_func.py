@@ -51,49 +51,116 @@ def remove_last_py_attribute(exec_str):
 def match_inspect_panel_name(input_str):
     return re.match(INSPECT_PANEL_CLASS_MATCH_STR, input_str)
 
-def get_active_thing_name(context):
-    if context.space_data.type == "VIEW_3D":
-        if context.active_object is None:
-            return ""
-        if context.mode == "EDIT_ARMATURE":
-            if context.active_bone != None:
-                return context.active_bone.name
-        elif context.mode == "POSE":
-            if context.active_pose_bone != None:
-                return context.active_pose_bone.name
-        # default to OBJECT if mode is unknown
-        return context.active_object.name
-    elif context.space_data.type == "NODE_EDITOR":
-        if context.active_node is None:
-            return ""
-        return context.active_node.name
-    return ""
+def get_action_fcurve_index(fcurves, data_path, array_index):
+    for index in range(len(fcurves)):
+        if fcurves[index].array_index == array_index and fcurves[index].data_path == data_path:
+            return index
+    return None
 
-def get_active_thing_inspect_str(context):
-    context_type = context.space_data.type
-    active_object = context.active_object
-    if context_type == "VIEW_3D":
-        if active_object is None:
-            return ""
-        if context.mode == "EDIT_ARMATURE":
+def get_inspect_active_type_items(self, context):
+    active_items = []
+    # add active_items based on context type, and available active things
+    if context.space_data.type == "DOPESHEET_EDITOR":
+        if context.active_action != None and context.space_data.ui_mode == "ACTION":
+            active_items.append( ("active_action", "Action", "") )
+    elif context.space_data.type == "GRAPH_EDITOR":
+        if context.active_action != None:
+            active_items.append( ("active_action", "Action", "") )
+            if context.active_editable_fcurve != None:
+                fcurve_index = get_action_fcurve_index(context.active_action.fcurves,
+                                                       context.active_editable_fcurve.data_path,
+                                                       context.active_editable_fcurve.array_index)
+                if fcurve_index != None:
+                    active_items.append( ("active_editable_fcurve", "Editable F-Curve", "") )
+    elif context.space_data.type == "NLA_EDITOR":
+        if context.active_object != None:
+            active_items.append( ("active_object", "Object", "") )
+            if context.active_nla_track != None:
+                active_items.append( ("active_nla_track", "NLA Track", "") )
+                if context.active_nla_strip != None:
+                    active_items.append( ("active_nla_strip", "NLA Strip", "") )
+    elif context.space_data.type == "NODE_EDITOR":
+        if context.space_data.edit_tree != None:
+            active_items.append( ("nodetree", "Nodetree", "") )
+            if context.active_node != None:
+                active_items.append( ("active_node", "Node", "") )
+    elif context.space_data.type == "VIEW_3D":
+        if context.active_object != None:
+            active_items.append( ("active_object", "Object", "") )
+            if context.active_object.type == "ARMATURE":
+                active_items.append( ("armature", "Armature", "") )
+            elif context.active_object.type == "CAMERA":
+                active_items.append( ("camera", "Camera", "") )
+            elif context.active_object.type == "LIGHT":
+                active_items.append( ("light", "Light", "") )
+            elif context.active_object.type == "MESH":
+                active_items.append( ("mesh", "Mesh", "") )
             if context.active_bone != None:
-                return "bpy.data.armatures[\"%s\"].bones[\"%s\"]" % (active_object.data.name,
-                                                                     context.active_bone.name)
-        elif context.mode == "POSE":
+                active_items.append( ("active_bone", "Bone", "") )
             if context.active_pose_bone != None:
-                return "bpy.data.objects[\"%s\"].pose.bones[\"%s\"]" % (active_object.name,
-                                                                        context.active_pose_bone.name)
-        # default to OBJECT if mode is unknown
-        return "bpy.data.objects[\"%s\"]" % active_object.name
-    elif context_type == "NODE_EDITOR":
-        if context.active_node is None:
+                active_items.append( ("active_pose_bone", "Pose Bone", "") )
+    # if active_items is empty then return empty list (list needs at least one item or exception will occur)
+    if len(active_items) < 1:
+        return [ (" ", "", "") ]
+    return active_items
+
+def get_active_thing_inspect_str(context, active_type):
+    # check for empty (single space is checked because enum is used for active_type, and enum needs at least one item)
+    if active_type == "" or active_type == " ":
+        return ""
+    # check active type and return active thing if available
+    if active_type == "active_object" and context.active_object != None:
+        return "bpy.data.objects[\"%s\"]" % context.active_object.name
+    elif active_type == "armature" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.armatures[\"%s\"]" % context.active_object.data.name
+    elif active_type == "camera" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.cameras[\"%s\"]" % context.active_object.data.name
+    elif active_type == "light" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.lights[\"%s\"]" % context.active_object.data.name
+    elif active_type == "mesh" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.meshes[\"%s\"]" % context.active_object.data.name
+    elif active_type in ["active_action", "active_editable_fcurve"]:
+        if context.active_action is None:
+            return ""
+        if active_type == "active_action":
+            return "bpy.data.actions[\"%s\"]" % context.active_action.name
+        else:
+            fcurve_index = get_action_fcurve_index(context.active_action.fcurves,
+                                                   context.active_editable_fcurve.data_path,
+                                                   context.active_editable_fcurve.array_index)
+            if fcurve_index != None:
+                return "bpy.data.actions[\"%s\"].fcurves[%i]" % (context.active_action.name, fcurve_index)
+    elif active_type in ["active_nla_track", "active_nla_strip"]:
+        if context.active_object is None or context.active_nla_track is None:
+            return ""
+        inspect_str = "bpy.data.objects[\"%s\"].animation_data.nla_tracks[\"%s\"]" % (context.active_object.name,
+                                                                                      context.active_nla_track.name)
+        if active_type == "active_nla_track":
+            return inspect_str
+        if context.active_nla_strip != None:
+            return inspect_str + (".strips[\"%s\"]" % context.active_nla_strip.name)
+    elif active_type in ["nodetree", "active_node"]:
+        if context.space_data.edit_tree is None:
             return ""
         if context.space_data.edit_tree.name in bpy.data.node_groups:
-            return "bpy.data.node_groups[\"%s\"].nodes[\"%s\"]" % (context.space_data.edit_tree.name,
-                                                                   context.active_node.name)
+            inspect_str = "bpy.data.node_groups[\"%s\"]" % context.space_data.edit_tree.name
         elif isinstance(context.space_data.id, bpy.types.Material):
-            return "bpy.data.materials[\"%s\"].node_tree.nodes[\"%s\"]" % (context.space_data.id.name,
-                                                                           context.active_node.name)
+            inspect_str = "bpy.data.materials[\"%s\"].node_tree" % context.space_data.id.name
         else:
-            return "bpy.context.active_node"
+            return ""
+        if active_type == "nodetree":
+            return inspect_str
+        if context.active_node != None:
+            return inspect_str + (".nodes[\"%s\"]" % context.active_node.name)
+    elif active_type in ["active_bone", "active_pose_bone"]:
+        if context.active_object is None:
+            return ""
+        elif active_type == "active_bone":
+            if context.active_bone != None and context.active_object.data != None:
+                return "bpy.data.armatures[\"%s\"].bones[\"%s\"]" % (context.active_object.data.name,
+                                                                     context.active_bone.name)
+        elif active_type == "active_pose_bone":
+            if context.active_pose_bone != None:
+                return "bpy.data.objects[\"%s\"].pose.bones[\"%s\"]" % (context.active_object.name,
+                                                                        context.active_pose_bone.name)
     return ""

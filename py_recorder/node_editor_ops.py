@@ -468,7 +468,7 @@ class PYREC_OT_RecordNodetree(Operator):
         return False
 
     def execute(self, context):
-        ntr = context.scene.py_rec.record_options.nodetree
+        ntr = context.window_manager.py_rec.record_options.nodetree
         uni_node_options = {
             LOC_DEC_PLACES_UNI_NODE_OPT: ntr.write_loc_decimal_places,
             WRITE_DEFAULTS_UNI_NODE_OPT: ntr.write_default_values,
