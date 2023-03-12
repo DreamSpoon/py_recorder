@@ -21,10 +21,10 @@ bl_info = {
     "description": "Inspect Python object attributes. Record Blender data to Python code. Record Info lines to " \
         "Text / Text Object script so that user actions in Blender can be recreated later by running the script",
     "author": "Dave",
-    "version": (0, 4, 0),
+    "version": (0, 4, 1),
     "blender": (2, 80, 0),
-    "location": "3DView -> Tools -> Tool -> Py Record, Py Exec, Py Inspect / right-click Context menu -> " \
-        "Add Inspect Panel",
+    "location": "3DView -> Tools -> Tool -> Py Record Info, Py Exec Object. Right-click Context menu -> " \
+        "Add Inspect Panel. Context -> Tool -> Py Inspect",
     "category": "Python",
     "wiki_url": "https://github.com/DreamSpoon/py_recorder#readme",
 }

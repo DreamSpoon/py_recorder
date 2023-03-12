@@ -6,15 +6,15 @@ Inspect Blender data in any Context (some contexts unavailable, e.g. 'Properties
   - see Inspect Panel in Context -> Tools -> Py Inspect
     - e.g. View3D -> Tools -> Tool -> Py Inspect
 
-Record recently run commands as Python code (commands can be viewed in Info context):
-  - View3D -> Tools -> Py Record
-
 Exec Python code in any Context:
   - Context -> Tools -> Py Exec
     - e.g. View3D -> Tools -> Tool -> Py Exec
 
-Record Nodetree (e.g. Material nodes):
+Record Driver as Python code:
+  - Driver Editor -> Tools -> Tool -> Record Driver
+
+Record Material Nodes / Geometry Nodes as Python code:
   - Shader Editor -> Tools -> Tool -> Record Nodetree
 
-Record Driver:
-  - Driver Editor -> Tools -> Tool -> Record Driver
+Record recently run commands as Python code (commands can be viewed in Info context):
+  - View3D -> Tools -> Py Record

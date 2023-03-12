@@ -34,6 +34,9 @@ def get_dir(val):
 def get_inspect_context_panel(panel_num, context_name, inspect_context_collections):
     if panel_num < 0 or context_name == "" or inspect_context_collections is None:
         return None
+    # panel classes in "Properties" context are shared with "View3D" context
+    if context_name == "PROPERTIES":
+        context_name = "VIEW_3D"
     coll = inspect_context_collections.get(context_name)
     if coll is None:
         return None
@@ -72,6 +75,11 @@ def get_inspect_active_type_items(self, context):
                                                        context.active_editable_fcurve.array_index)
                 if fcurve_index != None:
                     active_items.append( ("active_editable_fcurve", "Editable F-Curve", "") )
+    elif context.space_data.type == "IMAGE_EDITOR":
+        if context.space_data.image != None:
+            active_items.append( ("image", "Image", "") )
+        if context.space_data.mask != None:
+            active_items.append( ("mask", "Mask", "") )
     elif context.space_data.type == "NLA_EDITOR":
         if context.active_object != None:
             active_items.append( ("active_object", "Object", "") )
@@ -81,20 +89,51 @@ def get_inspect_active_type_items(self, context):
                     active_items.append( ("active_nla_strip", "NLA Strip", "") )
     elif context.space_data.type == "NODE_EDITOR":
         if context.space_data.edit_tree != None:
-            active_items.append( ("nodetree", "Nodetree", "") )
+            active_items.append( ("node_tree", "Node Tree", "") )
             if context.active_node != None:
                 active_items.append( ("active_node", "Node", "") )
+        if isinstance(context.space_data.id, bpy.types.FreestyleLineStyle):
+            active_items.append( ("line_style", "Line Style", "") )
+        elif isinstance(context.space_data.id, bpy.types.Material):
+            active_items.append( ("material", "Material", "") )
+        elif isinstance(context.space_data.id, bpy.types.Texture):
+            active_items.append( ("texture", "Texture", "") )
+        elif isinstance(context.space_data.id, bpy.types.World):
+            active_items.append( ("world", "World", "") )
+    elif context.space_data.type == "TEXT_EDITOR":
+        if context.space_data.text != None:
+            active_items.append( ("text", "Text", "") )
     elif context.space_data.type == "VIEW_3D":
+        if context.view_layer.active_layer_collection != None:
+            active_items.append( ("collection", "Collection", "") )
         if context.active_object != None:
             active_items.append( ("active_object", "Object", "") )
             if context.active_object.type == "ARMATURE":
                 active_items.append( ("armature", "Armature", "") )
             elif context.active_object.type == "CAMERA":
                 active_items.append( ("camera", "Camera", "") )
+            elif context.active_object.type in ["CURVE", "FONT"]:
+                active_items.append( ("curve", "Curve", "") )
             elif context.active_object.type == "LIGHT":
                 active_items.append( ("light", "Light", "") )
+            elif context.active_object.type == "LATTICE":
+                active_items.append( ("lattice", "Lattice", "") )
+            elif context.active_object.type == "LIGHT_PROBE":
+                active_items.append( ("light_probe", "Light Probe", "") )
             elif context.active_object.type == "MESH":
                 active_items.append( ("mesh", "Mesh", "") )
+                if context.active_object.vertex_groups.active_index != -1:
+                    active_items.append( ("vertex_group", "Vertex Group", "") )
+                if context.active_object.data.uv_layers.active_index != -1:
+                    active_items.append( ("uv_layer", "UV Map", "") )
+                if context.active_object.active_shape_key != None:
+                    active_items.append( ("shape_key", "Shape Key", "") )
+            elif context.active_object.type == "META":
+                active_items.append( ("metaball", "Metaball", "") )
+            elif context.active_object.type == "SPEAKER":
+                active_items.append( ("speaker", "Speaker", "") )
+            elif context.active_object.type == "VOLUME":
+                active_items.append( ("volume", "Volume", "") )
             if context.active_bone != None:
                 active_items.append( ("active_bone", "Bone", "") )
             if context.active_pose_bone != None:
@@ -115,10 +154,22 @@ def get_active_thing_inspect_str(context, active_type):
         return "bpy.data.armatures[\"%s\"]" % context.active_object.data.name
     elif active_type == "camera" and context.active_object != None and context.active_object.data != None:
         return "bpy.data.cameras[\"%s\"]" % context.active_object.data.name
+    elif active_type == "curve" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.curves[\"%s\"]" % context.active_object.data.name
     elif active_type == "light" and context.active_object != None and context.active_object.data != None:
         return "bpy.data.lights[\"%s\"]" % context.active_object.data.name
+    elif active_type == "lattice" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.lattices[\"%s\"]" % context.active_object.data.name
+    elif active_type == "light_probe" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.lightprobes[\"%s\"]" % context.active_object.data.name
     elif active_type == "mesh" and context.active_object != None and context.active_object.data != None:
         return "bpy.data.meshes[\"%s\"]" % context.active_object.data.name
+    elif active_type == "metaball" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.metaballs[\"%s\"]" % context.active_object.data.name
+    elif active_type == "speaker" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.speakers[\"%s\"]" % context.active_object.data.name
+    elif active_type == "volume" and context.active_object != None and context.active_object.data != None:
+        return "bpy.data.volumes[\"%s\"]" % context.active_object.data.name
     elif active_type in ["active_action", "active_editable_fcurve"]:
         if context.active_action is None:
             return ""
@@ -139,16 +190,24 @@ def get_active_thing_inspect_str(context, active_type):
             return inspect_str
         if context.active_nla_strip != None:
             return inspect_str + (".strips[\"%s\"]" % context.active_nla_strip.name)
-    elif active_type in ["nodetree", "active_node"]:
+    elif active_type in ["node_tree", "active_node"]:
         if context.space_data.edit_tree is None:
             return ""
-        if context.space_data.edit_tree.name in bpy.data.node_groups:
-            inspect_str = "bpy.data.node_groups[\"%s\"]" % context.space_data.edit_tree.name
+        if isinstance(context.space_data.id, bpy.types.FreestyleLineStyle):
+            inspect_str = "bpy.data.linestyles[\"%s\"].node_tree" % context.space_data.id.name
         elif isinstance(context.space_data.id, bpy.types.Material):
             inspect_str = "bpy.data.materials[\"%s\"].node_tree" % context.space_data.id.name
+        elif isinstance(context.space_data.id, bpy.types.Scene):    # compositor nodetree
+            inspect_str = "bpy.data.scenes[\"%s\"].node_tree" % context.space_data.id.name
+        elif isinstance(context.space_data.id, bpy.types.Texture):
+            inspect_str = "bpy.data.textures[\"%s\"].node_tree" % context.space_data.id.name
+        elif isinstance(context.space_data.id, bpy.types.World):
+            inspect_str = "bpy.data.worlds[\"%s\"].node_tree" % context.space_data.id.name
+        elif context.space_data.edit_tree.name in bpy.data.node_groups:
+            inspect_str = "bpy.data.node_groups[\"%s\"]" % context.space_data.edit_tree.name
         else:
             return ""
-        if active_type == "nodetree":
+        if active_type == "node_tree":
             return inspect_str
         if context.active_node != None:
             return inspect_str + (".nodes[\"%s\"]" % context.active_node.name)
@@ -163,4 +222,44 @@ def get_active_thing_inspect_str(context, active_type):
             if context.active_pose_bone != None:
                 return "bpy.data.objects[\"%s\"].pose.bones[\"%s\"]" % (context.active_object.name,
                                                                         context.active_pose_bone.name)
+    elif active_type == "collection":
+        if context.view_layer.active_layer_collection != None:
+            coll_name = context.view_layer.active_layer_collection.name
+            coll = bpy.data.collections.get(coll_name)
+            # check for 'Scene Collection', which is not in bpy.data.collections, rather it is part of Scene class
+            if coll is None or coll == context.scene.collection:
+                return "bpy.data.scenes[\"%s\"].collection" % context.scene.name
+            return "bpy.data.collections[\"%s\"]" % coll_name
+    elif active_type == "image":
+        if context.space_data.image != None:
+            return "bpy.data.images[\"%s\"]" % context.space_data.image.name
+    elif active_type == "line_style":
+        if hasattr(context.space_data, "id") and isinstance(context.space_data.id, bpy.types.FreestyleLineStyle):
+            return "bpy.data.linestyles[\"%s\"]" % context.space_data.id.name
+    elif active_type == "mask":
+        if context.space_data.mask != None:
+            return "bpy.data.masks[\"%s\"]" % context.space_data.mask.name
+    elif active_type == "material":
+        if hasattr(context.space_data, "id") and isinstance(context.space_data.id, bpy.types.Material):
+            return "bpy.data.materials[\"%s\"]" % context.space_data.id.name
+    elif active_type == "shape_key":
+        if context.active_object != None and context.active_object.data != None and \
+            context.active_object.active_shape_key != None:
+            return "bpy.data.shape_keys[\"%s\"].key_blocks[\"%s\"]" % (context.active_object.data.shape_keys.name,
+                context.active_object.active_shape_key.name)
+    elif active_type == "texture":
+        if hasattr(context.space_data, "id") and isinstance(context.space_data.id, bpy.types.Texture):
+            return "bpy.data.textures[\"%s\"]" % context.space_data.id.name
+    elif active_type == "text":
+        if context.space_data.text != None:
+            return "bpy.data.texts[\"%s\"]" % context.space_data.text.name
+    elif active_type == "uv_layer":
+        if context.active_object != None and context.active_object.data != None and \
+            context.active_object.data.uv_layers.active_index != -1:
+            return "bpy.data.meshes[\"%s\"].uv_layers[\"%s\"]" % (context.active_object.data.name,
+                context.active_object.data.uv_layers[context.active_object.data.uv_layers.active_index].name)
+    elif active_type == "vertex_group":
+        if context.active_object != None and context.active_object.vertex_groups.active_index != -1:
+            return "bpy.data.objects[\"%s\"].vertex_groups[\"%s\"]" % (context.active_object.name,
+                context.active_object.vertex_groups[context.active_object.vertex_groups.active_index].name)
     return ""

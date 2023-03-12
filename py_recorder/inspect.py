@@ -74,19 +74,20 @@ def draw_inspect_panel(self, context):
     panel_options = ic_panel.panel_options
     if panel_options is None:
         return
-
     layout = self.layout
-
     box = layout.box()
+    # top row of Py Inspect panel buttons, always visible
     row = box.row()
     row.operator(PYREC_OT_RemoveInspectPanel.bl_idname, icon='REMOVE', text="").panel_num = self.panel_num
     row.separator()
     row.operator(PYREC_OT_InspectOptions.bl_idname, icon='OPTIONS', text="").panel_num = self.panel_num
     row.separator()
     row.operator(PYREC_OT_InspectChoosePy.bl_idname, icon='HIDE_OFF', text="").panel_num = self.panel_num
+    row.separator()
+    row.operator(PYREC_OT_InspectPanelAttrZoomOut.bl_idname, icon='ZOOM_OUT', text="").panel_num = self.panel_num
+    # array index / key
     if panel_options.display_value_attributes:
         box = layout.box()
-
         array_index_key_type = ic_panel.array_index_key_type
         if array_index_key_type == "int" or array_index_key_type == "str" or array_index_key_type == "int_str":
             sub_box = box.box()
@@ -102,36 +103,37 @@ def draw_inspect_panel(self, context):
             row.prop(ic_panel, "array_key", text="")
             row.operator(PYREC_OT_InspectPanelArrayKeyZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
                 self.panel_num
-
+    # current inspect exec string
     sub_box = box.box()
     sub_box.label(text="Exec: " + ic_panel.dir_inspect_exec_str)
+    # attributes of inspect exec value
     if panel_options.display_value_attributes:
         sub_box.label(text="Inspect Attributes")
         row = sub_box.row()
+        # calculate split factor
         split_denominator = 1
         if panel_options.display_dir_attribute_type:
             split_denominator = split_denominator + 1
         if panel_options.display_dir_attribute_value:
             split_denominator = split_denominator + 1
         split = row.split(factor=1/split_denominator)
+        # add attribute list labels to split
         split.label(text="Name")
         if panel_options.display_dir_attribute_type:
             split.label(text="Type")
         if panel_options.display_dir_attribute_value:
             split.label(text="Value")
-
+        # attributes list
         row = sub_box.row()
         row.template_list("PYREC_UL_DirAttributeList", "", ic_panel, "dir_attributes", ic_panel,
                           "dir_attributes_index", rows=5)
         col = row.column()
         sub_col = col.column(align=True)
         sub_col.operator(PYREC_OT_InspectPanelAttrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = self.panel_num
-        sub_col.operator(PYREC_OT_InspectPanelAttrZoomOut.bl_idname, icon='ZOOM_OUT', text="").panel_num = \
-            self.panel_num
         col.operator(PYREC_OT_InspectRecordAttribute.bl_idname, icon='DOCUMENTS', text="").panel_num = self.panel_num
         col.operator(PYREC_OT_InspectCopyAttribute.bl_idname, icon='COPY_ID', text="").panel_num = self.panel_num
         col.operator(PYREC_OT_InspectPasteAttribute.bl_idname, icon='PASTEDOWN', text="").panel_num = self.panel_num
-
+    # current inspect value, type, doc
     box = layout.box()
     if ic_panel.dir_inspect_exec_str != "":
         box.label(text="Type: " + ic_panel.dir_item_value_typename_str)

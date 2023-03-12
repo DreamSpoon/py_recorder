@@ -41,7 +41,11 @@ class PYREC_OT_InspectOptions(Operator):
         context_name = context.space_data.type
         p_r = context.window_manager.py_rec
         ic_panel = get_inspect_context_panel(self.panel_num, context_name, p_r.inspect_context_collections)
+        if ic_panel is None:
+            return
         panel_options = ic_panel.panel_options
+        if panel_options is None:
+            return
         layout = self.layout
 
         box = layout.box()
