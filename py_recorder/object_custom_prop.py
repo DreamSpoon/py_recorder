@@ -32,21 +32,16 @@ class PYREC_OT_OBJ_ModifyInit(Operator):
         return context.active_object is not None
 
     def execute(self, context):
-        act_ob = context.active_object
         pr_ir = context.window_manager.py_rec.record_options.info
-        delete_init = False
         if pr_ir.modify_data_type == "texts":
-            if pr_ir.modify_data_text is None:
-                delete_init = True
-            else:
-                act_ob[CPROP_NAME_INIT_PY] = pr_ir.modify_data_text
+            context.active_object[CPROP_NAME_INIT_PY] = pr_ir.modify_data_text
         elif pr_ir.modify_data_type == "objects":
-            if pr_ir.modify_data_obj is None:
-                delete_init = True
-            else:
-                act_ob[CPROP_NAME_INIT_PY] = pr_ir.modify_data_obj
-        if delete_init and act_ob.get(CPROP_NAME_INIT_PY) != None:
-            del act_ob[CPROP_NAME_INIT_PY]
+            context.active_object[CPROP_NAME_INIT_PY] = pr_ir.modify_data_obj
+        else:
+            try:
+                del context.active_object[CPROP_NAME_INIT_PY]
+            except:
+                pass
         return {'FINISHED'}
 
     def draw(self, context):

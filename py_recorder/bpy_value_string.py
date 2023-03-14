@@ -18,6 +18,48 @@
 
 import bpy
 
+BPY_DATA_TYPE_ITEMS = [
+    ('actions', "Action", "", 1),
+    ('armatures', "Armature", "", 2),
+    ('brushes', "Brush", "", 3),
+    ('cache_files', "Cache File", "", 4),
+    ('cameras', "Camera", "", 5),
+    ('collections', "Collection", "", 6),
+    ('curves', "Curve", "", 7),
+    ('fonts', "Font", "", 8),
+    ('grease_pencils', "Grease Pencil", "", 9),
+    ('images', "Image", "", 10),
+    ('lattices', "Lattice", "", 11),
+    ('libraries', "Library", "", 12),
+    ('lights', "Light", "", 13),
+    ('lightprobes', "Light Probe", "", 14),
+    ('linestyles', "Line Style", "", 15),
+    ('masks', "Mask", "", 16),
+    ('materials', "Material", "", 17),
+    ('meshes', "Mesh", "", 18),
+    ('metaballs', "Meta Ball", "", 19),
+    ('movieclips', "Movie Clip", "", 20),
+    ('node_groups', "Node Group", "", 21),
+    ('objects', "Object", "", 22),
+    ('paint_curves', "Paint Curve", "", 23),
+    ('palettes', "Palette", "", 24),
+    ('particles', "Particle Settings", "", 25),
+    ('shape_keys', "Shape Key", "", 26),
+    ('scenes', "Scene", "", 27),
+    ('screens', "Screen", "", 28),
+    ('sounds', "Sound", "", 29),
+    ('speakers', "Speaker", "", 30),
+    ('textures', "Texture", "", 31),
+    ('texts', "Text", "", 32),
+    ('volumes', "Volume", "", 33),
+    ('workspaces', "Work Space", "", 34),
+    ('worlds', "World", "", 35),
+]
+if bpy.app.version >= (3,10,0):
+    BPY_DATA_TYPE_ITEMS = BPY_DATA_TYPE_ITEMS + ('pointclouds', "Point Cloud", "", len(BPY_DATA_TYPE_ITEMS)+1)
+if bpy.app.version >= (3,30,0):
+    BPY_DATA_TYPE_ITEMS = BPY_DATA_TYPE_ITEMS + ('hair_curves', "Hair Curve", "", len(BPY_DATA_TYPE_ITEMS)+1)
+
 def get_node_tree_material_name(node_tree):
     for m in bpy.data.materials:
         if m.node_tree == node_tree:

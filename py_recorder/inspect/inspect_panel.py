@@ -17,21 +17,182 @@
 # ##### END GPL LICENSE BLOCK #####
 
 import mathutils
+import re
 import traceback
 
 import bpy
 from bpy.types import (Operator, PropertyGroup, UIList)
-from bpy.props import (BoolProperty, IntProperty, StringProperty)
+from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, IntProperty, PointerProperty, StringProperty)
 from bpy.utils import unregister_class
 
 from .inspect_options import PYREC_OT_InspectOptions
 from .inspect_func import (get_dir, get_inspect_context_panel, remove_last_py_attribute, match_inspect_panel_name,
-    get_active_thing_inspect_str)
-from .inspect_exec import (get_inspect_exec_result, register_inspect_panel_exec, unregister_inspect_panel_exec)
-from .bpy_value_string import bpy_value_to_string
-from .log_text import (LOG_TEXT_NAME, log_text_append)
+    get_active_thing_inspect_str, get_inspect_active_type_items)
+from .inspect_exec import (get_inspect_exec_result, register_inspect_panel, unregister_inspect_panel)
+from ..bpy_value_string import (BPY_DATA_TYPE_ITEMS, bpy_value_to_string)
+from ..log_text import (LOG_TEXT_NAME, log_text_append)
 
 RECORD_ATTRIBUTE_TEXT_NAME = "pyrec_attribute.py"
+
+class PYREC_PG_AttributeRecordOptions(PropertyGroup):
+    copy_from: EnumProperty(name = "From", description="Record Python code of Single Attribute or All Attributes of " +
+        "current inspect value", items=[ ("single_attribute", "Single Attribute", ""),
+                                         ("all_attributes", "All Attributes", "") ], default="single_attribute")
+    copy_to: EnumProperty(name="To", description="Record attribute(s) as Python code to this", items=[
+            ("clipboard", "Clipboard", "Record Python code to clipboard. Paste with 'Ctrl-V'"),
+            ("new_text", "New Text", "Record Python code to new Text"),
+            ("text", "Text", "Record Python code to existing Text"), ], default="clipboard")
+    copy_to_text: PointerProperty(description="Text (in Text Editor) to receive output", type=bpy.types.Text)
+    include_value: BoolProperty(name="Value", description="Include attribute value in recorded Python output " +
+        "(with '=')", default=True)
+    comment_type: BoolProperty(name="Type Comment", description="Include Python code with attribute value's type",
+        default=True)
+    comment_doc: BoolProperty(name="__doc__ Comment", description="Include Python code with attribute value's " +
+        "'__doc__' attribute value (if it exists)", default=True)
+
+class PYREC_PG_DirAttributeItem(PropertyGroup):
+    type_name: StringProperty()
+    value_str: StringProperty()
+
+class PYREC_PG_InspectPanelOptions(PropertyGroup):
+    display_attr_doc: BoolProperty(name="__doc__", description="Display '__doc__' attribute, which may contain " +
+        "relevant information about current value", default=True, options={'HIDDEN'})
+    display_attr_type_only: BoolProperty(name="Display only", description="Display only selected types of " +
+        "attributes in Inspect Attributes area", default=False, options={'HIDDEN'})
+    display_attr_type_function: BoolProperty(name="Function", description="Display 'function' type attributes in " +
+        "Inspect Attributes area", default=True, options={'HIDDEN'})
+    display_attr_type_builtin: BoolProperty(name="Builtin", description="Display 'builtin' type attributes in " +
+        "Inspect Attributes area ('builtin' types have names beginning, and ending, with '__' , e.g. '__doc__')",
+        default=True, options={'HIDDEN'})
+    display_attr_type_bl: BoolProperty(name="bl_", description="Display 'Blender builtin' type attributes in " +
+        "Inspect Attributes area. 'Blender builtin' type attributes have names beginning with 'bl_' ", default=True,
+        options={'HIDDEN'})
+    display_value_attributes: BoolProperty(name="Attributes List", description="Display Inspect Attributes area, " +
+        "to inspect list of attributes of current Inspect value (i.e. view result of dir() in list format)",
+        default=True, options={'HIDDEN'})
+    display_value_selector: BoolProperty(name="Try value entry", description="Try to display attribute value entry " +
+        "box, to allow real-time editing of attribute value. Display value as string if try fails", default=True,
+        options={'HIDDEN'})
+    display_dir_attribute_type: BoolProperty(name="Type", description="Display Type column in Attribute list",
+        default=True, options={'HIDDEN'})
+    display_dir_attribute_value: BoolProperty(name="Value", description="Display Value column in Attribute list",
+        default=True, options={'HIDDEN'})
+
+def get_dir_attribute_exec_str(base, attr_name):
+    # if exec str is '.', which means 'self' is selected, then do not append attribute name
+    if attr_name == ".":
+        return base
+    return base + "." + attr_name
+
+def has_relevant_doc(value):
+    return value != None and hasattr(value, "__doc__") and value.__doc__ != None and \
+        not isinstance(value, (bool, dict, float, int, list, set, str, tuple, mathutils.Color, mathutils.Euler, \
+                       mathutils.Matrix, mathutils.Quaternion, mathutils.Vector) )
+
+# split 'input_str' into separate lines, and add each line to 'lines_coll'
+def string_to_lines_collection(input_str, lines_coll):
+    for str_line in input_str.splitlines():
+        new_item = lines_coll.add()
+        new_item.name = str_line
+
+def set_array_index(self, value):
+    if value < 0 or value > self.array_index_max:
+        return
+    self["array_index"] = value
+    return
+
+def get_array_index(self):
+    return self.get("array_index", 0)
+
+def populate_index_strings(self, context):
+    # if index string collection is not empty then create array for use with EnumProperty
+    if len(self.array_key_set) > 0:
+        output = []
+        for index_str in self.array_key_set:
+            output.append( (index_str.name, index_str.name, "") )
+        return output
+    # return empty
+    return [ (" ", "", "") ]
+
+def update_dir_attributes(self, value):
+    # self, e.g.  PYREC_PG_InspectPanelProps
+    # value, e.g. bpy.types.Context
+    panel_props = self
+    panel_props.dir_item_value_str = ""
+    panel_props.dir_item_value_typename_str = ""
+    panel_props.dir_item_doc_lines.clear()
+    # quit if dir() listing is empty
+    if len(panel_props.dir_attributes) < 1:
+        return
+    # exec the string to get the attribute's value
+    result_value, result_error = get_inspect_exec_result(get_pre_exec_str(panel_props),
+        get_dir_attribute_exec_str(panel_props.dir_inspect_exec_str,
+        panel_props.dir_attributes[panel_props.dir_attributes_index].name), False)
+    if result_error is None:
+        panel_props.dir_item_value_str = str(result_value)
+    # remaining attribute info is blank if attribute value is None
+    if result_value is None:
+        return
+    # set 'type name' label
+    panel_props.dir_item_value_typename_str = type(result_value).__name__
+    # set '__doc__' label, if available as string type
+    if has_relevant_doc(result_value):
+        doc_value = getattr(result_value, "__doc__")
+        if isinstance(doc_value, str):
+            string_to_lines_collection(doc_value, panel_props.dir_item_doc_lines)
+
+class PYREC_PG_InspectPanel(PropertyGroup):
+    panel_label: StringProperty()
+    panel_options: PointerProperty(type=PYREC_PG_InspectPanelOptions)
+
+    pre_inspect_type: EnumProperty(name="Pre-Inspect Exec Type", items=[
+        ("none", "None", "Only inspect value Python code will be run to get inspect value"),
+        ("single_line", "One Line", "Single line of Python code will be run before inspect value code is run"),
+        ("textblock", "Text", "Text (in Text-Editor) with one or more lines of Python code to run before " \
+         "inspect value code is run") ], default="none")
+    pre_inspect_single_line: StringProperty(name="Pre-Inspect Exec", description="Single line of Python code to run " +
+        "before running inspect value code")
+    pre_inspect_text: PointerProperty(name="Pre-Inspect Text", description="Text (in Text Editor) with line(s) of " +
+        "Python code to run before running inspect value code", type=bpy.types.Text)
+
+    inspect_py_type: EnumProperty(name="Py Type", items=[
+        ("active", "Active", "Active thing will be inspected (e.g. active Object in View3D context). Not yet " +
+         "available in all contexts"),
+        ("custom", "Custom", "Custom string of code will be run, and run result will be inspected"),
+        ("datablock", "Datablock", "Datablock includes all data collections under 'bpy.data'") ],
+        description="Type of Python object to inspect", default="custom")
+    inspect_active_type: EnumProperty(name="Active Type", items=get_inspect_active_type_items)
+    inspect_datablock_type: EnumProperty(name="Type", items=BPY_DATA_TYPE_ITEMS, default="objects",
+        description="Type of data to inspect. Includes 'bpy.data' sources")
+    inspect_datablock_name: StringProperty(name="Inspect datablock Name", description="Name of datablock instance " +
+        "to inspect. Includes 'bpy.data' sources", default="")
+    inspect_exec_str: StringProperty(name="Inspect Exec", description="Python string that will be run and result " +
+        "returned when 'Inspect Exec' is used", default="bpy.data.objects")
+
+    array_index_max: IntProperty()
+    array_index: IntProperty(set=set_array_index, get=get_array_index, description="Array index integer for Zoom " +
+        "In. Uses zero-based indexing, i.e. first item is number 0 ")
+    array_key_set: CollectionProperty(type=PropertyGroup)
+    array_key: EnumProperty(items=populate_index_strings, description="Array key string for Zoom In. Uses 'key()' " +
+        "function to get available key names for array")
+    array_index_key_type: EnumProperty(items=[("none", "None", "", 1),
+        ("int", "Integer", "", 2),
+        ("str", "String", "", 3),
+        ("int_str", "Integer and String", "", 4) ], default="none")
+
+    dir_inspect_exec_str: StringProperty()
+    dir_attributes: CollectionProperty(type=PYREC_PG_DirAttributeItem)
+    dir_attributes_index: IntProperty(update=update_dir_attributes)
+
+    dir_item_value_str: StringProperty()
+    dir_item_value_typename_str: StringProperty()
+
+    dir_item_doc_lines: CollectionProperty(type=PropertyGroup)
+    dir_item_doc_lines_index: IntProperty()
+
+class PYREC_PG_InspectPanelCollection(PropertyGroup):
+    inspect_context_panels: CollectionProperty(type=PYREC_PG_InspectPanel)
+    inspect_context_panel_next_num: IntProperty()
 
 def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
     # display value selector, if enabled and value is available
@@ -108,7 +269,9 @@ def draw_inspect_panel(self, context):
     sub_box.label(text="Exec: " + ic_panel.dir_inspect_exec_str)
     # attributes of inspect exec value
     if panel_options.display_value_attributes:
-        sub_box.label(text="Inspect Attributes")
+        # subtract 1 to account for the '.' list item (which represents 'self' value)
+        sub_box.label(text="Inspect Attributes ( %i )" % ( 0 if len(ic_panel.dir_attributes)-1 < 0 else \
+                                                           len(ic_panel.dir_attributes)-1 ))
         row = sub_box.row()
         # calculate split factor
         split_denominator = 1
@@ -145,50 +308,6 @@ def draw_inspect_panel(self, context):
             split.template_list("PYREC_UL_StringList", "", ic_panel, "dir_item_doc_lines", ic_panel,
                               "dir_item_doc_lines_index", rows=2)
 
-def get_dir_attribute_exec_str(base, attr_name):
-    # if exec str is '.', which means 'self' is selected, then do not append attribute name
-    if attr_name == ".":
-        return base
-    return base + "." + attr_name
-
-# split 'input_str' into separate lines, and add each line to 'lines_coll'
-def string_to_lines_collection(input_str, lines_coll):
-    for str_line in input_str.splitlines():
-        new_item = lines_coll.add()
-        new_item.name = str_line
-
-def has_relevant_doc(value):
-    return value != None and hasattr(value, "__doc__") and value.__doc__ != None and \
-        not isinstance(value, (bool, dict, float, int, list, set, str, tuple, mathutils.Color, mathutils.Euler, \
-                       mathutils.Matrix, mathutils.Quaternion, mathutils.Vector) )
-
-def update_dir_attributes(self, value):
-    # self, e.g.  PYREC_PG_InspectPanelProps
-    # value, e.g. bpy.types.Context
-    panel_props = self
-    panel_props.dir_item_value_str = ""
-    panel_props.dir_item_value_typename_str = ""
-    panel_props.dir_item_doc_lines.clear()
-    # quit if dir() listing is empty
-    if len(panel_props.dir_attributes) < 1:
-        return
-    # exec the string to get the attribute's value
-    result_value, result_error = get_inspect_exec_result(get_pre_exec_str(panel_props),
-        get_dir_attribute_exec_str(panel_props.dir_inspect_exec_str,
-        panel_props.dir_attributes[panel_props.dir_attributes_index].name), False)
-    if result_error is None:
-        panel_props.dir_item_value_str = str(result_value)
-    # remaining attribute info is blank if attribute value is None
-    if result_value is None:
-        return
-    # set 'type name' label
-    panel_props.dir_item_value_typename_str = type(result_value).__name__
-    # set '__doc__' label, if available as string type
-    if has_relevant_doc(result_value):
-        doc_value = getattr(result_value, "__doc__")
-        if isinstance(doc_value, str):
-            string_to_lines_collection(doc_value, panel_props.dir_item_doc_lines)
-
 def create_context_inspect_panel(context_name, inspect_context_collections, panel_label, auto_number):
     ic_coll = inspect_context_collections.get(context_name)
     if ic_coll is None:
@@ -202,7 +321,7 @@ def create_context_inspect_panel(context_name, inspect_context_collections, pane
         if count > 0:
             panel_label = panel_label + "." + str(count).zfill(3)
     # create and register class for panel, to add panel to UI
-    if not register_inspect_panel_exec(context_name, count, panel_label):
+    if not register_inspect_panel(context_name, count, panel_label):
         return False
     # if context does not have a panel collection yet, then create new panel collection and name it with context_name
     # (Py Inspect panels are grouped by context type/name, because panel classes are registered to context type)
@@ -249,7 +368,7 @@ class PYREC_OT_RemoveInspectPanel(Operator):
             self.report({'ERROR'}, "Unable to Remove Inspect Panel because panel_num is less than zero")
             return {'CANCELLED'}
         context_name = context.space_data.type
-        unregister_inspect_panel_exec(context_name, self.panel_num)
+        unregister_inspect_panel(context_name, self.panel_num)
         panels = context.window_manager.py_rec.inspect_context_collections[context_name].inspect_context_panels
         # remove panel by finding its index first, then passing index to '.remove()' function
         panels.remove(panels.find(str(self.panel_num)))
@@ -472,10 +591,6 @@ class PYREC_OT_InspectPanelAttrZoomOut(Operator):
         inspect_zoom_out(context, ic_panel, self.panel_num)
         return {'FINISHED'}
 
-class PYREC_PG_DirAttributeItem(PropertyGroup):
-    type_name: StringProperty()
-    value_str: StringProperty()
-
 class PYREC_UL_DirAttributeList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         # self,  e.g. PYREC_UL_DirAttributeList
@@ -577,7 +692,7 @@ def restore_inspect_context_panels(inspect_context_collections):
             if hasattr(bpy.types, "PYREC_PT_%s_Inspect%s" % (context_name, icc_panel.name)):
                 continue
             # create and register class for panel, to add panel to UI
-            register_inspect_panel_exec(context_name, int(icc_panel.name), icc_panel.panel_label)
+            register_inspect_panel(context_name, int(icc_panel.name), icc_panel.panel_label)
 
 class PYREC_OT_RestoreInspectContextPanels(Operator):
     bl_idname = "py_rec.restore_inspect_context_panels"
@@ -607,18 +722,25 @@ def get_attribute_python_str(inspect_str, attr_name, ic_panel, attr_record_optio
     if attr_record_options.include_value:
         result_value, result_error = get_inspect_exec_result(get_pre_exec_str(ic_panel), inspect_str, False)
         if result_value is None:
-            out_last_str = out_last_str + " = None\n"
+            out_last_str += " = None\n"
+        elif callable(result_value):
+            out_last_str += " # = %s\n" % str(result_value)
+            if attr_record_options.comment_type:
+                out_first_str += "# Type: " + type(result_value).__name__ + "\n"
+            if attr_record_options.comment_doc and has_relevant_doc(result_value):
+                out_first_str += "# __doc__:\n" + \
+                    get_commented_splitlines(str(result_value.__doc__))
         else:
             py_val_str = bpy_value_to_string(result_value)
             if py_val_str != None:
-                out_last_str = out_last_str + " = " + py_val_str + "\n"
+                out_last_str += " = %s\n" % py_val_str
                 if attr_record_options.comment_type:
-                    out_first_str = out_first_str + "# Type: " + type(result_value).__name__ + "\n"
+                    out_first_str += "# Type: " + type(result_value).__name__ + "\n"
                 if attr_record_options.comment_doc and has_relevant_doc(result_value):
-                    out_first_str = out_first_str + "# __doc__:\n" + \
+                    out_first_str += "# __doc__:\n" + \
                         get_commented_splitlines(str(result_value.__doc__))
             else:
-                out_last_str = out_last_str + "  # = " + str(result_value) + "\n"
+                out_last_str += "  # = %s\n" % str(result_value)
     return out_first_str + out_last_str
 
 class PYREC_OT_InspectRecordAttribute(Operator):
@@ -823,3 +945,27 @@ class PYREC_OT_InspectChoosePy(Operator):
         # open window to set options before operator execute
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
+
+def draw_inspect_context_menu(self, context):
+    layout = self.layout
+    layout.separator()
+    layout.operator(PYREC_OT_AddInspectPanel.bl_idname)
+
+context_type_draw_removes = []
+def append_inspect_context_menu_all():
+    for type_name in dir(bpy.types):
+        # e.g. 'VIEW3D_MT_object_context_menu', 'NODE_MT_context_menu'
+        if not re.match("^[A-Za-z0-9_]+_MT[A-Za-z0-9_]*_context_menu$", type_name):
+            continue
+        attr_value = getattr(bpy.types, type_name)
+        if attr_value is None:
+            continue
+        try:
+            attr_value.append(draw_inspect_context_menu)
+            context_type_draw_removes.append(attr_value)
+        except:
+            pass
+
+def remove_inspect_context_menu_all():
+    for d in context_type_draw_removes:
+        d.remove(draw_inspect_context_menu)

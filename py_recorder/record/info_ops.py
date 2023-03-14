@@ -16,19 +16,14 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-import traceback
-from datetime import datetime as dt
-
 import bpy
-from bpy.types import Operator
+from bpy.props import (BoolProperty, EnumProperty, IntProperty, PointerProperty, StringProperty)
+from bpy.types import (Operator, Panel, PropertyGroup)
 
-from .object_custom_prop import CPROP_NAME_INIT_PY
-from .string_exec import exec_str
+from ..bpy_value_string import BPY_DATA_TYPE_ITEMS
+from ..object_custom_prop import CPROP_NAME_INIT_PY
 
 PY_INFO_TEXT_NAME = "InfoText"
-
-SCRIPT_RUN_NAME_APPEND = "_RunTemp"
-ERROR_RUN_NAME_APPEND = "_Error"
 
 LINETYPE_CONTEXT = "CONTEXT"
 LINETYPE_MACRO = "MACRO"
@@ -79,53 +74,153 @@ if bpy.app.version >= (3,10,0):
 if bpy.app.version >= (3,30,0):
     DATABLOCK_DUAL_TYPES = DATABLOCK_DUAL_TYPES + (bpy.types.Curves, "hair_curves"),
 
-CP_DATA_TYPE_ITEMS = [
-    ('actions', "Action", "", 1),
-    ('armatures', "Armature", "", 2),
-    ('brushes', "Brush", "", 3),
-    ('cache_files', "Cache File", "", 4),
-    ('cameras', "Camera", "", 5),
-    ('collections', "Collection", "", 6),
-    ('curves', "Curve", "", 7),
-    ('fonts', "Font", "", 8),
-    ('grease_pencils', "Grease Pencil", "", 9),
-    ('images', "Image", "", 10),
-    ('lattices', "Lattice", "", 11),
-    ('libraries', "Library", "", 12),
-    ('lights', "Light", "", 13),
-    ('lightprobes', "Light Probe", "", 14),
-    ('linestyles', "Line Style", "", 15),
-    ('masks', "Mask", "", 16),
-    ('materials', "Material", "", 17),
-    ('meshes', "Mesh", "", 18),
-    ('metaballs', "Meta Ball", "", 19),
-    ('movieclips', "Movie Clip", "", 20),
-    ('node_groups', "Node Group", "", 21),
-    ('objects', "Object", "", 22),
-    ('paint_curves', "Paint Curve", "", 23),
-    ('palettes', "Palette", "", 24),
-    ('particles', "Particle Settings", "", 25),
-    ('shape_keys', "Shape Key", "", 26),
-    ('scenes', "Scene", "", 27),
-    ('screens', "Screen", "", 28),
-    ('sounds', "Sound", "", 29),
-    ('speakers', "Speaker", "", 30),
-    ('textures', "Texture", "", 31),
-    ('texts', "Text", "", 32),
-    ('volumes', "Volume", "", 33),
-    ('workspaces', "Work Space", "", 34),
-    ('worlds', "World", "", 35),
-]
-if bpy.app.version >= (3,10,0):
-    CP_DATA_TYPE_ITEMS = CP_DATA_TYPE_ITEMS + ('pointclouds', "Point Cloud", "", len(CP_DATA_TYPE_ITEMS)+1)
-if bpy.app.version >= (3,30,0):
-    CP_DATA_TYPE_ITEMS = CP_DATA_TYPE_ITEMS + ('hair_curves', "Hair Curve", "", len(CP_DATA_TYPE_ITEMS)+1)
+def text_object_poll(self, object):
+    return object.type == 'FONT'
 
-MODIFY_DATA_TYPE_ITEMS = [
-    ('texts', "Text", "", 1),
-    ('objects', "Text Object", "", 2),
-    ('None', "None", "", 3),
-]
+class PYREC_PG_InfoRecordOptions(PropertyGroup):
+    create_root_object: BoolProperty(name="Create Root", description="New root Object will be created, instead of " +
+        "using active Object as root (Text / Text Object will be linked to root Object)",
+        default=False)
+    root_init: BoolProperty(name="Root " + CPROP_NAME_INIT_PY, description="Create Custom Property '" +
+        CPROP_NAME_INIT_PY + "' on root Object, so root Object can be 'run' by running its '" + CPROP_NAME_INIT_PY +
+        "' script", default=True)
+    use_text_object: BoolProperty(name="Use Text Object", description="Text Object will be used for output, " +
+        "instead of Text (in Text Editor)", default=False)
+    output_text_object: PointerProperty(name="Output Text Object", description="Text Object to receive output",
+        type=bpy.types.Object, poll=text_object_poll)
+    output_text: PointerProperty(name="Output Text", description="Text (in Text Editor) to receive " +
+        "output", type=bpy.types.Text)
+    filter_end_line_offset: IntProperty(name="Offset", description="Filter End Line Offset: When copying lines " +
+        "from Info, last filtered line copied is most recent filtered line minus Filtered Line Offset",
+        default=0, min=0)
+    filter_line_count: IntProperty(name="Count", description="Filter Line Count: Number of filtered lines to copy " +
+        "from Info", default=10, min=1)
+    include_line_type_context: BoolProperty(name="Context", description="Copy Context type Info lines (lines " +
+        "beginning with \"bpy.context\")", default=True)
+    include_line_type_info: BoolProperty(name="Info", description="Copy general information type Info lines " +
+        "(example: console error output)", default=False)
+    include_line_type_macro: BoolProperty(name="Macro", description="Copy Info lines that cannot be run",
+        default=False)
+    include_line_type_operation: BoolProperty(name="Operation", description="Copy Operation type Info lines (lines " +
+        "beginning with \"bpy.ops\")", default=True)
+    include_line_type_prev_dup: BoolProperty(name="Prev Duplicate", description="Copy Info lines that have " +
+        "previous duplicates (i.e. the same \"bpy.ops\" operation repeated, or the same \"bpy.context\" value set). " +
+        "If set to False, then only most recent operation / context change is copied", default=True)
+    include_line_type_py_rec: BoolProperty(name="Py Recorder", description="Copy Info lines related to Py " +
+        "Recorder operation or state change (lines beginning with \"bpy.ops.py_rec\" or " +
+        "\"bpy.context.scene.py_rec\")", default=False)
+    comment_line_type_context: BoolProperty(name="Context", description="Comment out Context type Info " +
+        "lines (lines beginning with \"bpy.context\")", default=False)
+    comment_line_type_info: BoolProperty(name="Info", description="Comment out general information type Info " +
+        "lines (example: console error output)", default=True)
+    comment_line_type_macro: BoolProperty(name="Macro", description="Comment out Macro type Info " +
+        "lines", default=True)
+    comment_line_type_operation: BoolProperty(name="Operation", description="Comment out Operation type Info lines " +
+        "(lines beginning with \"bpy.ops\"", default=False)
+    comment_line_type_prev_dup: BoolProperty(name="Prev Duplicate", description="Comment out previous duplicate " +
+        "lines from Info", default=True)
+    comment_line_type_py_rec: BoolProperty(name="Py Recorder", description="Comment out Info lines related to Py " +
+        "Recorder operations or state changes (lines beginning with \"bpy.ops.py_rec\" or " +
+        "\"bpy.context.scene.py_rec\")", default=True)
+    root_collection: PointerProperty(name="Root", description="New root Objects will be put into this collection",
+        type=bpy.types.Collection)
+    text_object_collection: PointerProperty(name="Text", description="New Text Objects will be put into this " +
+        "collection", type=bpy.types.Collection)
+    add_cp_data_name: StringProperty(name="Name", description="Custom Property name", default="")
+    add_cp_data_type: EnumProperty(name="Type", description="Data type", items=BPY_DATA_TYPE_ITEMS, default="objects")
+    add_cp_datablock: StringProperty(name="Data", description="Custom Property value", default="")
+    modify_data_type: EnumProperty(name="Type", description="Type of data, either Text or Text Object",
+        items=[ ("texts", "Text", "", 1), ("objects", "Text Object", "", 2), ("None", "None", "", 3) ] )
+    modify_data_text: PointerProperty(name="Data", description="Text (see Blender's builtin Text Editor) to " +
+        "use for active Object's '"+CPROP_NAME_INIT_PY+"' script", type=bpy.types.Text)
+    modify_data_obj: PointerProperty(name="Data", description="Text Object to use for active Object's '" +
+        CPROP_NAME_INIT_PY+"' script", type=bpy.types.Object, poll=text_object_poll)
+    record_info_line: BoolProperty(name="Record Info line", description="", default=False)
+    record_info_start_line_offset: IntProperty(name="Start Record Info line count", description="", default=0)
+    record_auto_import_bpy: BoolProperty(name="Auto 'import bpy'", description="Automatically prepend line to " +
+        "recorded / copied script, to prevent run script error: \"NameError: name 'bpy' is not defined\"",
+        default=True)
+    run_auto_import_bpy: BoolProperty(name="Auto 'import bpy'", description="If necessary, automatically prepend " +
+        "line to script before run, and remove line after run, to prevent error: \"NameError: name 'bpy' is " +
+        "not defined\"", default=True)
+    use_temp_text: BoolProperty(name="Run Temp Text", description="Copy text from Text Object to a Text (in Text " +
+        "Editor) before running script", default=True)
+
+class PYREC_PT_VIEW3D_RecordInfo(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Tool"
+    bl_label = "Py Record Info"
+
+    def draw(self, context):
+        pr_ir = context.window_manager.py_rec.record_options.info
+        layout = self.layout
+
+        box = layout.box()
+        sub_box = box.box()
+        # show 'Stop Record' button if recording is on,
+        if pr_ir.record_info_line:
+            sub_box.operator(PYREC_OT_VIEW3D_StopRecordInfoLine.bl_idname)
+        # show 'Start Record' button if recording is off
+        else:
+            sub_box.operator(PYREC_OT_VIEW3D_StartRecordInfoLine.bl_idname)
+
+        rec_state = "Off"
+        if pr_ir.record_info_line:
+            rec_state = "On"
+        sub_box.label(text="Recording: " + rec_state)
+        box.operator(PYREC_OT_VIEW3D_CopyInfoToObjectText.bl_idname)
+
+        box = layout.box()
+        box.label(text="Option")
+        sub_box = box.box()
+        sub_box.prop(pr_ir, "record_auto_import_bpy")
+
+        sub_box.label(text="Info Line")
+        row = sub_box.row(align=True)
+        row.prop(pr_ir, "filter_end_line_offset")
+        row.prop(pr_ir, "filter_line_count")
+
+        sub_sub_box = sub_box.box()
+        row = sub_sub_box.row()
+        row.label(text="Type")
+        row.label(text="Include/Comment")
+        row = sub_sub_box.row()
+        row.label(text="Context")
+        row.prop(pr_ir, "include_line_type_context", text="")
+        row.prop(pr_ir, "comment_line_type_context", text="")
+        row = sub_sub_box.row()
+        row.label(text="Info")
+        row.prop(pr_ir, "include_line_type_info", text="")
+        row.prop(pr_ir, "comment_line_type_info", text="")
+        row = sub_sub_box.row()
+        row.label(text="Macro")
+        row.prop(pr_ir, "include_line_type_macro", text="")
+        row.prop(pr_ir, "comment_line_type_macro", text="")
+        row = sub_sub_box.row()
+        row.label(text="Operation")
+        row.prop(pr_ir, "include_line_type_operation", text="")
+        row.prop(pr_ir, "comment_line_type_operation", text="")
+        row = sub_sub_box.row()
+        row.label(text="Prev Duplicate")
+        row.prop(pr_ir, "include_line_type_prev_dup", text="")
+        row.prop(pr_ir, "comment_line_type_prev_dup", text="")
+        row = sub_sub_box.row()
+        row.label(text="Py Recorder")
+        row.prop(pr_ir, "include_line_type_py_rec", text="")
+        row.prop(pr_ir, "comment_line_type_py_rec", text="")
+
+        sub_box.label(text="Object")
+        sub_box.prop(pr_ir, "root_init")
+        sub_box.prop(pr_ir, "create_root_object")
+        if pr_ir.create_root_object:
+            sub_box.prop(pr_ir, "root_collection")
+        sub_box.prop(pr_ir, "use_text_object")
+        if pr_ir.use_text_object:
+            sub_box.prop(pr_ir, "output_text_object")
+            sub_box.prop(pr_ir, "text_object_collection")
+        else:
+            sub_box.prop(pr_ir, "output_text")
 
 def get_datablock_for_type(data):
     for dd in DATABLOCK_DUAL_TYPES:
@@ -460,129 +555,4 @@ class PYREC_OT_VIEW3D_CopyInfoToObjectText(Operator):
             thing_name = str(output_thing)
         self.report({'INFO'}, "Copy Info: copy Info line"+l_str+" (filtered line count %i) to %s %s" %
                     (filter_line_count, thing_type, thing_name))
-        return {'FINISHED'}
-
-def create_error_text(error_text_name, error_msg):
-    date_time = dt.now().strftime("Error date: %m/%d/%Y\nError time: %H:%M:%S\n")
-    # create Text to receive error message string
-    print("Py Recorder: create error traceback Text named: " + error_text_name)
-    error_text = bpy.data.texts.new(name=error_text_name)
-    error_text.from_string(date_time+error_msg)
-
-def add_text_prepend_import_bpy(text):
-    # save state of Text current/select line/character, with plus one line because 'import bpy' will be prepended
-    old_data = (text.current_character, text.current_line_index+1,
-                text.select_end_character, text.select_end_line_index+1)
-    # write prepend to first character of first line of text
-    (text.current_character, text.current_line_index,
-     text.select_end_character, text.select_end_line_index) = (0, 0, 0, 0)
-    text.write("import bpy\n")
-    # restore state of Text current and select line/character
-    (text.current_character, text.current_line_index,
-     text.select_end_character, text.select_end_line_index) = old_data
-
-def remove_text_prepend_import_bpy(text):
-    # save state of Text current/select line/character, with minus one line because 'import bpy' will be removed
-    current_line_index = text.current_line_index-1
-    if current_line_index < 0:
-        current_line_index = 0
-    select_end_line_index = text.select_end_line_index-1
-    if select_end_line_index < 0:
-        select_end_line_index = 0
-    old_data = (text.current_character, current_line_index,
-                text.select_end_character, select_end_line_index)
-    # select first line of 'text'
-    (text.current_character, text.current_line_index,
-     text.select_end_character, text.select_end_line_index) = (0, 0, 0, 1)
-    # write empty string to 'delete' selected line
-    text.write("")
-    # restore state of Text current and select line/character
-    (text.current_character, text.current_line_index,
-     text.select_end_character, text.select_end_line_index) = old_data
-
-# returns False on error, otherwise returns True
-def run_script_in_text_editor(context, textblock, auto_import_bpy):
-    # prepend 'import bpy' line if needed
-    if auto_import_bpy:
-        add_text_prepend_import_bpy(textblock)
-    # switch context UI type to Text Editor
-    prev_type = context.area.ui_type
-    context.area.ui_type = 'TEXT_EDITOR'
-    # set Text as active in Text Editor
-    context.space_data.text = textblock
-    # try to run script, allowing for graceful fail, where graceful fail is:
-    #   -Python error, lines after run_script will not be run, i.e.
-    #     -remain in Text Editor with temporary Text active, so user has quick access to Text script with error
-    try:
-        print("Py Recorder: bpy.ops.text.run_script() called with Text named: " + textblock.name)
-        bpy.ops.text.run_script()
-    except:
-        # return False because script caused an error, so Text Editor will remain as current context, and user has
-        # quick access to script with error
-        tb = traceback.format_exc()
-        print(tb)   # print(tb) replaces traceback.print_exc()
-        # create Text to receive error traceback message as string
-        create_error_text(textblock.name+ERROR_RUN_NAME_APPEND, tb)
-        return False
-    # change context to previous type
-    context.area.ui_type = prev_type
-    # remove 'import bpy' line if it was prepended
-    if auto_import_bpy:
-        remove_text_prepend_import_bpy(textblock)
-    # return True because script did not cause error
-    return True
-
-# returns False on error, otherwise returns True
-def run_text_object_body(context, text_ob, use_temp_text, auto_import_bpy):
-    text_str = text_ob.data.body
-    if use_temp_text:
-        # temporary Text name includes Text Object name, to help user identify and debug issues/errors
-        temp_text = bpy.data.texts.new(name=text_ob.name+SCRIPT_RUN_NAME_APPEND)
-        # write lines from Text Object body to temporary Text
-        temp_text.write(text_str)
-        # return False if run script resulted in error
-        if not run_script_in_text_editor(context, temp_text, auto_import_bpy):
-            return False
-        # remove temporary Text, only if run script did not result in error
-        bpy.data.texts.remove(temp_text)
-    else:
-        print("Py Recorder: exec() with Text Object named: " + text_ob.name)
-        succeed, error_msg = exec_str(text_str, auto_import_bpy)
-        if not succeed:
-            create_error_text(text_ob.name+ERROR_RUN_NAME_APPEND, error_msg)
-            return False
-    return True
-
-# returns False on error, otherwise returns True
-def run_object_init(context, ob, use_temp_text, auto_import_bpy):
-    init_thing = ob.get(CPROP_NAME_INIT_PY)
-    if init_thing != None:
-        if isinstance(init_thing, bpy.types.Text):
-            # if run results in error then return False to indicate error result
-            if not run_script_in_text_editor(context, init_thing, auto_import_bpy):
-                return False
-        elif isinstance(init_thing, bpy.types.Object) and init_thing.type == 'FONT':
-            # if run results in error then return False to indicate error result
-            if not run_text_object_body(context, init_thing, use_temp_text, auto_import_bpy):
-                return False
-    # no errors, so return True
-    return True
-
-class PYREC_OT_VIEW3D_RunObjectScript(Operator):
-    bl_idname = "py_rec.view3d_run_object_script"
-    bl_label = "Exec Object"
-    bl_description = "Run selected Objects' Custom Property '"+CPROP_NAME_INIT_PY+"' as script. If property is " \
-        "Text Object type: Text Object body is copied to temporary Text, and Text is run as script. If property is " \
-        "Text type: Text is run as script using '.run_script()'"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        pr_ir = context.window_manager.py_rec.record_options.info
-        for ob in context.selected_objects:
-            # get Object name before running init, to prevent errors in case Object is removed by running init
-            o_name = ob.name
-            # if run results in error, then halt and print name of Object that has script with error
-            if not run_object_init(context, ob, pr_ir.use_temp_text, pr_ir.run_auto_import_bpy):
-                self.report({'ERROR'}, "Error, see System Console for details of run of Object named: " + o_name)
-                return {'CANCELLED'}
         return {'FINISHED'}

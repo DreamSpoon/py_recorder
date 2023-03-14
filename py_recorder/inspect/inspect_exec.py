@@ -20,10 +20,10 @@ import traceback
 import bpy
 from bpy.utils import (register_class, unregister_class)
 
-from .log_text import log_text_append
+from ..log_text import log_text_append
 
 inspect_panel_classes = {}
-PANEL_REGISTER_EXEC_STR = "class PYREC_PT_%s_Inspect%i(bpy.types.Panel):\n" \
+INSPECT_PANEL_REGISTER = "class PYREC_PT_%s_Inspect%i(bpy.types.Panel):\n" \
       "    bl_space_type = '%s'\n" \
       "    bl_region_type = 'UI'\n" \
       "    bl_category = \"Tool\"\n" \
@@ -36,10 +36,6 @@ PANEL_REGISTER_EXEC_STR = "class PYREC_PT_%s_Inspect%i(bpy.types.Panel):\n" \
       "global inspect_panel_classes\n" \
       "inspect_panel_classes['PYREC_PT_%s_Inspect%i'] = PYREC_PT_%s_Inspect%i\n"
 
-PANEL_UNREGISTER_EXEC_STR = "global inspect_panel_classes\n" \
-                            "c = inspect_panel_classes[\"PYREC_PT_%s_Inspect%i\"]\n" \
-                            "del inspect_panel_classes[\"PYREC_PT_%s_Inspect%i\"]\n" \
-                            "unregister_class(c)\n"
 inspect_exec_result = {}
 
 inspect_exec_panel_draw_func = []
@@ -49,21 +45,22 @@ def register_inspect_exec_panel_draw_func(draw_func):
     inspect_exec_panel_draw_func.clear()
     inspect_exec_panel_draw_func.append(draw_func)
 
-def register_inspect_panel_exec(context_name, index, panel_label):
-    exec_str = PANEL_REGISTER_EXEC_STR % (context_name, index, context_name, panel_label, index, context_name, index,
-                                          context_name, index, context_name, index)
+def register_inspect_panel(context_name, index, panel_label):
     try:
-        exec(exec_str)
+        exec(INSPECT_PANEL_REGISTER % (context_name, index, context_name, panel_label, index, context_name, index,
+                                       context_name, index, context_name, index))
     except:
         return False
     return True
 
-def unregister_inspect_panel_exec(context_name, index):
-    if inspect_panel_classes.get("PYREC_PT_%s_Inspect%i" % (context_name, index)) is None:
-        return
-    exec_str = PANEL_UNREGISTER_EXEC_STR % (context_name, index, context_name, index)
+def unregister_inspect_panel(context_name, index):
+    panel_classname = "PYREC_PT_%s_Inspect%i" % (context_name, index)
+    panel_class = inspect_panel_classes.get(panel_classname)
+    if panel_class is None:
+        return False
     try:
-        exec(exec_str)
+        del inspect_panel_classes[panel_classname]
+        unregister_class(panel_class)
     except:
         return False
     return True
