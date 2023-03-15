@@ -309,7 +309,7 @@ def draw_inspect_panel(self, context):
             split.template_list("PYREC_UL_StringList", "", ic_panel, "dir_item_doc_lines", ic_panel,
                               "dir_item_doc_lines_index", rows=2)
 
-def create_context_inspect_panel(context_name, inspect_context_collections):
+def create_context_inspect_panel(context, context_name, inspect_context_collections, begin_exec_str=None):
     panel_label = "Py Inspect"
     ic_coll = inspect_context_collections.get(context_name)
     if ic_coll is None:
@@ -329,24 +329,31 @@ def create_context_inspect_panel(context_name, inspect_context_collections):
     # create new panel in collection
     i_panel = ic_coll.inspect_context_panels.add()
     i_panel.name = str(ic_coll.inspect_context_panel_next_num)
+    ic_coll.inspect_context_panel_next_num = ic_coll.inspect_context_panel_next_num + 1
     i_panel.panel_label = panel_label
     i_panel.panel_options.panel_option_label = panel_label
-    ic_coll.inspect_context_panel_next_num = ic_coll.inspect_context_panel_next_num + 1
-    return True
+    if begin_exec_str is None:
+        return True
+    i_panel.inspect_exec_str = begin_exec_str
+    # do refresh using modified 'inspect_exec_str'
+    ret_val, _ = inspect_exec_refresh(context, ic_coll.inspect_context_panel_next_num - 1)
+    if ret_val == "FINISHED":
+        return True
+    return False
 
 class PYREC_OT_AddInspectPanel(Operator):
-    bl_idname = "py_rec.add_inspect_panel"
-    bl_label = "Add Inspect Panel"
-    bl_description = "Add Inspect panel to active context Tools menu. If View 3D context, Inspect panel is added " \
-        "in Tools -> Tool menu"
+    bl_idname = "py_rec.add_py_inspect_panel"
+    bl_label = "Add Py Inspect Panel"
+    bl_description = "Add Py Inspect panel to active context Tools menu. e.g. If View 3D context, then " \
+        "Py Inspect panel is in Tools -> Tool menu"
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
     def execute(self, context):
-        if not create_context_inspect_panel(context.space_data.type,
+        if not create_context_inspect_panel(context, context.space_data.type,
                                             context.window_manager.py_rec.inspect_context_collections):
-            self.report({'ERROR'}, "Add Inspect Panel: Unable to add panel to context type '" +
+            self.report({'ERROR'}, "Add Inspect Panel: Unable to add Py Inspect panel to context type '" +
                         context.space_data.type + "'")
             return {'CANCELLED'}
         return {'FINISHED'}
@@ -727,8 +734,6 @@ def get_attribute_python_str(inspect_str, attr_name, ic_panel, attr_record_optio
                 out_first_str += "# __doc__:\n" + \
                     get_commented_splitlines(str(result_value.__doc__))
         else:
-            print("get bpy value to string for ", attr_name)
-            print("duh is ",  isinstance(result_value, dict))
             py_val_str = bpy_value_to_string(result_value)
             if py_val_str != None:
                 out_last_str += " = %s\n" % py_val_str
@@ -949,8 +954,7 @@ def draw_inspect_context_menu(self, context):
     layout.separator()
     layout.operator(PYREC_OT_AddInspectPanel.bl_idname)
 
-context_type_draw_removes = []
-def append_inspect_context_menu_all():
+def append_context_menu_all(draw_func, menu_list):
     for type_name in dir(bpy.types):
         # e.g. 'VIEW3D_MT_object_context_menu', 'NODE_MT_context_menu'
         if not re.match("^[A-Za-z0-9_]+_MT[A-Za-z0-9_]*_context_menu$", type_name):
@@ -959,11 +963,61 @@ def append_inspect_context_menu_all():
         if attr_value is None:
             continue
         try:
-            attr_value.append(draw_inspect_context_menu)
-            context_type_draw_removes.append(attr_value)
+            attr_value.append(draw_func)
+            menu_list.append(attr_value)
         except:
             pass
 
+def remove_context_menu_all(draw_func, menu_list):
+    for d in menu_list:
+        d.remove(draw_func)
+    menu_list.clear()
+
+inspect_context_menu_removes = []
+def append_inspect_context_menu_all():
+    append_context_menu_all(draw_inspect_context_menu, inspect_context_menu_removes)
+
 def remove_inspect_context_menu_all():
-    for d in context_type_draw_removes:
-        d.remove(draw_inspect_context_menu)
+    remove_context_menu_all(draw_inspect_context_menu, inspect_context_menu_removes)
+
+class PYREC_OT_PyInspectActiveObject(Operator):
+    bl_description = "Inspect active Object with new Py Inspect panel (see context Tools menu)"
+    bl_idname = "py_rec.py_inspect_active_object"
+    bl_label = "Object"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    inspect_type: StringProperty(default="OBJECT", options={'HIDDEN'})
+
+    @classmethod
+    def poll(cls, context):
+        active_types = get_inspect_active_type_items(None, context)
+        return len(active_types) > 0
+
+    def execute(self, context):
+        start_string = get_active_thing_inspect_str(context, self.inspect_type)
+        if not create_context_inspect_panel(context, context.space_data.type,
+                                            context.window_manager.py_rec.inspect_context_collections, start_string):
+            self.report({'ERROR'}, "Inspect Active Object: Unable to inspect Object")
+            return {'CANCELLED'}
+        return {'FINISHED'}
+
+class PYREC_MT_InspectActive(bpy.types.Menu):
+    bl_label = "Py Inspect Active"
+    bl_idname = "PYREC_MT_InspectActive"
+
+    def draw(self, context):
+        layout = self.layout
+        active_types = get_inspect_active_type_items(None, context)
+        for type_name, nice_name, _ in active_types:
+            layout.operator(PYREC_OT_PyInspectActiveObject.bl_idname, text=nice_name).inspect_type = type_name
+
+def draw_inspect_active_context_menu(self, context):
+    layout = self.layout
+    layout.menu(PYREC_MT_InspectActive.bl_idname)
+
+inspect_active_context_menu_removes = []
+def append_inspect_active_context_menu_all():
+    append_context_menu_all(draw_inspect_active_context_menu, inspect_active_context_menu_removes)
+
+def remove_inspect_active_context_menu_all():
+    remove_context_menu_all(draw_inspect_active_context_menu, inspect_active_context_menu_removes)

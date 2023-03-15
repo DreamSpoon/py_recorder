@@ -16,12 +16,11 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-# separate file for exec_str(), for edge cases re: 'import' keyword (e.g. 'import bubble_pop_yay as bpy')
+import bpy
+
 # returns tuple (True, "") on success, returns tuple (False, error_msg) on error (exception raised)
-def exec_str(script_str, auto_import_bpy):
+def exec_str(script_str):
     try:
-        if auto_import_bpy:
-            import bpy
         exec(script_str)
     except:
         import traceback

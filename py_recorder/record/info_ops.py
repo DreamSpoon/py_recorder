@@ -139,12 +139,12 @@ class PYREC_PG_InfoRecordOptions(PropertyGroup):
     record_info_start_line_offset: IntProperty(name="Start Record Info line count", description="", default=0)
     record_auto_import_bpy: BoolProperty(name="Auto 'import bpy'", description="Automatically prepend line to " +
         "recorded / copied script, to prevent run script error: \"NameError: name 'bpy' is not defined\"",
-        default=True)
-    run_auto_import_bpy: BoolProperty(name="Auto 'import bpy'", description="If necessary, automatically prepend " +
-        "line to script before run, and remove line after run, to prevent error: \"NameError: name 'bpy' is " +
-        "not defined\"", default=True)
-    use_temp_text: BoolProperty(name="Run Temp Text", description="Copy text from Text Object to a Text (in Text " +
-        "Editor) before running script", default=True)
+        default=False)
+    run_auto_import_bpy: BoolProperty(name="Auto 'import bpy'", description="Automatically prepend line to script, " +
+        "if needed, to prevent error: \"NameError: name 'bpy' is not defined\"", default=True)
+    run_as_text_script: BoolProperty(name="Run in Text Editor", description="If enabled then Python code from " +
+        "Textblock / Text Object will be 'run as script' in Text Editor. If disabled then Python code will be " +
+        "run directly with exec()", default=False)
 
 class PYREC_PT_VIEW3D_RecordInfo(Panel):
     bl_space_type = 'VIEW_3D'

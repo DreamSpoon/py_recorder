@@ -18,15 +18,15 @@
 
 bl_info = {
     "name": "Python Recorder",
+    "version": (0, 4, 2),
+    "author": "Dave",
+    "blender": (2, 80, 0),
     "description": "Inspect Python object attributes. Record Blender data to Python code. Record Info lines to " \
         "Text / Text Object script so that user actions in Blender can be recreated later by running the script",
-    "author": "Dave",
-    "version": (0, 4, 2),
-    "blender": (2, 80, 0),
     "location": "3DView -> Tools -> Tool -> Py Record Info, Py Exec Object. Right-click Context menu -> " \
         "Add Inspect Panel. Context -> Tool -> Py Inspect",
+    "doc_url": "https://github.com/DreamSpoon/py_recorder#readme",
     "category": "Python",
-    "wiki_url": "https://github.com/DreamSpoon/py_recorder#readme",
 }
 
 import numpy
@@ -43,7 +43,9 @@ from .inspect.inspect_panel import (PYREC_PG_AttributeRecordOptions, PYREC_PG_In
     PYREC_OT_InspectPanelArrayKeyZoomIn, PYREC_OT_RestoreInspectContextPanels, PYREC_OT_InspectRecordAttribute,
     PYREC_OT_InspectCopyAttribute, PYREC_OT_InspectPasteAttribute, PYREC_OT_InspectChoosePy, PYREC_PG_DirAttributeItem,
     PYREC_UL_DirAttributeList, PYREC_UL_StringList, PYREC_PG_InspectPanelOptions, PYREC_PG_InspectPanel,
-    draw_inspect_panel, append_inspect_context_menu_all, remove_inspect_context_menu_all)
+    PYREC_MT_InspectActive, PYREC_OT_PyInspectActiveObject,
+    draw_inspect_panel, append_inspect_context_menu_all, remove_inspect_context_menu_all,
+    append_inspect_active_context_menu_all, remove_inspect_active_context_menu_all)
 from .inspect.inspect_exec import (register_inspect_exec_panel_draw_func, unregister_all_inspect_panel_classes)
 from .object_custom_prop import (CPROP_NAME_INIT_PY, PYREC_OT_OBJ_AddCP_Data, PYREC_OT_OBJ_ModifyInit)
 from .exec_object import PYREC_OT_VIEW3D_RunObjectScript
@@ -100,7 +102,7 @@ class PYREC_PT_VIEW3D_ExecObject(Panel):
         box = layout.box()
         box.label(text="Run Object '__init__'")
         box.operator(PYREC_OT_VIEW3D_RunObjectScript.bl_idname)
-        box.prop(pr_ir, "use_temp_text")
+        box.prop(pr_ir, "run_as_text_script")
         box.prop(pr_ir, "run_auto_import_bpy")
 
 ########################
@@ -129,6 +131,8 @@ classes = [
     PYREC_OT_VIEW3D_RunObjectScript,
     PYREC_PT_VIEW3D_ExecObject,
     PYREC_OT_AddInspectPanel,
+    PYREC_MT_InspectActive,
+    PYREC_OT_PyInspectActiveObject,
     PYREC_OT_RemoveInspectPanel,
     PYREC_OT_InspectOptions,
     PYREC_OT_InspectPanelAttrZoomIn,
@@ -222,10 +226,12 @@ def register():
         bpy.app.handlers.save_pre.append(save_pre_handler_func)
     # append 'Add Inspect Panel' button to all Context menus (all Context types)
     append_inspect_context_menu_all()
+    append_inspect_active_context_menu_all()
     append_exec_context_panel_all()
 
 def unregister():
     remove_exec_context_panel_all()
+    remove_inspect_active_context_menu_all()
     # remove 'Add Inspect Panel' button from all Context menus (all Context types)
     remove_inspect_context_menu_all()
     # unregister Py Inspect panel UI classes
