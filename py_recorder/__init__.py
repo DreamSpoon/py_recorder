@@ -60,6 +60,7 @@ class PYREC_PT_OBJ_AdjustCustomProp(Panel):
     bl_region_type = 'WINDOW'
     bl_context = 'object'
     bl_label = "Py Exec Custom Properties"
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
@@ -160,12 +161,12 @@ classes = [
 ]
 
 def duplicate_prop(to_prop, from_prop):
-    if isinstance(from_prop, bpy.types.PropertyGroup):
+    if isinstance(from_prop, PropertyGroup):
         for attr_name in dir(from_prop):
             attr_value = getattr(from_prop, attr_name)
             if attr_name in [ "bl_rna", "rna_type", "id_data" ] or callable(attr_value) or attr_name.startswith("__"):
                 continue
-            if isinstance(attr_value, bpy.types.PropertyGroup) or \
+            if isinstance(attr_value, PropertyGroup) or \
                 (hasattr(attr_value, "__len__") and not isinstance(attr_value, str)):
                 duplicate_prop(getattr(to_prop, attr_name), attr_value)
             else:

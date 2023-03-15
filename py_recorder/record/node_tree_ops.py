@@ -82,6 +82,7 @@ class PYREC_PT_RecordNodetree(Panel):
     bl_region_type = "UI"
     bl_category = "Tool"
     bl_label = "Py Record Nodetree"
+    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         ntr = context.window_manager.py_rec.record_options.nodetree

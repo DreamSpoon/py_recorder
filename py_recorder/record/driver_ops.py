@@ -20,7 +20,7 @@ import numpy
 
 import bpy
 from bpy.props import (BoolProperty, BoolVectorProperty, IntProperty)
-from bpy.types import PropertyGroup
+from bpy.types import (Operator, Panel, PropertyGroup)
 
 RECORD_DRIVER_TEXT_NAME = "pyrec_drivers.py"
 
@@ -88,7 +88,7 @@ class PYREC_PG_DriverRecordOptions(PropertyGroup):
     animdata_bool_vec: BoolVectorProperty(size=len(ANIMDATA_BOOL_NAMES),
                                            default=tuple(numpy.ones((len(ANIMDATA_BOOL_NAMES)), dtype=int)))
 
-class PYREC_PT_RecordDriver(bpy.types.Panel):
+class PYREC_PT_RecordDriver(Panel):
     bl_space_type = "GRAPH_EDITOR"
     bl_region_type = "UI"
     bl_category = "Tool"
@@ -271,7 +271,7 @@ def create_driver_py_from_data_item(space_pad, make_into_function, animdata_bool
     out_text.cursor_set(0)
     return out_text
 
-class PYREC_OT_DriversToPython(bpy.types.Operator):
+class PYREC_OT_DriversToPython(Operator):
     bl_description = "Convert all drivers of selected data sources to Python code, available in the Text Editor"
     bl_idname = "py_rec.driver_editor_record_driver"
     bl_label = "Record Driver"
@@ -287,7 +287,7 @@ def set_bool_vec_state(bool_vec, state):
     for c in range(len(bool_vec)):
         bool_vec[c] = state
 
-class PYREC_OT_SelectAnimdataSrcAll(bpy.types.Operator):
+class PYREC_OT_SelectAnimdataSrcAll(Operator):
     bl_description = "Select all available data sources"
     bl_idname = "py_rec.driver_editor_select_animdata_src_all"
     bl_label = "Select All"
@@ -298,7 +298,7 @@ class PYREC_OT_SelectAnimdataSrcAll(bpy.types.Operator):
         set_bool_vec_state(dr.animdata_bool_vec, True)
         return {'FINISHED'}
 
-class PYREC_OT_SelectAnimdataSrcNone(bpy.types.Operator):
+class PYREC_OT_SelectAnimdataSrcNone(Operator):
     bl_description = "Select all available data sources"
     bl_idname = "py_rec.driver_editor_select_animdata_src_none"
     bl_label = "Select None"

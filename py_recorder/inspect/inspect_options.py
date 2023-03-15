@@ -21,6 +21,7 @@ from bpy.types import Operator
 from bpy.props import IntProperty
 
 from .inspect_func import get_inspect_context_panel
+from .inspect_exec import (register_inspect_panel, unregister_inspect_panel)
 
 class PYREC_OT_InspectOptions(Operator):
     bl_description = "Open Py Inspect panel Options window"
@@ -35,18 +36,41 @@ class PYREC_OT_InspectOptions(Operator):
         return True
 
     def execute(self, context):
-        return {'FINISHED'}
-
-    def draw(self, context):
-        context_name = context.space_data.type
         p_r = context.window_manager.py_rec
+        context_name = context.space_data.type
         ic_panel = get_inspect_context_panel(self.panel_num, context_name, p_r.inspect_context_collections)
         if ic_panel is None:
             return
         panel_options = ic_panel.panel_options
         if panel_options is None:
             return
+        # check for change of panel name
+        old_label = ic_panel.panel_label
+        new_label = panel_options.panel_option_label
+        if new_label != old_label:
+            # unregister old panel
+            unregister_inspect_panel(context_name, self.panel_num)
+            # change prop to new label
+            ic_panel.panel_label = panel_options.panel_option_label
+            # register again with new label
+            if not register_inspect_panel(context_name, self.panel_num, new_label):
+                self.report({'ERROR'}, "Unable to change label of Py Inspect panel previously with label '%s'" % \
+                            old_label)
+                return {'CANCELLED'}
+        return {'FINISHED'}
+
+    def draw(self, context):
+        p_r = context.window_manager.py_rec
+        ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type, p_r.inspect_context_collections)
+        if ic_panel is None:
+            return
+        panel_options = ic_panel.panel_options
+        if panel_options is None:
+            return
         layout = self.layout
+
+        box = layout.box()
+        box.prop(panel_options, "panel_option_label")
 
         box = layout.box()
         box.label(text="Inspect Panel")

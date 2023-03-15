@@ -62,6 +62,8 @@ def get_action_fcurve_index(fcurves, data_path, array_index):
 
 def get_inspect_active_type_items(self, context):
     active_items = []
+    if context is None or context.space_data is None:
+        return [ (" ", "", "") ]
     # add active_items based on context type, and available active things
     if context.space_data.type == "DOPESHEET_EDITOR":
         if context.active_action != None and context.space_data.ui_mode == "ACTION":

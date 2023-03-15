@@ -76,6 +76,8 @@ def bpy_value_to_string(value):
         return "%d" % value
     elif isinstance(value, float):
         return "%f" % value
+    elif isinstance(value, dict):
+        return str(value)
     # if attribute has a length then it is a Vector, Color, etc., so write elements of attribute in a tuple,
     # unless it is a set
     elif hasattr(value, '__len__'):
@@ -92,10 +94,10 @@ def bpy_value_to_string(value):
                     vec_str = vec_str + sub_val_str
             return "{" + vec_str + "}"
         else:
-            for val_index in range(len(value)):
+            for count, sub_value in enumerate(value):
                 if vec_str != "":
                     vec_str = vec_str + ", "
-                sub_val_str = bpy_value_to_string(value[val_index])
+                sub_val_str = bpy_value_to_string(sub_value)
                 if sub_val_str is None:
                     vec_str = vec_str + "None"
                 else:

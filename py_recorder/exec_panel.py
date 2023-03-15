@@ -30,7 +30,8 @@ EXEC_PANEL_REGISTER = "class PYREC_PT_%s_Exec(bpy.types.Panel):\n" \
       "    bl_space_type = '%s'\n" \
       "    bl_region_type = 'UI'\n" \
       "    bl_category = \"Tool\"\n" \
-      "    bl_label = \"Exec\"\n" \
+      "    bl_label = \"Py Exec\"\n" \
+      "    bl_options = {'DEFAULT_CLOSED'}\n" \
       "    def draw(self, context):\n" \
       "        exec_panel_draw(self, context)\n" \
       "register_class(PYREC_PT_%s_Exec)\n" \

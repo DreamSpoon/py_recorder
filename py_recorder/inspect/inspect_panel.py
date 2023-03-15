@@ -55,6 +55,7 @@ class PYREC_PG_DirAttributeItem(PropertyGroup):
     value_str: StringProperty()
 
 class PYREC_PG_InspectPanelOptions(PropertyGroup):
+    panel_option_label: StringProperty(name="Panel Label", description="Modify Py Inspect panel label")
     display_attr_doc: BoolProperty(name="__doc__", description="Display '__doc__' attribute, which may contain " +
         "relevant information about current value", default=True, options={'HIDDEN'})
     display_attr_type_only: BoolProperty(name="Display only", description="Display only selected types of " +
@@ -308,18 +309,15 @@ def draw_inspect_panel(self, context):
             split.template_list("PYREC_UL_StringList", "", ic_panel, "dir_item_doc_lines", ic_panel,
                               "dir_item_doc_lines_index", rows=2)
 
-def create_context_inspect_panel(context_name, inspect_context_collections, panel_label, auto_number):
+def create_context_inspect_panel(context_name, inspect_context_collections):
+    panel_label = "Py Inspect"
     ic_coll = inspect_context_collections.get(context_name)
     if ic_coll is None:
         count = 0
     else:
         count = ic_coll.inspect_context_panel_next_num
-    # exec string to add panel class, and register the new class
-    if panel_label == "":
-        panel_label = "Py Inspect"
-    if auto_number:
         if count > 0:
-            panel_label = panel_label + "." + str(count).zfill(3)
+            panel_label += "." + str(count).zfill(3)
     # create and register class for panel, to add panel to UI
     if not register_inspect_panel(context_name, count, panel_label):
         return False
@@ -332,6 +330,7 @@ def create_context_inspect_panel(context_name, inspect_context_collections, pane
     i_panel = ic_coll.inspect_context_panels.add()
     i_panel.name = str(ic_coll.inspect_context_panel_next_num)
     i_panel.panel_label = panel_label
+    i_panel.panel_options.panel_option_label = panel_label
     ic_coll.inspect_context_panel_next_num = ic_coll.inspect_context_panel_next_num + 1
     return True
 
@@ -343,13 +342,10 @@ class PYREC_OT_AddInspectPanel(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
-    panel_name_default: StringProperty(name="Name", description="New Py Inspect panel name", default="Py Inspect")
-    panel_name_auto_number: BoolProperty(name="Auto-number", description="Append number to Inspect panel name. " +
-        "Number is incremented after new panel is created", default=True)
 
     def execute(self, context):
-        if not create_context_inspect_panel(context.space_data.type, context.window_manager.py_rec.inspect_context_collections,
-                                            self.panel_name_default, self.panel_name_auto_number):
+        if not create_context_inspect_panel(context.space_data.type,
+                                            context.window_manager.py_rec.inspect_context_collections):
             self.report({'ERROR'}, "Add Inspect Panel: Unable to add panel to context type '" +
                         context.space_data.type + "'")
             return {'CANCELLED'}
@@ -731,6 +727,8 @@ def get_attribute_python_str(inspect_str, attr_name, ic_panel, attr_record_optio
                 out_first_str += "# __doc__:\n" + \
                     get_commented_splitlines(str(result_value.__doc__))
         else:
+            print("get bpy value to string for ", attr_name)
+            print("duh is ",  isinstance(result_value, dict))
             py_val_str = bpy_value_to_string(result_value)
             if py_val_str != None:
                 out_last_str += " = %s\n" % py_val_str

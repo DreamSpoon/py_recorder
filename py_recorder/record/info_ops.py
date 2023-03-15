@@ -151,6 +151,7 @@ class PYREC_PT_VIEW3D_RecordInfo(Panel):
     bl_region_type = 'UI'
     bl_category = "Tool"
     bl_label = "Py Record Info"
+    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         pr_ir = context.window_manager.py_rec.record_options.info
