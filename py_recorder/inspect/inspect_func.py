@@ -31,6 +31,14 @@ def get_dir(val):
         temp_dict[attr] = True
     return temp_dict.keys()
 
+def get_pre_exec_str(ic_panel):
+    if ic_panel.pre_inspect_type == "single_line":
+        return ic_panel.pre_inspect_single_line + "\n"
+    elif ic_panel.pre_inspect_type == "textblock":
+        if ic_panel.pre_inspect_text != None:
+            return ic_panel.pre_inspect_text.as_string() + "\n"
+    return ""
+
 def get_inspect_context_panel(panel_num, context_name, inspect_context_collections):
     if panel_num < 0 or context_name == "" or inspect_context_collections is None:
         return None
@@ -143,6 +151,9 @@ def get_inspect_active_type_items(self, context):
                 active_items.append( ("ACTIVE_BONE", "Bone", "") )
             if context.active_pose_bone != None:
                 active_items.append( ("ACTIVE_POSE_BONE", "Pose Bone", "") )
+    elif context.space_data.type == "SEQUENCE_EDITOR":
+        if context.active_sequence_strip != None:
+            active_items.append( ("ACTIVE_SEQUENCE_STRIP", "Sequence Strip", "") )
     # if active_items is empty then return empty list (list needs at least one item or exception will occur)
     if len(active_items) < 1:
         return [ (" ", "", "") ]
@@ -276,4 +287,8 @@ def get_active_thing_inspect_str(context, active_type):
     elif active_type == "WORLD":
         if isinstance(context.space_data.id, bpy.types.World):
             return "bpy.data.worlds[\"%s\"]" % context.space_data.id.name
+    elif active_type == "ACTIVE_SEQUENCE_STRIP":
+        if context.active_sequence_strip != None:
+            return "bpy.data.scenes[\"%s\"].sequence_editor.sequences_all[\"%s\"]" % \
+                (context.scene.name, context.active_sequence_strip.name)
     return ""

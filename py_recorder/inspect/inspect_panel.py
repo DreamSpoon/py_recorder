@@ -16,18 +16,19 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-import mathutils
+import inspect
 import re
 import traceback
 
+import mathutils
 import bpy
 from bpy.types import (Operator, PropertyGroup, UIList)
 from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, IntProperty, PointerProperty, StringProperty)
 from bpy.utils import unregister_class
 
 from .inspect_options import PYREC_OT_InspectOptions
-from .inspect_func import (get_dir, get_inspect_context_panel, remove_last_py_attribute, match_inspect_panel_name,
-    get_active_thing_inspect_str, get_inspect_active_type_items)
+from .inspect_func import (get_dir, get_pre_exec_str, get_inspect_context_panel, remove_last_py_attribute,
+    match_inspect_panel_name, get_active_thing_inspect_str, get_inspect_active_type_items)
 from .inspect_exec import (get_inspect_exec_result, register_inspect_panel, unregister_inspect_panel)
 from ..bpy_value_string import (BPY_DATA_TYPE_ITEMS, bpy_value_to_string)
 from ..log_text import (LOG_TEXT_NAME, log_text_append)
@@ -85,13 +86,17 @@ def get_dir_attribute_exec_str(base, attr_name):
         return base
     return base + "." + attr_name
 
-def has_relevant_doc(value):
-    return value != None and hasattr(value, "__doc__") and value.__doc__ != None and \
-        not isinstance(value, (bool, dict, float, int, list, set, str, tuple, mathutils.Color, mathutils.Euler, \
-                       mathutils.Matrix, mathutils.Quaternion, mathutils.Vector) )
+# filter out values that do not have __doc__, and empty __doc__, then return clean doc
+def get_relevant_doc(value):
+    if value != None and not isinstance(value, (bool, dict, float, int, list, set, str, tuple, mathutils.Color,
+        mathutils.Euler, mathutils.Matrix, mathutils.Quaternion, mathutils.Vector) ):
+        return inspect.getdoc(value)
+    return None
 
 # split 'input_str' into separate lines, and add each line to 'lines_coll'
 def string_to_lines_collection(input_str, lines_coll):
+    if input_str is None or lines_coll is None:
+        return
     for str_line in input_str.splitlines():
         new_item = lines_coll.add()
         new_item.name = str_line
@@ -116,8 +121,6 @@ def populate_index_strings(self, context):
     return [ (" ", "", "") ]
 
 def update_dir_attributes(self, value):
-    # self, e.g.  PYREC_PG_InspectPanelProps
-    # value, e.g. bpy.types.Context
     panel_props = self
     panel_props.dir_item_value_str = ""
     panel_props.dir_item_value_typename_str = ""
@@ -137,10 +140,7 @@ def update_dir_attributes(self, value):
     # set 'type name' label
     panel_props.dir_item_value_typename_str = type(result_value).__name__
     # set '__doc__' label, if available as string type
-    if has_relevant_doc(result_value):
-        doc_value = getattr(result_value, "__doc__")
-        if isinstance(doc_value, str):
-            string_to_lines_collection(doc_value, panel_props.dir_item_doc_lines)
+    string_to_lines_collection(get_relevant_doc(result_value), panel_props.dir_item_doc_lines)
 
 class PYREC_PG_InspectPanel(PropertyGroup):
     panel_label: StringProperty()
@@ -229,7 +229,8 @@ def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
     layout.label(text="Value: " + panel_props.dir_item_value_str)
 
 def draw_inspect_panel(self, context):
-    ic_panel = get_inspect_context_panel(self.panel_num, context.space_data.type,
+    context_name = context.space_data.type
+    ic_panel = get_inspect_context_panel(self.panel_num, context_name,
                                          context.window_manager.py_rec.inspect_context_collections)
     if ic_panel is None:
         return
@@ -289,8 +290,8 @@ def draw_inspect_panel(self, context):
             split.label(text="Value")
         # attributes list
         row = sub_box.row()
-        row.template_list("PYREC_UL_DirAttributeList", "", ic_panel, "dir_attributes", ic_panel,
-                          "dir_attributes_index", rows=5)
+        list_classname = "PYREC_UL_%s_DirAttributeList%s" % (context_name, ic_panel.name)
+        row.template_list(list_classname, "", ic_panel, "dir_attributes", ic_panel, "dir_attributes_index", rows=5)
         col = row.column()
         sub_col = col.column(align=True)
         sub_col.operator(PYREC_OT_InspectPanelAttrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = self.panel_num
@@ -306,7 +307,8 @@ def draw_inspect_panel(self, context):
         if panel_options.display_attr_doc:
             box.label(text="__doc__:")
             split = box.split(factor=0.95)
-            split.template_list("PYREC_UL_StringList", "", ic_panel, "dir_item_doc_lines", ic_panel,
+            list_classname = "PYREC_UL_%s_DocLineList%s" % (context_name, ic_panel.name)
+            split.template_list(list_classname, "", ic_panel, "dir_item_doc_lines", ic_panel,
                               "dir_item_doc_lines_index", rows=2)
 
 def create_context_inspect_panel(context, context_name, inspect_context_collections, begin_exec_str=None):
@@ -353,8 +355,7 @@ class PYREC_OT_AddInspectPanel(Operator):
     def execute(self, context):
         if not create_context_inspect_panel(context, context.space_data.type,
                                             context.window_manager.py_rec.inspect_context_collections):
-            self.report({'ERROR'}, "Add Inspect Panel: Unable to add Py Inspect panel to context type '" +
-                        context.space_data.type + "'")
+            self.report({'ERROR'}, "Unable to add Py Inspect panel to context type '%s'" % context.space_data.type)
             return {'CANCELLED'}
         return {'FINISHED'}
 
@@ -384,14 +385,6 @@ class PYREC_OT_RemoveInspectPanel(Operator):
     def invoke(self, context, event):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
-
-def get_pre_exec_str(ic_panel):
-    if ic_panel.pre_inspect_type == "single_line":
-        return ic_panel.pre_inspect_single_line + "\n"
-    elif ic_panel.pre_inspect_type == "textblock":
-        if ic_panel.pre_inspect_text != None:
-            return ic_panel.pre_inspect_text.as_string() + "\n"
-    return ""
 
 def inspect_exec_refresh(context, panel_num):
     ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
@@ -441,7 +434,7 @@ def inspect_exec_refresh(context, panel_num):
         # check for integer type index
         has_array_index = False
         try:
-            x = inspect_value[0]    # this line will raise exception if inspect_value cannot be indexed with integer
+            _ = inspect_value[0]    # this line will raise exception if inspect_value cannot be indexed with integer
             # the following lines in the 'try' block will be run only if inspect_value can be indexed with integer
             has_array_index = True
             ic_panel.array_index_max = len(inspect_value)-1
@@ -510,10 +503,7 @@ def inspect_exec_refresh(context, panel_num):
     # set 'type name' label
     ic_panel.dir_item_value_typename_str = type(inspect_value).__name__
     # set '__doc__' lines, if available as string type
-    if has_relevant_doc(inspect_value):
-        doc_value = getattr(inspect_value, "__doc__")
-        if isinstance(doc_value, str):
-            string_to_lines_collection(doc_value, ic_panel.dir_item_doc_lines)
+    string_to_lines_collection(get_relevant_doc(inspect_value), ic_panel.dir_item_doc_lines)
     return 'FINISHED', ""
 
 def inspect_datablock_refresh(context, panel_num):
@@ -593,46 +583,6 @@ class PYREC_OT_InspectPanelAttrZoomOut(Operator):
             return {'CANCELLED'}
         inspect_zoom_out(context, ic_panel, self.panel_num)
         return {'FINISHED'}
-
-class PYREC_UL_DirAttributeList(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        # self,  e.g. PYREC_UL_DirAttributeList
-        # data, PYREC_PG_InspectPanelProps
-        # item, e.g. PYREC_PG_DirAttributeItem
-        # active_data, e.g. PYREC_PG_InspectPanelProps
-        panel_options = data.panel_options
-        pre_exec_str = get_pre_exec_str(data)
-        split_denominator = 1
-        if panel_options.display_dir_attribute_type:
-            split_denominator = split_denominator + 1
-        if panel_options.display_dir_attribute_value:
-            split_denominator = split_denominator + 1
-        split = layout.split(factor=1/split_denominator)
-        split.label(text=item.name)
-        if panel_options.display_dir_attribute_type:
-            split.label(text=item.type_name)
-        if panel_options.display_dir_attribute_value:
-            row = split.row()
-            # display value selector, if possible
-            if panel_options.display_value_selector and data.dir_inspect_exec_str != "" and item.name != "." and \
-                not item.name.startswith("__") and item.name != "bl_rna":
-                result_value, result_error = get_inspect_exec_result(pre_exec_str, data.dir_inspect_exec_str, False)
-                if result_error is None and result_value != None and hasattr(result_value, item.name):
-                    attr_val = getattr(result_value, item.name)
-                    # do not display if attribute value is None or if it is a zero-length list/tuple
-                    if attr_val != None and not ( isinstance(attr_val, (list, tuple)) and len(attr_val) == 0) and \
-                        not callable(attr_val):
-                        try:
-                            row.prop(result_value, item.name, text="")
-                            return
-                        except:
-                            pass
-            # show value str if value selector not available
-            row.label(text=item.value_str)
-
-class PYREC_UL_StringList(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        layout.label(text=item.name)
 
 def inspect_array_index_zoom_in(context, ic_panel, panel_num):
     ic_panel.inspect_exec_str = "%s[%i]" % (ic_panel.dir_inspect_exec_str, ic_panel.array_index)
@@ -723,27 +673,23 @@ def get_attribute_python_str(inspect_str, attr_name, ic_panel, attr_record_optio
     out_last_str = inspect_str
     # append attribute value to output, if needed
     if attr_record_options.include_value:
-        result_value, result_error = get_inspect_exec_result(get_pre_exec_str(ic_panel), inspect_str, False)
+        result_value, _ = get_inspect_exec_result(get_pre_exec_str(ic_panel), inspect_str, False)
         if result_value is None:
             out_last_str += " = None\n"
         elif callable(result_value):
             out_last_str += " # = %s\n" % str(result_value)
-            if attr_record_options.comment_type:
-                out_first_str += "# Type: " + type(result_value).__name__ + "\n"
-            if attr_record_options.comment_doc and has_relevant_doc(result_value):
-                out_first_str += "# __doc__:\n" + \
-                    get_commented_splitlines(str(result_value.__doc__))
         else:
             py_val_str = bpy_value_to_string(result_value)
-            if py_val_str != None:
-                out_last_str += " = %s\n" % py_val_str
-                if attr_record_options.comment_type:
-                    out_first_str += "# Type: " + type(result_value).__name__ + "\n"
-                if attr_record_options.comment_doc and has_relevant_doc(result_value):
-                    out_first_str += "# __doc__:\n" + \
-                        get_commented_splitlines(str(result_value.__doc__))
-            else:
+            if py_val_str is None:
                 out_last_str += "  # = %s\n" % str(result_value)
+            else:
+                out_last_str += " = %s\n" % py_val_str
+    if attr_record_options.comment_type:
+        out_first_str += "# Type: " + type(result_value).__name__ + "\n"
+    if attr_record_options.comment_doc:
+        doc = get_relevant_doc(result_value)
+        if doc != None and doc != "":
+            out_first_str += "# __doc__:\n" + get_commented_splitlines(doc)
     return out_first_str + out_last_str
 
 class PYREC_OT_InspectRecordAttribute(Operator):

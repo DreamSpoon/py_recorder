@@ -42,8 +42,7 @@ from .inspect.inspect_panel import (PYREC_PG_AttributeRecordOptions, PYREC_PG_In
     PYREC_OT_InspectPanelAttrZoomIn, PYREC_OT_InspectPanelAttrZoomOut, PYREC_OT_InspectPanelArrayIndexZoomIn,
     PYREC_OT_InspectPanelArrayKeyZoomIn, PYREC_OT_RestoreInspectContextPanels, PYREC_OT_InspectRecordAttribute,
     PYREC_OT_InspectCopyAttribute, PYREC_OT_InspectPasteAttribute, PYREC_OT_InspectChoosePy, PYREC_PG_DirAttributeItem,
-    PYREC_UL_DirAttributeList, PYREC_UL_StringList, PYREC_PG_InspectPanelOptions, PYREC_PG_InspectPanel,
-    PYREC_MT_InspectActive, PYREC_OT_PyInspectActiveObject,
+    PYREC_PG_InspectPanelOptions, PYREC_PG_InspectPanel, PYREC_MT_InspectActive, PYREC_OT_PyInspectActiveObject,
     draw_inspect_panel, append_inspect_context_menu_all, remove_inspect_context_menu_all,
     append_inspect_active_context_menu_all, remove_inspect_active_context_menu_all)
 from .inspect.inspect_exec import (register_inspect_exec_panel_draw_func, unregister_all_inspect_panel_classes)
@@ -149,8 +148,6 @@ classes = [
     PYREC_OT_InspectChoosePy,
     PYREC_PT_RecordDriver,
     PYREC_PG_DirAttributeItem,
-    PYREC_UL_DirAttributeList,
-    PYREC_UL_StringList,
     PYREC_PG_InspectPanelOptions,
     PYREC_PG_InspectPanel,
     PYREC_PG_InspectPanelCollection,

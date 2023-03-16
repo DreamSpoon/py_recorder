@@ -18,27 +18,73 @@
 
 import traceback
 import bpy
+from bpy.types import UIList
 from bpy.utils import (register_class, unregister_class)
 
+from .inspect_func import get_pre_exec_str
 from ..log_text import log_text_append
 
 inspect_panel_classes = {}
 INSPECT_PANEL_REGISTER = "class PYREC_PT_%s_Inspect%i(bpy.types.Panel):\n" \
-      "    bl_space_type = '%s'\n" \
-      "    bl_region_type = 'UI'\n" \
-      "    bl_category = \"Tool\"\n" \
-      "    bl_label = \"%s\"\n" \
-      "    panel_num = %i\n" \
-      "    def draw(self, context):\n" \
-      "        if len(inspect_exec_panel_draw_func) > 0:\n" \
-      "            inspect_exec_panel_draw_func[0](self, context)\n" \
-      "register_class(PYREC_PT_%s_Inspect%i)\n" \
-      "global inspect_panel_classes\n" \
-      "inspect_panel_classes['PYREC_PT_%s_Inspect%i'] = PYREC_PT_%s_Inspect%i\n"
+    "    bl_space_type = '%s'\n" \
+    "    bl_region_type = 'UI'\n" \
+    "    bl_category = \"Tool\"\n" \
+    "    bl_label = \"%s\"\n" \
+    "    panel_num = %i\n" \
+    "    def draw(self, context):\n" \
+    "        if len(inspect_exec_panel_draw_func) > 0:\n" \
+    "            inspect_exec_panel_draw_func[0](self, context)\n" \
+    "register_class(PYREC_PT_%s_Inspect%i)\n" \
+    "global inspect_panel_classes\n" \
+    "inspect_panel_classes['PYREC_PT_%s_Inspect%i'] = PYREC_PT_%s_Inspect%i\n"
 
 inspect_exec_result = {}
 
 inspect_exec_panel_draw_func = []
+
+INSPECT_UL_DOCLINE_LIST_REGISTER = "class PYREC_UL_%s_DocLineList%i(UIList):\n" \
+    "    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):\n" \
+    "        layout.label(text=item.name)\n" \
+    "register_class(PYREC_UL_%s_DocLineList%i)\n" \
+    "global inspect_panel_classes\n" \
+    "inspect_panel_classes['PYREC_UL_%s_DocLineList%i'] = PYREC_UL_%s_DocLineList%i\n"
+
+# use 'exec()' command to create new class of this for each Py Inspect panel - to prevent list display problems when
+# multiple copies of this class are visible
+INSPECT_DIR_ATTRIBUTE_LIST_REGISTER = "class PYREC_UL_%s_DirAttributeList%i(UIList):\n" \
+    "    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):\n" \
+    "        panel_options = data.panel_options\n" \
+    "        pre_exec_str = get_pre_exec_str(data)\n" \
+    "        split_denominator = 1\n" \
+    "        if panel_options.display_dir_attribute_type:\n" \
+    "            split_denominator = split_denominator + 1\n" \
+    "        if panel_options.display_dir_attribute_value:\n" \
+    "            split_denominator = split_denominator + 1\n" \
+    "        split = layout.split(factor=1/split_denominator)\n" \
+    "        split.label(text=item.name)\n" \
+    "        if panel_options.display_dir_attribute_type:\n" \
+    "            split.label(text=item.type_name)\n" \
+    "        if panel_options.display_dir_attribute_value:\n" \
+    "            row = split.row()\n" \
+    "            # display value selector, if possible\n" \
+    "            if panel_options.display_value_selector and data.dir_inspect_exec_str != \"\" and item.name != \".\" and \\\n" \
+    "                not item.name.startswith(\"__\") and item.name != \"bl_rna\":\n" \
+    "                result_value, result_error = get_inspect_exec_result(pre_exec_str, data.dir_inspect_exec_str, False)\n" \
+    "                if result_error is None and result_value != None and hasattr(result_value, item.name):\n" \
+    "                    attr_val = getattr(result_value, item.name)\n" \
+    "                    # do not display if attribute value is None or if it is a zero-length list/tuple\n" \
+    "                    if attr_val != None and not ( isinstance(attr_val, (list, tuple)) and len(attr_val) == 0) and \\\n" \
+    "                        not callable(attr_val):\n" \
+    "                        try:\n" \
+    "                            row.prop(result_value, item.name, text=\"\")\n" \
+    "                            return\n" \
+    "                        except:\n" \
+    "                            pass\n" \
+    "            # show value str if value selector not available\n" \
+    "            row.label(text=item.value_str)\n" \
+    "register_class(PYREC_UL_%s_DirAttributeList%i)\n" \
+    "global inspect_panel_classes\n" \
+    "inspect_panel_classes['PYREC_UL_%s_DirAttributeList%i'] = PYREC_UL_%s_DirAttributeList%i\n"
 
 def register_inspect_exec_panel_draw_func(draw_func):
     # replace previous draw function, if any
@@ -48,22 +94,28 @@ def register_inspect_exec_panel_draw_func(draw_func):
 def register_inspect_panel(context_name, index, panel_label):
     try:
         exec(INSPECT_PANEL_REGISTER % (context_name, index, context_name, panel_label, index, context_name, index,
-                                       context_name, index, context_name, index))
+                                       context_name, index, context_name, index) )
+        exec(INSPECT_UL_DOCLINE_LIST_REGISTER % (context_name, index, context_name, index, context_name, index,
+                                                 context_name, index) )
+        exec(INSPECT_DIR_ATTRIBUTE_LIST_REGISTER % (context_name, index, context_name, index, context_name, index,
+                                                    context_name, index) )
     except:
         return False
     return True
 
-def unregister_inspect_panel(context_name, index):
-    panel_classname = "PYREC_PT_%s_Inspect%i" % (context_name, index)
+def unregister_inspect_panel_class(panel_classname):
     panel_class = inspect_panel_classes.get(panel_classname)
-    if panel_class is None:
-        return False
-    try:
+    if panel_class != None:
         del inspect_panel_classes[panel_classname]
-        unregister_class(panel_class)
-    except:
-        return False
-    return True
+        try:
+            unregister_class(panel_class)
+        except:
+            return
+
+def unregister_inspect_panel(context_name, index):
+    unregister_inspect_panel_class("PYREC_PT_%s_Inspect%i" % (context_name, index) )
+    unregister_inspect_panel_class("PYREC_UL_%s_DocLineList%i" % (context_name, index) )
+    unregister_inspect_panel_class("PYREC_UL_%s_DirAttributeList%i" % (context_name, index) )
 
 def unregister_all_inspect_panel_classes():
     for panel_class in inspect_panel_classes.values():
