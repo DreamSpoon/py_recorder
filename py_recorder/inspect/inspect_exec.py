@@ -27,7 +27,7 @@ from ..log_text import log_text_append
 inspect_panel_classes = {}
 INSPECT_PANEL_REGISTER = "class PYREC_PT_%s_Inspect%i(bpy.types.Panel):\n" \
     "    bl_space_type = '%s'\n" \
-    "    bl_region_type = 'UI'\n" \
+    "    bl_region_type = '%s'\n" \
     "    bl_category = \"Tool\"\n" \
     "    bl_label = \"%s\"\n" \
     "    panel_num = %i\n" \
@@ -69,8 +69,8 @@ INSPECT_DIR_ATTRIBUTE_LIST_REGISTER = "class PYREC_UL_%s_DirAttributeList%i(UILi
     "            # display value selector, if possible\n" \
     "            if panel_options.display_value_selector and data.dir_inspect_exec_str != \"\" and item.name != \".\" and \\\n" \
     "                not item.name.startswith(\"__\") and item.name != \"bl_rna\":\n" \
-    "                result_value, result_error = get_inspect_exec_result(pre_exec_str, data.dir_inspect_exec_str, False)\n" \
-    "                if result_error is None and result_value != None and hasattr(result_value, item.name):\n" \
+    "                result_value = get_inspect_exec_result()\n" \
+    "                if result_value != None and hasattr(result_value, item.name):\n" \
     "                    attr_val = getattr(result_value, item.name)\n" \
     "                    # do not display if attribute value is None or if it is a zero-length list/tuple\n" \
     "                    if attr_val != None and not ( isinstance(attr_val, (list, tuple)) and len(attr_val) == 0) and \\\n" \
@@ -92,9 +92,17 @@ def register_inspect_exec_panel_draw_func(draw_func):
     inspect_exec_panel_draw_func.append(draw_func)
 
 def register_inspect_panel(context_name, index, panel_label):
+    # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+    if context_name == "PROPERTIES":
+        context_name = "VIEW_3D"
+    # File Browser context does not have accessible 'UI' region, so use 'Tools' region instead
+    if context_name == "FILE_BROWSER":
+        region_type = "TOOLS"
+    else:
+        region_type = "UI"
     try:
-        exec(INSPECT_PANEL_REGISTER % (context_name, index, context_name, panel_label, index, context_name, index,
-                                       context_name, index, context_name, index) )
+        exec(INSPECT_PANEL_REGISTER % (context_name, index, context_name, region_type, panel_label, index,
+                                       context_name, index, context_name, index, context_name, index) )
         exec(INSPECT_UL_DOCLINE_LIST_REGISTER % (context_name, index, context_name, index, context_name, index,
                                                  context_name, index) )
         exec(INSPECT_DIR_ATTRIBUTE_LIST_REGISTER % (context_name, index, context_name, index, context_name, index,
@@ -113,6 +121,9 @@ def unregister_inspect_panel_class(panel_classname):
             return
 
 def unregister_inspect_panel(context_name, index):
+    # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+    if context_name == "PROPERTIES":
+        context_name = "VIEW_3D"
     unregister_inspect_panel_class("PYREC_PT_%s_Inspect%i" % (context_name, index) )
     unregister_inspect_panel_class("PYREC_UL_%s_DocLineList%i" % (context_name, index) )
     unregister_inspect_panel_class("PYREC_UL_%s_DirAttributeList%i" % (context_name, index) )
@@ -124,10 +135,13 @@ def unregister_all_inspect_panel_classes():
 
 # returns 2-tuple of (output value, error string)
 # error string is None if no error occurred during exec
-def get_inspect_exec_result(pre_exec_str, inspect_exec_str, enable_log):
+def refresh_inspect_exec_result(pre_exec_str, inspect_exec_str, enable_log):
     if inspect_exec_str == "":
         return None, "Empty Inspect Exec string"
     ie_str = pre_exec_str + "global inspect_exec_result\ninspect_exec_result['result'] = %s" % inspect_exec_str
+    # delete previous result if it exists
+    if inspect_exec_result.get("result") != None:
+        del inspect_exec_result["result"]
     try:
         exec(ie_str)
     except:
@@ -139,6 +153,7 @@ def get_inspect_exec_result(pre_exec_str, inspect_exec_str, enable_log):
             log_text_append("Exception raised during Inspect Exec of string:\n%s%s\n%s" %
                             (ie_str, end_newline, traceback.format_exc()))
         return None, "Exception raised during Inspect Exec of string"
-    r = inspect_exec_result["result"]
-    del inspect_exec_result["result"]
-    return r, None
+    return inspect_exec_result["result"], None
+
+def get_inspect_exec_result():
+    return inspect_exec_result.get("result")

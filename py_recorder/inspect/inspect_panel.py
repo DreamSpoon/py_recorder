@@ -29,7 +29,8 @@ from bpy.utils import unregister_class
 from .inspect_options import PYREC_OT_InspectOptions
 from .inspect_func import (get_dir, get_pre_exec_str, get_inspect_context_panel, remove_last_py_attribute,
     match_inspect_panel_name, get_active_thing_inspect_str, get_inspect_active_type_items)
-from .inspect_exec import (get_inspect_exec_result, register_inspect_panel, unregister_inspect_panel)
+from .inspect_exec import (get_inspect_exec_result, refresh_inspect_exec_result, register_inspect_panel,
+    unregister_inspect_panel)
 from ..bpy_value_string import (BPY_DATA_TYPE_ITEMS, bpy_value_to_string)
 from ..log_text import (LOG_TEXT_NAME, log_text_append)
 
@@ -128,19 +129,21 @@ def update_dir_attributes(self, value):
     # quit if dir() listing is empty
     if len(panel_props.dir_attributes) < 1:
         return
-    # exec the string to get the attribute's value
-    result_value, result_error = get_inspect_exec_result(get_pre_exec_str(panel_props),
-        get_dir_attribute_exec_str(panel_props.dir_inspect_exec_str,
-        panel_props.dir_attributes[panel_props.dir_attributes_index].name), False)
-    if result_error is None:
-        panel_props.dir_item_value_str = str(result_value)
-    # remaining attribute info is blank if attribute value is None
-    if result_value is None:
-        return
+    attr_name = panel_props.dir_attributes[panel_props.dir_attributes_index].name
+    # get the current result value
+    result_value = get_inspect_exec_result()
+    # get the current result attribute's value
+    if attr_name == ".":
+        attr_value = result_value
+    elif result_value != None and hasattr(result_value, attr_name):
+        attr_value = getattr(result_value, attr_name)
+    else:
+        attr_value = None
+    panel_props.dir_item_value_str = str(attr_value)
     # set 'type name' label
-    panel_props.dir_item_value_typename_str = type(result_value).__name__
+    panel_props.dir_item_value_typename_str = type(attr_value).__name__
     # set '__doc__' label, if available as string type
-    string_to_lines_collection(get_relevant_doc(result_value), panel_props.dir_item_doc_lines)
+    string_to_lines_collection(get_relevant_doc(attr_value), panel_props.dir_item_doc_lines)
 
 class PYREC_PG_InspectPanel(PropertyGroup):
     panel_label: StringProperty()
@@ -198,28 +201,26 @@ class PYREC_PG_InspectPanelCollection(PropertyGroup):
 def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
     # display value selector, if enabled and value is available
     result_value = None
-    result_error = None
-    pre_exec_str = get_pre_exec_str(panel_props)
     attr_name = panel_props.dir_attributes[panel_props.dir_attributes_index].name
     attr_val = None
     if panel_options.display_value_selector:
         if attr_name == ".":
             first_part, last_part = remove_last_py_attribute(panel_props.dir_inspect_exec_str)
             if first_part != None and last_part != None:
-                result_value, result_error = get_inspect_exec_result(pre_exec_str, first_part, False)
+                result_value = get_inspect_exec_result()
                 # if last part is indexed then force value to be displayed as label
                 if (last_part[0]+last_part[-1]) == "[]":
                     result_value = None
                 else:
                     attr_name = last_part
         else:
-            result_value, result_error = get_inspect_exec_result(pre_exec_str, panel_props.dir_inspect_exec_str, False)
+            result_value = get_inspect_exec_result()
     # try to use a real-time entry field (selector), and display label string if real-time entry field fails
-    if result_error is None and result_value != None and attr_name != "bl_rna" and not attr_name.startswith("__") and \
+    if result_value != None and attr_name != "bl_rna" and not attr_name.startswith("__") and \
         hasattr(result_value, attr_name):
         attr_val = getattr(result_value, attr_name)
         # do not display if attribute value is None or if it is a zero-length list/tuple
-        if attr_val != None and not ( isinstance(attr_val, (list, tuple)) and len(attr_val) == 0) and \
+        if attr_val != None and not (isinstance(attr_val, (list, tuple)) and len(attr_val) == 0) and \
             not callable(attr_val):
             try:
                 layout.prop(result_value, attr_name, text="Value")
@@ -230,6 +231,9 @@ def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
 
 def draw_inspect_panel(self, context):
     context_name = context.space_data.type
+    # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+    if context_name == "PROPERTIES":
+        context_name = "VIEW_3D"
     ic_panel = get_inspect_context_panel(self.panel_num, context_name,
                                          context.window_manager.py_rec.inspect_context_collections)
     if ic_panel is None:
@@ -312,6 +316,9 @@ def draw_inspect_panel(self, context):
                               "dir_item_doc_lines_index", rows=2)
 
 def create_context_inspect_panel(context, context_name, inspect_context_collections, begin_exec_str=None):
+    # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+    if context_name == "PROPERTIES":
+        context_name = "VIEW_3D"
     panel_label = "Py Inspect"
     ic_coll = inspect_context_collections.get(context_name)
     if ic_coll is None:
@@ -334,7 +341,7 @@ def create_context_inspect_panel(context, context_name, inspect_context_collecti
     ic_coll.inspect_context_panel_next_num = ic_coll.inspect_context_panel_next_num + 1
     i_panel.panel_label = panel_label
     i_panel.panel_options.panel_option_label = panel_label
-    if begin_exec_str is None:
+    if begin_exec_str is None or begin_exec_str == "":
         return True
     i_panel.inspect_exec_str = begin_exec_str
     # do refresh using modified 'inspect_exec_str'
@@ -372,6 +379,9 @@ class PYREC_OT_RemoveInspectPanel(Operator):
             self.report({'ERROR'}, "Unable to Remove Inspect Panel because panel_num is less than zero")
             return {'CANCELLED'}
         context_name = context.space_data.type
+        # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+        if context_name == "PROPERTIES":
+            context_name = "VIEW_3D"
         unregister_inspect_panel(context_name, self.panel_num)
         panels = context.window_manager.py_rec.inspect_context_collections[context_name].inspect_context_panels
         # remove panel by finding its index first, then passing index to '.remove()' function
@@ -414,7 +424,7 @@ def inspect_exec_refresh(context, panel_num):
     post_exec_str = ic_panel.inspect_exec_str
     pre_exec_str = get_pre_exec_str(ic_panel)
     # get 'Inspect Exec' result value, and update label strings based on result
-    inspect_value, inspect_error = get_inspect_exec_result(pre_exec_str, post_exec_str, True)
+    inspect_value, inspect_error = refresh_inspect_exec_result(pre_exec_str, post_exec_str, True)
     if inspect_error != None:
         return 'CANCELLED', "Unable to refresh Inspect Value, because exception raised during exec, see " \
             "details in log Text named '%s'" % LOG_TEXT_NAME
@@ -492,17 +502,11 @@ def inspect_exec_refresh(context, panel_num):
             dir_item.type_name = type(item_value).__name__
         dir_item.value_str = str(item_value)
 
-    inspect_value, inspect_error = get_inspect_exec_result(pre_exec_str,
-        get_dir_attribute_exec_str(ic_panel.dir_inspect_exec_str, ic_panel.dir_attributes[0].name), False)
-    if inspect_error != None:
-        return 'FINISHED', ""
+    inspect_value = get_inspect_exec_result()
     ic_panel.dir_item_value_str = str(inspect_value)
-    # remaining attribute info is blank if attribute value is None
-    if inspect_value is None:
-        return 'FINISHED', ""
     # set 'type name' label
     ic_panel.dir_item_value_typename_str = type(inspect_value).__name__
-    # set '__doc__' lines, if available as string type
+    # set '__doc__' lines
     string_to_lines_collection(get_relevant_doc(inspect_value), ic_panel.dir_item_doc_lines)
     return 'FINISHED', ""
 
@@ -640,6 +644,9 @@ def restore_inspect_context_panels(inspect_context_collections):
     # because panel needs to be registered to be visible
     for icc in inspect_context_collections:
         context_name = icc.name
+        # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+        if context_name == "PROPERTIES":
+            context_name = "VIEW_3D"
         for icc_panel in icc.inspect_context_panels:
             # check if Py Inspect panel class has been registered
             if hasattr(bpy.types, "PYREC_PT_%s_Inspect%s" % (context_name, icc_panel.name)):
@@ -667,27 +674,31 @@ def get_commented_splitlines(input_str):
     return out_str
 
 def get_attribute_python_str(inspect_str, attr_name, ic_panel, attr_record_options):
-    if attr_name != ".":
-        inspect_str = inspect_str + "." + attr_name
     out_first_str = ""
-    out_last_str = inspect_str
+    out_last_str = inspect_str if attr_name == "." else inspect_str + "." + attr_name
+    result_value = get_inspect_exec_result()
+    if attr_name == ".":
+        attr_value = result_value
+    elif result_value != None and hasattr(result_value, attr_name):
+        attr_value = getattr(result_value, attr_name)
+    else:
+        attr_value = None
     # append attribute value to output, if needed
     if attr_record_options.include_value:
-        result_value, _ = get_inspect_exec_result(get_pre_exec_str(ic_panel), inspect_str, False)
-        if result_value is None:
+        if attr_value is None:
             out_last_str += " = None\n"
-        elif callable(result_value):
-            out_last_str += " # = %s\n" % str(result_value)
+        elif callable(attr_value):
+            out_last_str += " # = %s\n" % str(attr_value)
         else:
-            py_val_str = bpy_value_to_string(result_value)
+            py_val_str = bpy_value_to_string(attr_value)
             if py_val_str is None:
-                out_last_str += "  # = %s\n" % str(result_value)
+                out_last_str += "  # = %s\n" % str(attr_value)
             else:
                 out_last_str += " = %s\n" % py_val_str
     if attr_record_options.comment_type:
-        out_first_str += "# Type: " + type(result_value).__name__ + "\n"
+        out_first_str += "# Type: " + type(attr_value).__name__ + "\n"
     if attr_record_options.comment_doc:
-        doc = get_relevant_doc(result_value)
+        doc = get_relevant_doc(attr_value)
         if doc != None and doc != "":
             out_first_str += "# __doc__:\n" + get_commented_splitlines(doc)
     return out_first_str + out_last_str
