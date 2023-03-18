@@ -86,15 +86,12 @@ class PYREC_PG_InfoRecordOptions(PropertyGroup):
         "' script", default=True)
     use_text_object: BoolProperty(name="Use Text Object", description="Text Object will be used for output, " +
         "instead of Text (in Text Editor)", default=False)
-    output_text_object: PointerProperty(name="Output Text Object", description="Text Object to receive output",
-        type=bpy.types.Object, poll=text_object_poll)
+    output_text_object: PointerProperty(name="Output Text Object", description="Text Object to receive output. " +
+        "If empty then new Text Object will be created", type=bpy.types.Object, poll=text_object_poll)
     output_text: PointerProperty(name="Output Text", description="Text (in Text Editor) to receive " +
         "output", type=bpy.types.Text)
-    filter_end_line_offset: IntProperty(name="Offset", description="Filter End Line Offset: When copying lines " +
-        "from Info, last filtered line copied is most recent filtered line minus Filtered Line Offset",
-        default=0, min=0)
-    filter_line_count: IntProperty(name="Count", description="Filter Line Count: Number of filtered lines to copy " +
-        "from Info", default=10, min=1)
+    filter_line_count: IntProperty(name="Line Count", description="Filter Line Count: Number of filtered lines to " +
+        "copy from Info", default=20, min=1)
     include_line_type_context: BoolProperty(name="Context", description="Copy Context type Info lines (lines " +
         "beginning with \"bpy.context\")", default=True)
     include_line_type_info: BoolProperty(name="Info", description="Copy general information type Info lines " +
@@ -173,19 +170,27 @@ class PYREC_PT_VIEW3D_RecordInfo(Panel):
         box.operator(PYREC_OT_VIEW3D_CopyInfoToObjectText.bl_idname)
 
         box = layout.box()
-        box.label(text="Option")
         sub_box = box.box()
         sub_box.prop(pr_ir, "record_auto_import_bpy")
+        sub_box.prop(pr_ir, "filter_line_count")
 
-        sub_box.label(text="Info Line")
-        row = sub_box.row(align=True)
-        row.prop(pr_ir, "filter_end_line_offset")
-        row.prop(pr_ir, "filter_line_count")
+        sub_box.prop(pr_ir, "root_init")
+        sub_box.prop(pr_ir, "create_root_object")
+        if pr_ir.create_root_object:
+            sub_box.prop(pr_ir, "root_collection")
+        sub_box.prop(pr_ir, "use_text_object")
+        if pr_ir.use_text_object:
+            sub_box.prop(pr_ir, "output_text_object")
+            sub_box.prop(pr_ir, "text_object_collection")
+        else:
+            sub_box.prop(pr_ir, "output_text")
 
-        sub_sub_box = sub_box.box()
-        row = sub_sub_box.row()
+        sub_box = box.box()
+        sub_box.label(text="Line Options")
+        row = sub_box.row()
         row.label(text="Type")
         row.label(text="Include/Comment")
+        sub_sub_box = sub_box.box()
         row = sub_sub_box.row()
         row.label(text="Context")
         row.prop(pr_ir, "include_line_type_context", text="")
@@ -211,18 +216,6 @@ class PYREC_PT_VIEW3D_RecordInfo(Panel):
         row.prop(pr_ir, "include_line_type_py_rec", text="")
         row.prop(pr_ir, "comment_line_type_py_rec", text="")
 
-        sub_box.label(text="Object")
-        sub_box.prop(pr_ir, "root_init")
-        sub_box.prop(pr_ir, "create_root_object")
-        if pr_ir.create_root_object:
-            sub_box.prop(pr_ir, "root_collection")
-        sub_box.prop(pr_ir, "use_text_object")
-        if pr_ir.use_text_object:
-            sub_box.prop(pr_ir, "output_text_object")
-            sub_box.prop(pr_ir, "text_object_collection")
-        else:
-            sub_box.prop(pr_ir, "output_text")
-
 def get_datablock_for_type(data):
     for dd in DATABLOCK_DUAL_TYPES:
         if isinstance(data, dd[0]):
@@ -235,6 +228,9 @@ def get_info_lines(context):
     # keep copy of old type, so it can be reset later
     old_area_type = area.type
     area.type = 'INFO'
+    # save old clipboard value
+    old_clipboard_value = context.window_manager.clipboard
+    # copy info lines to clipboard
     info_context = context.copy()
     info_context['window'] = win
     info_context['screen'] = win.screen
@@ -249,7 +245,10 @@ def get_info_lines(context):
     if context.window_manager.clipboard == "":
         return ""
     # get contents of clipboard (copy of all Info lines)
-    return context.window_manager.clipboard
+    ret_value = context.window_manager.clipboard
+    # retore old clipboard value
+    context.window_manager.clipboard = old_clipboard_value
+    return ret_value
 
 def check_add_prev_lines(line, split_str, prev_lines):
     if split_str != "":
@@ -261,8 +260,7 @@ def check_add_prev_lines(line, split_str, prev_lines):
         prev_lines[line] = True
         return False
 
-def filter_info_lines(info_lines, copy_start_line_offset, filter_end_line_offset, filter_line_count,
-                      include_line_types):
+def filter_info_lines(info_lines, copy_start_line_offset, filter_line_count, include_line_types):
     if info_lines is None or include_line_types is None or len(include_line_types) < 1:
         return []
     filtered_lines = []
@@ -319,9 +317,6 @@ def filter_info_lines(info_lines, copy_start_line_offset, filter_end_line_offset
     # filter by line count
     if filter_line_count != None and filter_line_count > 0:
         filtered_lines = filtered_lines[-filter_line_count:]
-    # filter by line offset (descending order)
-    if filter_end_line_offset != None and filter_end_line_offset > 0:
-        filtered_lines = filtered_lines[:-filter_end_line_offset]
     return filtered_lines
 
 def create_text_object(context, obj_name="Text", text_body=""):
@@ -365,8 +360,8 @@ def create_text_from_info_lines(text_str):
 def copy_filtered_info_lines(context, options):
     info_lines = get_info_lines(context).splitlines()
     line_end = len(info_lines)
-    filtered_lines = filter_info_lines(info_lines, options["copy_start_line_offset"],
-        options["filter_end_line_offset"], options["filter_line_count"], options["include_line_types"])
+    filtered_lines = filter_info_lines(info_lines, options["copy_start_line_offset"], options["filter_line_count"],
+                                       options["include_line_types"])
     text_str = get_text_str_from_info_lines(filtered_lines, options["comment_line_types"])
     # do not create object if body of text_str is empty
     if text_str == "":
@@ -457,7 +452,6 @@ def get_copy_info_options(pr_ir, copy_start_line_offset):
     return {
         "record_auto_import_bpy": pr_ir.record_auto_import_bpy,
         "copy_start_line_offset": copy_start_line_offset,
-        "filter_end_line_offset": pr_ir.filter_end_line_offset,
         "filter_line_count": pr_ir.filter_line_count,
         "include_line_types": get_include_line_types(pr_ir),
         "comment_line_types": get_comment_line_types(pr_ir),
@@ -470,9 +464,6 @@ def get_copy_info_options(pr_ir, copy_start_line_offset):
         "output_text_object": pr_ir.output_text_object,
     }
 
-def get_current_info_line_count(context):
-    return len(get_info_lines(context).splitlines())
-
 class PYREC_OT_VIEW3D_StartRecordInfoLine(Operator):
     bl_idname = "py_rec.view3d_start_record_info_line"
     bl_label = "Start Record"
@@ -484,7 +475,7 @@ class PYREC_OT_VIEW3D_StartRecordInfoLine(Operator):
     def execute(self, context):
         pr_ir = context.window_manager.py_rec.record_options.info
         pr_ir.record_info_line = True
-        pr_ir.record_info_start_line_offset = get_current_info_line_count(context)
+        pr_ir.record_info_start_line_offset = len(get_info_lines(context).splitlines())
         self.report({'INFO'}, "Start Record: begin at Info line number %i" % pr_ir.record_info_start_line_offset)
         return {'FINISHED'}
 

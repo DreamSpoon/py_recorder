@@ -21,7 +21,7 @@ from bpy.types import Operator
 from bpy.props import IntProperty
 
 from .inspect_func import get_inspect_context_panel
-from .inspect_exec import (register_inspect_panel, unregister_inspect_panel)
+from .inspect_exec import (inspect_exec_refresh, register_inspect_panel, unregister_inspect_panel)
 
 class PYREC_OT_InspectOptions(Operator):
     bl_description = "Open Py Inspect panel Options window"
@@ -30,10 +30,6 @@ class PYREC_OT_InspectOptions(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
-
-    @classmethod
-    def poll(cls, context):
-        return True
 
     def execute(self, context):
         p_r = context.window_manager.py_rec
@@ -57,6 +53,8 @@ class PYREC_OT_InspectOptions(Operator):
                 self.report({'ERROR'}, "Unable to change label of Py Inspect panel previously with label '%s'" % \
                             old_label)
                 return {'CANCELLED'}
+        # refresh the Attributes List
+        inspect_exec_refresh(context, self.panel_num)
         return {'FINISHED'}
 
     def draw(self, context):

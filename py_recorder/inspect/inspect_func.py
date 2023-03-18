@@ -16,9 +16,11 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+import inspect
 import re
 
 import bpy
+import mathutils
 
 from .lex_py_attributes import lex_py_attributes
 
@@ -30,6 +32,21 @@ def get_dir(val):
     for attr in dir(val):
         temp_dict[attr] = True
     return temp_dict.keys()
+
+# filter out values that do not have __doc__, and empty __doc__, then return clean doc
+def get_relevant_doc(value):
+    if value != None and not isinstance(value, (bool, dict, float, int, list, set, str, tuple, mathutils.Color,
+        mathutils.Euler, mathutils.Matrix, mathutils.Quaternion, mathutils.Vector) ):
+        return inspect.getdoc(value)
+    return None
+
+# split 'input_str' into separate lines, and add each line to 'lines_coll'
+def string_to_lines_collection(input_str, lines_coll):
+    if input_str is None or lines_coll is None:
+        return
+    for str_line in input_str.splitlines():
+        new_item = lines_coll.add()
+        new_item.name = str_line
 
 def get_pre_exec_str(ic_panel):
     if ic_panel.pre_inspect_type == "single_line":
