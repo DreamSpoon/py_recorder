@@ -21,7 +21,7 @@ from bpy.types import Operator
 from bpy.props import IntProperty
 
 from .inspect_func import get_inspect_context_panel
-from .inspect_exec import (inspect_exec_refresh, register_inspect_panel, unregister_inspect_panel)
+from .inspect_exec import (inspect_refresh_attribute_list, register_inspect_panel, unregister_inspect_panel)
 
 class PYREC_OT_InspectOptions(Operator):
     bl_description = "Open Py Inspect panel Options window"
@@ -54,7 +54,7 @@ class PYREC_OT_InspectOptions(Operator):
                             old_label)
                 return {'CANCELLED'}
         # refresh the Attributes List
-        inspect_exec_refresh(context, self.panel_num)
+        inspect_refresh_attribute_list(ic_panel)
         return {'FINISHED'}
 
     def draw(self, context):

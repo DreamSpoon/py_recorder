@@ -47,7 +47,7 @@ from .inspect.inspect_panel import (PYREC_PG_AttributeRecordOptions, PYREC_PG_In
     append_inspect_active_context_menu_all, remove_inspect_active_context_menu_all)
 from .inspect.inspect_exec import (register_inspect_exec_panel_draw_func, unregister_all_inspect_panel_classes)
 from .object_custom_prop import (CPROP_NAME_INIT_PY, PYREC_OT_OBJ_AddCP_Data, PYREC_OT_OBJ_ModifyInit)
-from .exec_object import PYREC_OT_VIEW3D_RunObjectScript
+from .exec_object import (PYREC_OT_BatchExecObject, PYREC_OT_ExecObject, PYREC_PT_VIEW3D_ExecObject)
 from .record.driver_ops import (PYREC_PG_DriverRecordOptions, PYREC_OT_DriversToPython, PYREC_PT_RecordDriver,
     PYREC_OT_SelectAnimdataSrcAll, PYREC_OT_SelectAnimdataSrcNone)
 from .record.node_tree_ops import (PYREC_OT_RecordNodetree, PYREC_PT_RecordNodetree, PYREC_PG_NodetreeRecordOptions)
@@ -88,22 +88,6 @@ class PYREC_PT_OBJ_AdjustCustomProp(Panel):
         box.prop_search(pr_ir, "add_cp_datablock", bpy.data, pr_ir.add_cp_data_type, text="")
         box.operator(PYREC_OT_OBJ_AddCP_Data.bl_idname)
 
-class PYREC_PT_VIEW3D_ExecObject(Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "Tool"
-    bl_label = "Py Exec Object"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw(self, context):
-        pr_ir = context.window_manager.py_rec.record_options.info
-        layout = self.layout
-        box = layout.box()
-        box.label(text="Run Object '__init__'")
-        box.operator(PYREC_OT_VIEW3D_RunObjectScript.bl_idname)
-        box.prop(pr_ir, "run_as_text_script")
-        box.prop(pr_ir, "run_auto_import_bpy")
-
 ########################
 
 class PYREC_PG_RecordOptions(PropertyGroup):
@@ -127,7 +111,8 @@ classes = [
     PYREC_OT_VIEW3D_StopRecordInfoLine,
     PYREC_OT_VIEW3D_CopyInfoToObjectText,
     PYREC_PT_VIEW3D_RecordInfo,
-    PYREC_OT_VIEW3D_RunObjectScript,
+    PYREC_OT_BatchExecObject,
+    PYREC_OT_ExecObject,
     PYREC_PT_VIEW3D_ExecObject,
     PYREC_OT_AddInspectPanel,
     PYREC_MT_InspectActive,

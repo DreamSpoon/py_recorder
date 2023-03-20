@@ -19,9 +19,12 @@
 import bpy
 
 # returns tuple (True, "") on success, returns tuple (False, error_msg) on error (exception raised)
-def exec_str(script_str):
+def exec_str(script_str, globs=None):
     try:
-        exec(script_str)
+        if globs is None:
+            exec(script_str)
+        else:
+            exec(script_str, globs)
     except:
         import traceback
         tb = traceback.format_exc()

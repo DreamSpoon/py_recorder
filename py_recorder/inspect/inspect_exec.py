@@ -162,77 +162,18 @@ def refresh_inspect_exec_result(pre_exec_str, inspect_exec_str, enable_log):
 def get_inspect_exec_result():
     return inspect_exec_result.get("result")
 
-def inspect_exec_refresh(context, panel_num):
-    ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
-                                         context.window_manager.py_rec.inspect_context_collections)
-    if ic_panel is None:
-        return 'CANCELLED', "Unable to refresh Inspect Value, because cannot get Inspect Panel"
+def inspect_refresh_attribute_list(ic_panel):
     panel_options = ic_panel.panel_options
     if panel_options is None:
-        return 'CANCELLED', "Unable to refresh Inspect Value, because cannot get Inspect Panel Options"
-    # clear index, and dir() attribute listing
-    ic_panel.array_index_key_type = "none"
-    ic_panel.array_index = 0
-    ic_panel.array_index_max = 0
-    ic_panel.array_key_set.clear()
-    ic_panel.dir_inspect_exec_str = ""
-    ic_panel.dir_attributes.clear()
-    # clear label strings
-    ic_panel.dir_item_value_str = ""
-    ic_panel.dir_item_value_typename_str = ""
-    ic_panel.dir_item_doc_lines.clear()
-
-    # if Inspect Exec string is empty then quit
-    if ic_panel.inspect_exec_str == "":
-        return 'CANCELLED', "Unable to refresh Inspect Value, because Inspect Exec string is empty"
-
-    # get total_exec_str, which includes pre-exec lines of code, if any
-    post_exec_str = ic_panel.inspect_exec_str
-    pre_exec_str = get_pre_exec_str(ic_panel)
-    # get 'Inspect Exec' result value, and update label strings based on result
-    inspect_value, inspect_error = refresh_inspect_exec_result(pre_exec_str, post_exec_str, True)
-    if inspect_error != None:
-        return 'CANCELLED', "Unable to refresh Inspect Value, because exception raised during exec, see " \
-            "details in log Text named '%s'" % LOG_TEXT_NAME
-
-    # update index props
-    if inspect_value != None and hasattr(inspect_value, "__len__") and len(inspect_value) > 0:
-        # check for string type keys (for string type index)
-        has_index_str = False
-        if hasattr(inspect_value, "keys") and callable(inspect_value.keys):
-            has_index_str = True
-            # create list of strings (key names) for index string enum
-            for key_name in inspect_value.keys():
-                if not isinstance(key_name, str):
-                    continue
-                index_str_item = ic_panel.array_key_set.add()
-                index_str_item.name = key_name
-        # check for integer type index
-        has_array_index = False
-        try:
-            _ = inspect_value[0]    # this line will raise exception if inspect_value cannot be indexed with integer
-            # the following lines in the 'try' block will be run only if inspect_value can be indexed with integer
-            has_array_index = True
-            ic_panel.array_index_max = len(inspect_value)-1
-            ic_panel.array_index = 0
-        except:
-            pass
-        # set prop to indicate available index types
-        if has_array_index and has_index_str:
-            ic_panel.array_index_key_type = "int_str"
-        elif has_array_index:
-            ic_panel.array_index_key_type = "int"
-        elif has_index_str:
-            ic_panel.array_index_key_type = "str"
-
+        return
+    inspect_value = get_inspect_exec_result()
     # dir listing can only be performed if 'inspect_value' is not None, because None does not have attributes
     if inspect_value is None:
         dir_array = []
     else:
         # get current dir() array, and quit if array is empty
         dir_array = get_dir(inspect_value)
-    # update dir() listing
-    ic_panel.dir_inspect_exec_str = ic_panel.inspect_exec_str
+    ic_panel.dir_attributes.clear()
     ic_panel.dir_attributes_index = 0
 
     # prepend two items in dir_attributes, to include self value and indexed value, so these values are in same format
@@ -268,7 +209,72 @@ def inspect_exec_refresh(context, panel_num):
             dir_item.type_name = type(item_value).__name__
         dir_item.value_str = str(item_value)
 
-    inspect_value = get_inspect_exec_result()
+def inspect_exec_refresh(context, panel_num):
+    ic_panel = get_inspect_context_panel(panel_num, context.space_data.type,
+                                         context.window_manager.py_rec.inspect_context_collections)
+    if ic_panel is None:
+        return 'CANCELLED', "Unable to refresh Inspect Value, because cannot get Inspect Panel"
+    panel_options = ic_panel.panel_options
+    if panel_options is None:
+        return 'CANCELLED', "Unable to refresh Inspect Value, because cannot get Inspect Panel Options"
+    # clear index, and dir() attribute listing
+    ic_panel.array_index_key_type = "none"
+    ic_panel.array_index = 0
+    ic_panel.array_index_max = 0
+    ic_panel.array_key_set.clear()
+    ic_panel.dir_inspect_exec_str = ""
+    # clear label strings
+    ic_panel.dir_item_value_str = ""
+    ic_panel.dir_item_value_typename_str = ""
+    ic_panel.dir_item_doc_lines.clear()
+
+    # if Inspect Exec string is empty then quit
+    if ic_panel.inspect_exec_str == "":
+        return 'CANCELLED', "Unable to refresh Inspect Value, because Inspect Exec string is empty"
+
+    # get total_exec_str, which includes pre-exec lines of code, if any
+    post_exec_str = ic_panel.inspect_exec_str
+    pre_exec_str = get_pre_exec_str(ic_panel)
+    # get 'Inspect Exec' result value, and update label strings based on result
+    inspect_value, inspect_error = refresh_inspect_exec_result(pre_exec_str, post_exec_str, True)
+    if inspect_error != None:
+        return 'CANCELLED', "Unable to refresh Inspect Value, because exception raised during exec, see " \
+            "details in log Text named '%s'" % LOG_TEXT_NAME
+
+    ic_panel.dir_inspect_exec_str = ic_panel.inspect_exec_str
+
+    # update index props
+    if inspect_value != None and hasattr(inspect_value, "__len__") and len(inspect_value) > 0:
+        # check for string type keys (for string type index)
+        has_index_str = False
+        if hasattr(inspect_value, "keys") and callable(inspect_value.keys):
+            has_index_str = True
+            # create list of strings (key names) for index string enum
+            for key_name in inspect_value.keys():
+                if not isinstance(key_name, str):
+                    continue
+                index_str_item = ic_panel.array_key_set.add()
+                index_str_item.name = key_name
+        # check for integer type index
+        has_array_index = False
+        try:
+            _ = inspect_value[0]    # this line will raise exception if inspect_value cannot be indexed with integer
+            # the following lines in the 'try' block will be run only if inspect_value can be indexed with integer
+            has_array_index = True
+            ic_panel.array_index_max = len(inspect_value)-1
+            ic_panel.array_index = 0
+        except:
+            pass
+        # set prop to indicate available index types
+        if has_array_index and has_index_str:
+            ic_panel.array_index_key_type = "int_str"
+        elif has_array_index:
+            ic_panel.array_index_key_type = "int"
+        elif has_index_str:
+            ic_panel.array_index_key_type = "str"
+    # refresh attribute list after refreshing inspect value
+    inspect_refresh_attribute_list(ic_panel)
+    # set 'value' label
     ic_panel.dir_item_value_str = str(inspect_value)
     # set 'type name' label
     ic_panel.dir_item_value_typename_str = type(inspect_value).__name__

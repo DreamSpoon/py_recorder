@@ -19,7 +19,7 @@
 import traceback
 
 import bpy
-from bpy.props import (EnumProperty, PointerProperty, StringProperty)
+from bpy.props import (BoolProperty, EnumProperty, PointerProperty, StringProperty)
 from bpy.types import (Operator, PropertyGroup)
 from bpy.utils import (register_class, unregister_class)
 
@@ -57,8 +57,11 @@ def unregister_exec_panel(context_name):
     except:
         return False
 
-#ALL_CONTEXT_NAMES = ('EMPTY', 'VIEW_3D', 'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR', 'DOPESHEET_EDITOR', 'GRAPH_EDITOR', 'NLA_EDITOR', 'TEXT_EDITOR', 'CONSOLE', 'INFO', 'TOPBAR', 'STATUSBAR', 'OUTLINER', 'PROPERTIES', 'FILE_BROWSER', 'SPREADSHEET', 'PREFERENCES')
-EXEC_CONTEXT_NAMES = ('VIEW_3D', 'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR', 'DOPESHEET_EDITOR', 'GRAPH_EDITOR', 'NLA_EDITOR', 'TEXT_EDITOR', 'SPREADSHEET', 'PREFERENCES')
+#ALL_CONTEXT_NAMES = ('EMPTY', 'VIEW_3D', 'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR',
+#    'DOPESHEET_EDITOR', 'GRAPH_EDITOR', 'NLA_EDITOR', 'TEXT_EDITOR', 'CONSOLE', 'INFO', 'TOPBAR', 'STATUSBAR',
+#    'OUTLINER', 'PROPERTIES', 'FILE_BROWSER', 'SPREADSHEET', 'PREFERENCES')
+EXEC_CONTEXT_NAMES = ('VIEW_3D', 'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR', 'DOPESHEET_EDITOR',
+    'GRAPH_EDITOR', 'NLA_EDITOR', 'TEXT_EDITOR', 'SPREADSHEET', 'PREFERENCES')
 def append_exec_context_panel_all():
     for context_name in EXEC_CONTEXT_NAMES:
         register_exec_panel(context_name)
@@ -72,6 +75,15 @@ class PYREC_PG_ExecOptions(PropertyGroup):
         default="single_line", description="Exec single line of code, or multi-line Text (see Text-Editor)")
     single_line: StringProperty(description="Single line of code to exec()")
     textblock: PointerProperty(description="Text to exec()", type=bpy.types.Text)
+    run_auto_import_bpy: BoolProperty(name="Auto 'import bpy'", description="Automatically prepend line to script, " +
+        "if needed, to prevent error: \"NameError: name 'bpy' is not defined\"", default=True)
+    run_as_text_script: BoolProperty(name="Run in Text Editor", description="If enabled then Python code from " +
+        "Textblock / Text Object will be 'run as script' in Text Editor. If disabled then Python code will be " +
+        "run directly with exec()", default=False)
+    use_operator_functions: BoolProperty(name="Operator Functions", description="Use Operator functions ('invoke', " +
+        "'draw', 'execute'), if found. Notes: Operator Functions are not available if 'Run in Text Editor', and " +
+        "windows will not display if 'Batch Exec' is used; only 'execute' is run during 'Batch Exec'",
+        default=True)
 
 def context_exec_single_line(single_line, enable_log):
     try:
@@ -95,7 +107,7 @@ def context_exec_textblock(textblock, enable_log):
 
 class PYREC_OT_ContextExec(Operator):
     bl_description = ""
-    bl_idname = "py_rec.exec_do"
+    bl_idname = "py_rec.context_exec"
     bl_label = "Exec"
     bl_options = {'REGISTER', 'UNDO'}
 
