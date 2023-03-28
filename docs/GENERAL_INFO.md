@@ -4,7 +4,7 @@ This documentation is a "Work In Progress" and not complete - yet.
 
 ## Add Py Inspect panel - Multiple Contexts
 
-![picture](assets\add_py_inspect_view3d.jpg)
+![picture](assets\add_py_inspect_view3d.png)
 
 *Rick-click context menu -> Add Py Inspect Panel*
 
@@ -18,9 +18,9 @@ Using this adds a Py Inspect panel to active context's Tool menu.
 
 Py Inspect Active is available in many contexts, e.g. View3D, Node Editor:
 
-![picture](assets\py_inspect_active_view3d.jpg)
+![picture](assets\py_inspect_active_view3d.png)
 
-![picture](assets\py_inspect_active_node_editor.jpg)
+![picture](assets\py_inspect_active_node_editor.png)
 
 *Rick-click context menu -> Py Inspect Active -> type*
 
@@ -28,11 +28,11 @@ Select type of active thing to inspect, varies by context, e.g. active Object in
 
 ## Py Inspect - Multiple Contexts
 
-![picture](assets\py_inspect_panel_view3d_1.jpg)
+![picture](assets\py_inspect_panel_view3d_1.png)
 
 ## Py Inspect - Custom Py Inspect String
 
-![picture](assets\py_inspect_panel_view3d_2.jpg)
+![picture](assets\py_inspect_panel_view3d_2.png)
 
 Pre-Inspect Exec can be one line, or entire Text (see Text Editor).
   - e.g. "import datetime"
@@ -46,7 +46,7 @@ Press OK button to set Inspect Exec string and update this Py Inspect panel (inc
 
 ## Py Inspect - Example with "bpy.data.objects"
 
-![picture](assets\py_inspect_panel_view3d_3.jpg)
+![picture](assets\py_inspect_panel_view3d_3.png)
 
 Drill down to indexed inspect values with Zoom Plus icons for either integer indexing, or string indexing, or both.
 
@@ -63,13 +63,13 @@ Paste clipboard reference value to active item in Attributes List
 
 ## Py Inspect Options - Multiple Contexts
 
-![picture](assets\py_inspect_panel_options_view3d.jpg)
+![picture](assets\py_inspect_panel_options_view3d.png)
 
 Change which data is displayed in Py Inspect panel, or change name of Panel, etc.
 
 ## Py Record Info - View3D Context
 
-![picture](assets\py_record_info_view3d.jpg)
+![picture](assets\py_record_info_view3d.png)
 
 Filter and copy lines from Info context (e.g. lines of Python code that create Cube mesh, Light, Landscape).
   - lines can be copied to Text (see Text Editor), or Text Object (see View3D)
@@ -82,7 +82,7 @@ If "Root __init__.py" is enabled, then active Object will be given a reference t
 
 ## Py Exec Object - View3D Context
 
-![picture](assets\py_exec_object_view3d.jpg)
+![picture](assets\py_exec_object_view3d.png)
 
 Single Objects can be "run" with "Exec Object" button.
   - "Operator functions" (invoke, draw, execute) will be run, if enabled, to e.g.
@@ -95,21 +95,21 @@ Multiple Objects can be run with one click by using the "Batch Exec" button.
 
 ## Py Exec - Multiple Contexts
 
-![picture](assets\py_exec_node_editor.jpg)
+![picture](assets\py_exec_node_editor.png)
 
-![picture](assets\py_exec_view3d.jpg)
+![picture](assets\py_exec_view3d.png)
 
 Execute code in any context. Can be single line or lines of Text (see Text Editor).
 
 ## Py Record Drivers - Drivers Editor Context
 
-![picture](assets\py_record_drivers.jpg)
+![picture](assets\py_record_drivers.png)
 
 Convert Drivers to Python Text, available in Text Editor.
 
 ## Py Record Nodetree - Node Editor Context
 
-![picture](assets\py_record_node_tree.jpg)
+![picture](assets\py_record_node_tree.png)
 
 Convert entire Nodetree to Python Text, available in Text Editor. Works with all builtin types of Blender nodetrees:
   - Shader Nodes
