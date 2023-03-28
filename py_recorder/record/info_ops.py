@@ -119,10 +119,10 @@ class PYREC_PG_InfoRecordOptions(PropertyGroup):
     comment_line_type_py_rec: BoolProperty(name="Py Recorder", description="Comment out Info lines related to Py " +
         "Recorder operations or state changes (lines beginning with \"bpy.ops.py_rec\" or " +
         "\"bpy.context.scene.py_rec\")", default=True)
-    root_collection: PointerProperty(name="Root", description="New root Objects will be put into this collection",
-        type=bpy.types.Collection)
-    text_object_collection: PointerProperty(name="Text", description="New Text Objects will be put into this " +
-        "collection", type=bpy.types.Collection)
+    root_collection: PointerProperty(name="Root", description="New root Objects will be added to this collection. " +
+        "If empty then new root Objects will be added to current Collection", type=bpy.types.Collection)
+    text_object_collection: PointerProperty(name="Text", description="New Text Objects will be added to this " +
+        "collection. If empty then new Text Objects will be added to current Collection", type=bpy.types.Collection)
     add_cp_data_name: StringProperty(name="Name", description="Custom Property name", default="")
     add_cp_data_type: EnumProperty(name="Type", description="Data type", items=BPY_DATA_TYPE_ITEMS, default="objects")
     add_cp_datablock: StringProperty(name="Data", description="Custom Property value", default="")

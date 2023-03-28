@@ -80,7 +80,7 @@ def bpy_value_to_string(value):
         return str(value)
     # if attribute has a length then it is a Vector, Color, etc., so write elements of attribute in a tuple,
     # unless it is a set
-    elif hasattr(value, '__len__'):
+    elif hasattr(value, "__len__"):
         vec_str = ""
         # is it a set?
         if isinstance(value, set):

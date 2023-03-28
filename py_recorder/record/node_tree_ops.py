@@ -125,17 +125,20 @@ def get_output_num_for_link(tr_link):
     return None
 
 def bpy_compare_to_value(blender_value, va):
-    if hasattr(blender_value, '__len__') and hasattr(va, '__len__'):
-        # False if lengths of objects are different
-        if len(blender_value) != len(va):
-            return False
+    if hasattr(blender_value, "__len__") and hasattr(va, "__len__"):
+# TODO: testing with sets! new code for sets is, not tested yet! delete commented lines of after testing code
+#        # False if lengths of objects are different
+#        if len(blender_value) != len(va):
+#            return False
         # is it a set?
         if isinstance(blender_value, set):
-            c = 0
+#            c = 0
             for item in blender_value:
-                if item != va[c]:
+#                if item != va[c]:
+#                    return False
+#                c = c + 1
+                if item not in va:
                     return False
-                c = c + 1
         else:
             for val_index in range(len(blender_value)):
                 if blender_value[val_index] != va[val_index]:

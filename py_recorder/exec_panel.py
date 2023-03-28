@@ -61,7 +61,7 @@ def unregister_exec_panel(context_name):
 #    'DOPESHEET_EDITOR', 'GRAPH_EDITOR', 'NLA_EDITOR', 'TEXT_EDITOR', 'CONSOLE', 'INFO', 'TOPBAR', 'STATUSBAR',
 #    'OUTLINER', 'PROPERTIES', 'FILE_BROWSER', 'SPREADSHEET', 'PREFERENCES')
 EXEC_CONTEXT_NAMES = ('VIEW_3D', 'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR', 'DOPESHEET_EDITOR',
-    'GRAPH_EDITOR', 'NLA_EDITOR', 'TEXT_EDITOR', 'SPREADSHEET', 'PREFERENCES')
+    'GRAPH_EDITOR', 'NLA_EDITOR', 'TEXT_EDITOR', 'SPREADSHEET')
 def append_exec_context_panel_all():
     for context_name in EXEC_CONTEXT_NAMES:
         register_exec_panel(context_name)

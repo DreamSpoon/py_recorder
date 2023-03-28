@@ -244,25 +244,30 @@ def inspect_exec_refresh(context, panel_num):
     ic_panel.dir_inspect_exec_str = ic_panel.inspect_exec_str
 
     # update index props
-    if inspect_value != None and hasattr(inspect_value, "__len__") and len(inspect_value) > 0:
+    if inspect_value != None and hasattr(inspect_value, "__len__"):
         # check for string type keys (for string type index)
         has_index_str = False
         if hasattr(inspect_value, "keys") and callable(inspect_value.keys):
-            has_index_str = True
-            # create list of strings (key names) for index string enum
-            for key_name in inspect_value.keys():
-                if not isinstance(key_name, str):
-                    continue
-                index_str_item = ic_panel.array_key_set.add()
-                index_str_item.name = key_name
+            try:
+                # create list of strings (key names) for index string enum
+                for key_name in inspect_value.keys():
+                    if not isinstance(key_name, str):
+                        continue
+                    index_str_item = ic_panel.array_key_set.add()
+                    index_str_item.name = key_name
+                    # locating following line of code in this 'for' loop ensures at least one key is added before
+                    # setting this boolean to True
+                    has_index_str = True
+            except:
+                pass
         # check for integer type index
         has_array_index = False
         try:
             _ = inspect_value[0]    # this line will raise exception if inspect_value cannot be indexed with integer
             # the following lines in the 'try' block will be run only if inspect_value can be indexed with integer
-            has_array_index = True
-            ic_panel.array_index_max = len(inspect_value)-1
             ic_panel.array_index = 0
+            ic_panel.array_index_max = len(inspect_value)-1
+            has_array_index = True
         except:
             pass
         # set prop to indicate available index types
