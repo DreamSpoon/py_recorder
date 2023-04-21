@@ -267,6 +267,8 @@ class PYREC_OT_ExecObject(Operator):
         if (not isinstance(invoke_ret_val, set) or len(invoke_ret_val.intersection({"RUNNING_MODAL"})) < 1) and \
             run_result.get("draw") != None:
             return context.window_manager.invoke_props_dialog(self)
+        if invoke_ret_val is None:
+            return {'FINISHED'}
         return invoke_ret_val
 
 class PYREC_PT_VIEW3D_ExecObject(Panel):

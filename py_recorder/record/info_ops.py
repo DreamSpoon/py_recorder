@@ -89,7 +89,7 @@ class PYREC_PG_InfoRecordOptions(PropertyGroup):
     output_text_object: PointerProperty(name="Output Text Object", description="Text Object to receive output. " +
         "If empty then new Text Object will be created", type=bpy.types.Object, poll=text_object_poll)
     output_text: PointerProperty(name="Output Text", description="Text (in Text Editor) to receive " +
-        "output", type=bpy.types.Text)
+        "output. If empty then new Text is created with name 'InfoText'", type=bpy.types.Text)
     filter_line_count: IntProperty(name="Line Count", description="Filter Line Count: Number of filtered lines to " +
         "copy from Info", default=20, min=1)
     include_line_type_context: BoolProperty(name="Context", description="Copy Context type Info lines (lines " +
