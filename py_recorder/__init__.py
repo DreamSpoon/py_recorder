@@ -18,7 +18,7 @@
 
 bl_info = {
     "name": "Python Recorder",
-    "version": (0, 5, 0),
+    "version": (0, 5, 1),
     "author": "Dave",
     "blender": (2, 80, 0),
     "description": "Inspect Python object attributes. Record Blender data to Python code. Record Info lines to " \
