@@ -17,7 +17,6 @@
 # ##### END GPL LICENSE BLOCK #####
 
 from mathutils import (Color, Vector)
-
 import bpy
 from bpy.types import (Operator, Panel, PropertyGroup)
 from bpy.props import (BoolProperty, IntProperty)
@@ -60,7 +59,7 @@ class PYREC_PG_NodetreeRecordOptions(PropertyGroup):
         default=False)
     make_function: BoolProperty(name="Make into Function", description="Add lines of Python code to " +
         "create runnable script (instead of just the bare essential code)", default=True)
-    delete_existing: BoolProperty(name="Delete Existing Shader",
+    delete_existing: BoolProperty(name="Delete Existing Nodes",
         description="Include code in the output that deletes all nodes in Shader Material / Geometry Node Setup " +
         "before creating new nodes", default=True)
     write_loc_decimal_places: IntProperty(name="Location Decimal Places", description="Number of " +
@@ -126,17 +125,9 @@ def get_output_num_for_link(tr_link):
 
 def bpy_compare_to_value(blender_value, va):
     if hasattr(blender_value, "__len__") and hasattr(va, "__len__"):
-# TODO: testing with sets! new code for sets is, not tested yet! delete commented lines of after testing code
-#        # False if lengths of objects are different
-#        if len(blender_value) != len(va):
-#            return False
         # is it a set?
         if isinstance(blender_value, set):
-#            c = 0
             for item in blender_value:
-#                if item != va[c]:
-#                    return False
-#                c = c + 1
                 if item not in va:
                     return False
         else:
@@ -160,42 +151,38 @@ def write_filtered_attribs(out_text, line_prefix, node, ignore_attribs):
         if attr_name.startswith('__') or attr_name.startswith('bl_') or callable(the_attr) or \
             attr_name in FILTER_OUT_ATTRIBS:
             continue
-
         # if type is Color Ramp
         if type(the_attr) == bpy.types.ColorRamp:
-            out_text.write(line_prefix + "node." + attr_name + ".color_mode = \"%s\"\n" % the_attr.color_mode)
-            out_text.write(line_prefix + "node." + attr_name + ".interpolation = \"%s\"\n" % the_attr.interpolation)
+            out_text.write("%snode.%s.color_mode = \"%s\"\n" % (line_prefix, attr_name, the_attr.color_mode))
+            out_text.write("%snode.%s.interpolation = \"%s\"\n" % (line_prefix, attr_name, the_attr.interpolation))
             # remove one element before adding any new elements, leaving the minimum of one element in list
             # (deleting last element causes Blender error, but one elements needs to be deleted in case only 1 is used)
-            out_text.write(line_prefix + "node." + attr_name + ".elements.remove(" + "node." + attr_name +
-                           ".elements[0])\n")
+            out_text.write("%snode.%s.elements.remove(node.%s.elements[0])\n" % (line_prefix, attr_name, attr_name))
             # add new elements, as needed
             elem_index = -1
             for el in the_attr.elements:
                 elem_index = elem_index + 1
                 # if writing first element then don't create new element
                 if elem_index < 1:
-                    out_text.write(line_prefix + "elem = node." + attr_name + ".elements[0]\n")
-                    out_text.write(line_prefix + "elem.position = %f\n" % el.position)
+                    out_text.write("%selem = node.%s.elements[0]\n" % (line_prefix, attr_name))
+                    out_text.write("%selem.position = %f\n" % (line_prefix, el.position))
                 # else create new element
                 else:
-                    out_text.write(line_prefix + "elem = node." + attr_name + ".elements.new(%f)\n" % el.position)
-
-                out_text.write(line_prefix + "elem.color = (%f, %f, %f, %f)\n" %
-                               (el.color[0], el.color[1], el.color[2], el.color[3]))
+                    out_text.write("%selem = node.%s.elements.new(%f)\n" % (line_prefix, attr_name, el.position))
+                out_text.write("%selem.color = (%f, %f, %f, %f)\n" %
+                               (line_prefix, el.color[0], el.color[1], el.color[2], el.color[3]))
         # if type is Curve Mapping, e.g. nodes Float Curve (Shader), RGB Curve (Shader), Time Curve (Compositor)
         elif type(the_attr) == bpy.types.CurveMapping:
-            out_text.write(line_prefix + "node." + attr_name + ".use_clip = %s\n" % the_attr.use_clip)
-            out_text.write(line_prefix + "node." + attr_name + ".clip_min_x = %f\n" % the_attr.clip_min_x)
-            out_text.write(line_prefix + "node." + attr_name + ".clip_min_y = %f\n" % the_attr.clip_min_y)
-            out_text.write(line_prefix + "node." + attr_name + ".clip_max_x = %f\n" % the_attr.clip_max_x)
-            out_text.write(line_prefix + "node." + attr_name + ".clip_max_y = %f\n" % the_attr.clip_max_y)
-            out_text.write(line_prefix + "node." + attr_name + ".extend = \"%s\"\n" % the_attr.extend)
+            out_text.write("%snode.%s.use_clip = %s\n" % (line_prefix, attr_name, the_attr.use_clip))
+            out_text.write("%snode.%s.clip_min_x = %f\n" % (line_prefix, attr_name, the_attr.clip_min_x))
+            out_text.write("%snode.%s.clip_min_y = %f\n" % (line_prefix, attr_name, the_attr.clip_min_y))
+            out_text.write("%snode.%s.clip_max_x = %f\n" % (line_prefix, attr_name, the_attr.clip_max_x))
+            out_text.write("%snode.%s.clip_max_y = %f\n" % (line_prefix, attr_name, the_attr.clip_max_y))
+            out_text.write("%snode.%s.extend = \"%s\"\n" % (line_prefix, attr_name, the_attr.extend))
             # note: Float Curve and Time Curve have 1 curve, RGB curve has 4 curves (C, R, G, B)
             curve_index = -1
             for curve in the_attr.curves:
                 curve_index = curve_index + 1
-
                 # addd new points, as needed
                 point_index = -1
                 for p in curve.points:
@@ -203,26 +190,25 @@ def write_filtered_attribs(out_text, line_prefix, node, ignore_attribs):
                     # each curve starts with 2 points by default, so write into these points before creating more
                     # (2 points minimum, cannot delete them)
                     if point_index < 2:
-                        out_text.write(line_prefix + "point = node." + attr_name + ".curves[%d].points[%d]\n" %
-                                       (curve_index, point_index))
-                        out_text.write(line_prefix + "point.location = (%f, %f)\n" % (p.location[0], p.location[1]))
+                        out_text.write("%spoint = node.%s.curves[%d].points[%d]\n" %
+                                       (line_prefix, attr_name, curve_index, point_index))
+                        out_text.write("%spoint.location = (%f, %f)\n" % (line_prefix, p.location[0], p.location[1]))
                     # create new point
                     else:
-                        out_text.write(line_prefix + "point = node." + attr_name + ".curves[%d].points.new(%f, %f)\n" %
-                                       (curve_index, p.location[0], p.location[1]))
-                    out_text.write(line_prefix + "point.handle_type = \"%s\"\n" % p.handle_type)
-
+                        out_text.write("%spoint = node.%s.curves[%d].points.new(%f, %f)\n" %
+                                       (line_prefix, attr_name, curve_index, p.location[0], p.location[1]))
+                    out_text.write("%spoint.handle_type = \"%s\"\n" % (line_prefix, p.handle_type))
             # reset the clipping view
-            out_text.write(line_prefix + "node." + attr_name + ".reset_view()\n")
+            out_text.write("%snode.%s.reset_view()\n" % (line_prefix, attr_name))
             # update the view of the mapping (trigger UI update)
-            out_text.write(line_prefix + "node." + attr_name + ".update()\n")
+            out_text.write("%snode.%s.update()\n" % (line_prefix, attr_name))
         # remaining types are String, Integer, Float, etc. (including bpy.types, e.g. bpy.types.Collection)
         else:
             val_str = bpy_value_to_string(the_attr)
             # do not write attributes that have value None
             # e.g. an 'object' attribute, that is set to None to indicate no object
             if val_str != None:
-                out_text.write(line_prefix + "node." + attr_name + " = " + val_str + "\n")
+                out_text.write("%snode.%s = %s\n" % (line_prefix, attr_name, val_str))
 
 def get_node_io_value_str(node_io_element, write_linked):
     # ignore virtual sockets and shader sockets, no default
@@ -250,13 +236,14 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     node_group = bpy.data.node_groups.get(mat.edit_tree.name)
     is_tree_node_group = (node_group != None)
 
-    out_text.write("# Python script from Blender version " + str(bpy.app.version) + " to create ")
+    out_text.write("# Python script from Blender version %d.%d.%d to create " %
+                   (bpy.app.version[0], bpy.app.version[1], bpy.app.version[2]))
     # if using Node Group (Shader or Geometry Nodes)
     if is_tree_node_group:
         if mat.edit_tree.type == 'GEOMETRY':
-            out_text.write("Geometry Nodes node group named " + mat.edit_tree.name + "\n\n")
+            out_text.write("Geometry Nodes node group named %s\n\n" % mat.edit_tree.name)
         else:
-            out_text.write("Shader Nodes node group named " + mat.edit_tree.name + "\n\n")
+            out_text.write("Shader Nodes node group named %s\n\n" % mat.edit_tree.name)
         if make_into_function:
             out_text.write("import bpy\n\n" +
                            "# add nodes and links to node group\n" +
@@ -283,11 +270,10 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                            "def add_shader_nodes(material):\n")
 
     if is_tree_node_group:
-        out_text.write(line_prefix + "# initialize variables\n")
         out_text.write(line_prefix + "new_nodes = {}\n")
-        out_text.write(line_prefix + "new_node_group = bpy.data.node_groups.new(name=node_group_name, type='" +
-                       mat.edit_tree.bl_idname + "')\n")
-        out_text.write("\n" + line_prefix + "# remove old group inputs and outputs\n")
+        out_text.write("%snew_node_group = bpy.data.node_groups.new(name=node_group_name, type='%s')\n" %
+                       (line_prefix, mat.edit_tree.bl_idname))
+        out_text.write(line_prefix + "# remove old group inputs and outputs\n")
         out_text.write(line_prefix + "new_node_group.inputs.clear()\n")
         out_text.write(line_prefix + "new_node_group.outputs.clear()\n")
         if len(node_group.inputs) > 0 or len(node_group.outputs) > 0:
@@ -298,29 +284,29 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             lines_to_write = []
             # check/write the min, max, default, and 'hide value' data
             if hasattr(ng_input, "min_value") and ng_input.min_value != -340282346638528859811704183484516925440.0:
-                lines_to_write.append(line_prefix + "new_input.min_value = " + bpy_value_to_string(ng_input.min_value) +
-                                      "\n")
+                lines_to_write.append("%snew_input.min_value = %s\n" %
+                                      (line_prefix, bpy_value_to_string(ng_input.min_value)))
             if hasattr(ng_input, "max_value") and ng_input.max_value != 340282346638528859811704183484516925440.0:
-                lines_to_write.append(line_prefix + "new_input.max_value = " + bpy_value_to_string(ng_input.max_value) +
-                                      "\n")
+                lines_to_write.append("%snew_input.max_value = %s\n" %
+                                      (line_prefix, bpy_value_to_string(ng_input.max_value)))
             if hasattr(ng_input, "default_value") and ng_input.default_value != None and \
                     ng_input.default_value != 0.0 and \
                     not bpy_compare_to_value(ng_input.default_value, (0.0, 0.0, 0.0)) and \
                     not ( ng_input.bl_socket_idname == 'NodeSocketColor' and \
                           bpy_compare_to_value(ng_input.default_value, (0.0, 0.0, 0.0, 1.0)) ):
-                lines_to_write.append(line_prefix + "new_input.default_value = " +
-                                      bpy_value_to_string(ng_input.default_value) + "\n")
+                lines_to_write.append("%snew_input.default_value = %s\n" %
+                                      (line_prefix, bpy_value_to_string(ng_input.default_value)))
             if ng_input.hide_value:
                 lines_to_write.append(line_prefix + "new_input.hide_value = True\n")
             # create new_input variable only if necessary, i.e. if input attribute values differ from default values
             if len(lines_to_write) > 0:
-                out_text.write(line_prefix + "new_input = new_node_group.inputs.new(type='" +
-                               ng_input.bl_socket_idname + "', name=\"" + ng_input.name + "\")\n")
+                out_text.write("%snew_input = new_node_group.inputs.new(type='%s', name=\"%s\")\n" %
+                               (line_prefix, ng_input.bl_socket_idname, ng_input.name))
                 for l in lines_to_write:
                     out_text.write(l)
             else:
-                out_text.write(line_prefix + "new_node_group.inputs.new(type='" + ng_input.bl_socket_idname +
-                               "', name=\"" + ng_input.name + "\")\n")
+                out_text.write("%snew_node_group.inputs.new(type='%s', name=\"%s\")\n" %
+                               (line_prefix, ng_input.bl_socket_idname, ng_input.name))
         # write group outputs
         for ng_output in node_group.outputs:
             # collect lines to be written before writing, to allow for checking if input attributes need to be
@@ -330,54 +316,54 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             if ng_output_min_max_def:
                 # check/write the min, max, default, and 'hide value' data
                 if hasattr(ng_output, "min_value") and ng_output.min_value !=-340282346638528859811704183484516925440.0:
-                    lines_to_write.append(line_prefix + "new_output.min_value = " +
-                                          bpy_value_to_string(ng_output.min_value) + "\n")
+                    lines_to_write.append("%snew_output.min_value = %s\n" %
+                                          (line_prefix, bpy_value_to_string(ng_output.min_value)))
                 if hasattr(ng_output, "max_value") and ng_output.max_value != 340282346638528859811704183484516925440.0:
-                    lines_to_write.append(line_prefix + "new_output.max_value = " +
-                                          bpy_value_to_string(ng_output.max_value) + "\n")
+                    lines_to_write.append("%snew_output.max_value = %s\n" %
+                                          (line_prefix, bpy_value_to_string(ng_output.max_value)))
                 if hasattr(ng_output, "default_value")and ng_output.default_value != None and \
                         ng_output.default_value != 0.0 and \
                         not bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0)) and \
                         not ( ng_output.bl_socket_idname == 'NodeSocketColor' and \
                               bpy_compare_to_value(ng_output.default_value, (0.0, 0.0, 0.0, 1.0)) ):
-                    lines_to_write.append(line_prefix + "new_output.default_value = " +
-                                   bpy_value_to_string(ng_output.default_value) + "\n")
+                    lines_to_write.append("%snew_output.default_value = %s\n" %
+                                          (line_prefix, bpy_value_to_string(ng_output.default_value)))
             if ng_output.hide_value:
                 lines_to_write.append(line_prefix + "new_output.hide_value = True\n")
             if hasattr(ng_output, "attribute_domain") and ng_output.attribute_domain != "POINT":
-                lines_to_write.append(line_prefix + "new_output.attribute_domain = '" + ng_output.attribute_domain+
-                                      "'\n")
+                lines_to_write.append("%snew_output.attribute_domain = '%s'\n" %
+                                      (line_prefix, ng_output.attribute_domain))
             if hasattr(ng_output, "default_attribute_name") and ng_output.default_attribute_name != "":
-                lines_to_write.append(line_prefix + "new_output.default_attribute_name = " +
-                                      ng_output.default_attribute_name + "\n")
+                lines_to_write.append("%snew_output.default_attribute_name = %s\n" %
+                                      (line_prefix, ng_output.default_attribute_name))
             # create new_output variable only if necessary, i.e. if output attribute values differ from default
             # values
             if len(lines_to_write) > 0:
-                out_text.write(line_prefix + "new_output = new_node_group.outputs.new(type='" +
-                               ng_output.bl_socket_idname + "', name=\"" + ng_output.name + "\")\n")
+                out_text.write("%snew_output = new_node_group.outputs.new(type='%s', name=\"%s\")\n" %
+                               (line_prefix, ng_output.bl_socket_idname, ng_output.name))
                 for l in lines_to_write:
                     out_text.write(l)
             else:
-                out_text.write(line_prefix + "new_node_group.outputs.new(type='" + ng_output.bl_socket_idname +
-                               "', name=\"" + ng_output.name + "\")\n")
+                out_text.write("%snew_node_group.outputs.new(type='%s', name=\"%s\")\n" %
+                               (line_prefix, ng_output.bl_socket_idname, ng_output.name))
 
         out_text.write(line_prefix + "tree_nodes = new_node_group.nodes\n")
     else:
-        out_text.write(line_prefix + "# initialize variables\n")
         out_text.write(line_prefix + "new_nodes = {}\n")
         out_text.write(line_prefix + "tree_nodes = material.node_tree.nodes\n")
 
     if delete_existing:
-        out_text.write("\n" + line_prefix + "# delete all nodes\n")
+        out_text.write(line_prefix + "# delete all nodes\n")
         out_text.write(line_prefix + "tree_nodes.clear()\n")
-    out_text.write("\n" + line_prefix + "# create nodes\n")
+    out_text.write(line_prefix + "# create nodes\n")
 
     # set parenting order of nodes (e.g. parenting to frames) after creating all the nodes in the tree,
     # so that parent nodes are referenced only after parent nodes are created
     frame_parenting_text = ""
     # write info about the individual nodes
     for tree_node in mat.edit_tree.nodes:
-        out_text.write(line_prefix + "node = tree_nodes.new(type=\"%s\")\n" % tree_node.bl_idname)
+        out_text.write("%s# %s\n" % (line_prefix, tree_node.bl_label))
+        out_text.write("%snode = tree_nodes.new(type=\"%s\")\n" % (line_prefix, tree_node.bl_idname))
         ignore_attribs = []
         for attr in uni_attr_default_list:
             # Input Color node will write this value, so ignore it for now
@@ -399,23 +385,20 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                 elif attr == 'select' and uni_node_options[WRITE_ATTR_SELECT_UNI_NODE_OPT] == False:
                     continue
 
-                out_text.write(line_prefix + "node." + attr + " = " + bpy_value_to_string(gotten_attr) + "\n")
-
+                out_text.write("%snode.%s = %s\n" % (line_prefix, attr, bpy_value_to_string(gotten_attr)))
         # node with parent is special, this node is offset by their parent frame's location
         parent_loc = Vector((0, 0))
         if tree_node.parent != None:
             parent_loc = tree_node.parent.location
-
         # do rounding of location values, if needed, and write the values
         precision = uni_node_options[LOC_DEC_PLACES_UNI_NODE_OPT]
         loc_x = tree_node.location.x + parent_loc.x
         loc_y = tree_node.location.y + parent_loc.y
-        out_text.write(line_prefix + "node.location = (%0.*f, %0.*f)\n" % (precision, loc_x, precision, loc_y))
-
+        out_text.write("%snode.location = (%0.*f, %0.*f)\n" % (line_prefix, precision, loc_x, precision, loc_y))
         # Input Color, this attribute is special because this node type's Color attribute is swapped - very strange!
         # (maybe a dinosaur left over from old versions of Blender)
         if tree_node.bl_idname == 'FunctionNodeInputColor':
-            out_text.write(line_prefix + "node.color = " + bpy_value_to_string(tree_node.color) + "\n")
+            out_text.write("%snode.color = %s\n" % (line_prefix, bpy_value_to_string(tree_node.color)))
             ignore_attribs.append("color")
 
         write_filtered_attribs(out_text, line_prefix, tree_node, ignore_attribs)
@@ -429,8 +412,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                 continue
             value_str = get_node_io_value_str(node_input, uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT])
             if value_str != None:
-                out_text.write(line_prefix+"node.inputs["+str(input_count)+"].default_value = "+value_str+"\n")
-
+                out_text.write("%snode.inputs[%s].default_value = %s\n" % (line_prefix, str(input_count), value_str))
         # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
         # TODO: this part needs more testing re: different node output default value(s) and type(s)
         output_count = -1
@@ -441,18 +423,18 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             # always write the value, even if linked, because this node is special
             value_str = get_node_io_value_str(node_output, True)
             if value_str != None:
-                out_text.write(line_prefix+"node.outputs["+str(output_count)+"].default_value = "+value_str+"\n")
+                out_text.write("%snode.outputs[%s].default_value = %s\n" % (line_prefix, str(output_count), value_str))
 
-        out_text.write(line_prefix + "new_nodes[\"" + tree_node.name + "\"] = node\n\n")
+        out_text.write("%snew_nodes[\"%s\"] = node\n" % (line_prefix, tree_node.name))
         # save a reference to parent node for later, if parent node exists
         if tree_node.parent != None:
-            frame_parenting_text = frame_parenting_text + line_prefix + "new_nodes[\"" + tree_node.name + \
-                "\"].parent = new_nodes[\"" + tree_node.parent.name + "\"]\n"
+            frame_parenting_text = "%s%snew_nodes[\"%s\"].parent = new_nodes[\"%s\"]\n" % \
+                                   (frame_parenting_text, line_prefix, tree_node.name, tree_node.parent.name)
 
     # do node parenting if needed
     if frame_parenting_text != "":
-        out_text.write(line_prefix + "# parenting of nodes\n" + frame_parenting_text + "\n")
-
+        out_text.write("%s# parenting of nodes\n%s\n" % (line_prefix, frame_parenting_text))
+    # create links, keeping list of created links if needed
     out_text.write(line_prefix + "# create links\n")
     if keep_links:
         out_text.write(line_prefix + "new_links = []\n")
@@ -464,48 +446,48 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         flint = ""
         if keep_links:
             flint = "link = "
-        out_text.write(line_prefix + flint + "tree_links.new(new_nodes[\"" + tree_link.from_socket.node.name +
-            "\"].outputs[" + str(get_output_num_for_link(tree_link)) + "], new_nodes[\"" +
-            tree_link.to_socket.node.name + "\"].inputs[" + str(get_input_num_for_link(tree_link)) + "])\n")
+        out_text.write("%s%stree_links.new(new_nodes[\"%s\"].outputs[%d], new_nodes[\"%s\"].inputs[%d])\n" %
+        (line_prefix, flint, tree_link.from_socket.node.name, get_output_num_for_link(tree_link),
+         tree_link.to_socket.node.name, get_input_num_for_link(tree_link)))
         if keep_links:
             out_text.write(line_prefix + "new_links.append(link)\n")
-
-    out_text.write("\n" + line_prefix + "# deselect all new nodes\n" +
-                   line_prefix + "for n in new_nodes.values(): n.select = False\n")
+    # created nodes are selected by default so deselect them
+    out_text.write("%s# deselect all new nodes\n%sfor n in new_nodes.values(): n.select = False\n" %
+                   (line_prefix, line_prefix))
 
     if is_tree_node_group:
-        out_text.write("\n" + line_prefix + "return new_node_group\n")
+        out_text.write(line_prefix + "return new_node_group\n")
     else:
-        out_text.write("\n" + line_prefix + "return new_nodes\n")
+        out_text.write(line_prefix + "return new_nodes\n")
 
     # add function call, if needed
     if make_into_function:
         # if using nodes in a group (Shader or Geometry Nodes)
         if is_tree_node_group:
-            out_text.write("\n# use Python script to add nodes, and links between nodes, to new Node Group\n" +
-                           "add_group_nodes('" + mat.edit_tree.name + "')\n")
+            out_text.write("\n# use Python script to add nodes, and links between nodes, to new Node Group\n" \
+                           "add_group_nodes('%s')\n" % mat.edit_tree.name)
         # if using World material node tree
         elif bpy.data.worlds.get(mat.id.name):
-            out_text.write("\n# use Python script to create World material, including nodes and links\n" +
-                           "world_mat = bpy.data.worlds.new(\""+mat.id.name+"\")\n" +
-                           "world_mat.use_nodes = True\n" +
-                           "add_shader_nodes(world_mat)\n")
+            out_text.write("\n# use Python script to create World material, including nodes and links\n" \
+                           "world_mat = bpy.data.worlds.new(\"%s\")\n" \
+                           "world_mat.use_nodes = True\n" \
+                           "add_shader_nodes(world_mat)\n" % mat.id.name)
         # if using Compositor node tree
         elif mat.edit_tree.bl_idname == 'CompositorNodeTree':
-            out_text.write("\n# use Python script to add nodes, and links between nodes, to Compositor node tree\n" +
+            out_text.write("\n# use Python script to add nodes, and links between nodes, to Compositor node tree\n" \
                            "add_shader_nodes(bpy.context.scene)\n")
         # if using Linestyle node tree
         elif bpy.data.linestyles.get(mat.id.name):
-            out_text.write("\n# use Python script to create Linestyle, including nodes and links\n" +
-                           "linestyle_mat = bpy.data.linestyles.new(\""+mat.id.name+"\")\n" +
-                           "linestyle_mat.use_nodes = True\n" +
-                           "add_shader_nodes(linestyle_mat)\n")
+            out_text.write("\n# use Python script to create Linestyle, including nodes and links\n" \
+                           "linestyle_mat = bpy.data.linestyles.new(\"%s\")\n" \
+                           "linestyle_mat.use_nodes = True\n" \
+                           "add_shader_nodes(linestyle_mat)\n" % mat.id.name)
         # else using Object Material Shader Nodes
         else:
-            out_text.write("\n# use Python script to create Material, including nodes and links\n" +
-                           "mat = bpy.data.materials.new(\""+mat.id.name+"\")\n" +
-                           "mat.use_nodes = True\n" +
-                           "add_shader_nodes(mat)\n")
+            out_text.write("\n# use Python script to create Material, including nodes and links\n" \
+                           "mat = bpy.data.materials.new(\"%s\")\n" \
+                           "mat.use_nodes = True\n" \
+                           "add_shader_nodes(mat)\n" % mat.id.name)
 
     # scroll to top of lines of text, so user sees start of script immediately upon opening the textblock
     out_text.current_line_index = 0

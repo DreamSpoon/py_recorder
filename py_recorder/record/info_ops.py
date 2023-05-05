@@ -225,15 +225,22 @@ def get_info_lines(context):
     area.type = 'INFO'
     # save old clipboard value
     old_clipboard_value = context.window_manager.clipboard
-    # copy info lines to clipboard
-    info_context = context.copy()
-    info_context['window'] = win
-    info_context['screen'] = win.screen
-    info_context['area'] = win.screen.areas[0]
-    # switch context to Info type, and select all Info lines
-    bpy.ops.info.select_all(info_context, action='SELECT')
-    # switch context to Info type, and copy all Info lines
-    bpy.ops.info.report_copy(info_context)
+    # copy info lines to clipboard, with override context if Blender version is >= 3.2
+    if bpy.app.version < (3, 2, 0):
+        info_context = context.copy()
+        info_context['window'] = win
+        info_context['screen'] = win.screen
+        info_context['area'] = win.screen.areas[0]
+        # switch context to Info type, and select all Info lines
+        bpy.ops.info.select_all(info_context, action='SELECT')
+        # switch context to Info type, and copy all Info lines
+        bpy.ops.info.report_copy(info_context)
+    else:
+        with context.temp_override(area=area):
+            # switch context to Info type, and select all Info lines
+            bpy.ops.info.select_all(action='SELECT')
+            # switch context to Info type, and copy all Info lines
+            bpy.ops.info.report_copy()
     # reset area type to its previous value, to avoid errors
     area.type = old_area_type
     # if clipboard is empty then return empty string
