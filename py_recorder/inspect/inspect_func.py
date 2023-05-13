@@ -29,6 +29,8 @@ INSPECT_PANEL_CLASS_MATCH_STR = "^PYREC_PT_[A-Za-z0-9_]+_Inspect[0-9]+$"
 # returns dir(val) without duplicates (e.g. '__doc__' duplicates)
 def get_dir(val):
     temp_dict = {}
+#    for attr in inspect.getmembers(val):
+#        temp_dict[attr[0]] = True
     for attr in dir(val):
         temp_dict[attr] = True
     return temp_dict.keys()
@@ -90,6 +92,7 @@ def get_inspect_active_type_items(self, context):
     if context is None or context.space_data is None:
         return [ (" ", "", "") ]
     # add 'Inspect Active' item(s) available in all contexts
+    active_items.append( ("ACTIVE_SPACE_DATA", "Space Data", "") )
     active_items.append( ("CONTEXT", "Context", "") )
     active_items.append( ("SCENE", "Scene", "") )
     # add active_items based on context type, and available active things
@@ -308,4 +311,7 @@ def get_active_thing_inspect_str(context, active_type):
         if context.active_sequence_strip != None:
             return "bpy.data.scenes[\"%s\"].sequence_editor.sequences_all[\"%s\"]" % \
                 (context.scene.name, context.active_sequence_strip.name)
+    elif active_type == "ACTIVE_SPACE_DATA":
+        if context.space_data != None:
+            return "bpy.context.space_data"
     return ""

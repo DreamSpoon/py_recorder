@@ -62,14 +62,11 @@ INSPECT_DIR_ATTRIBUTE_LIST_REGISTER = "class PYREC_UL_%s_DirAttributeList%i(UILi
 
 def attribute_list_draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
     panel_options = data.panel_options
-    split_denominator = 1
-    if panel_options.display_dir_attribute_type:
-        split_denominator = split_denominator + 1
-    if panel_options.display_dir_attribute_value:
-        split_denominator = split_denominator + 1
-    split = layout.split(factor=1/split_denominator)
+    split = layout.split(factor=data.dir_col_size1)
     split.label(text=item.name)
     if panel_options.display_dir_attribute_type:
+        if panel_options.display_dir_attribute_value:
+            split = split.split(factor=data.dir_col_size2)
         split.label(text=item.type_name)
     if panel_options.display_dir_attribute_value:
         row = split.row()

@@ -21,7 +21,8 @@ import traceback
 
 import bpy
 from bpy.types import (Operator, PropertyGroup)
-from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, IntProperty, PointerProperty, StringProperty)
+from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty,
+    StringProperty)
 from bpy.utils import unregister_class
 
 from .inspect_options import PYREC_OT_InspectOptions
@@ -165,6 +166,9 @@ class PYREC_PG_InspectPanel(PropertyGroup):
     dir_attributes: CollectionProperty(type=PYREC_PG_DirAttributeItem)
     dir_attributes_index: IntProperty(update=update_dir_attributes)
 
+    dir_col_size1: FloatProperty(default=0.333333, min=0.01, max=0.99)
+    dir_col_size2: FloatProperty(default=0.666667, min=0.01, max=0.99)
+
     dir_item_value_str: StringProperty()
     dir_item_value_typename_str: StringProperty()
 
@@ -255,30 +259,41 @@ def draw_inspect_panel(self, context):
         # subtract 1 to account for the '.' list item (which represents 'self' value)
         sub_box.label(text="Inspect Attributes ( %i )" % ( 0 if len(ic_panel.dir_attributes)-1 < 0 else \
                                                            len(ic_panel.dir_attributes)-1 ))
-        row = sub_box.row()
-        # calculate split factor
-        split_denominator = 1
-        if panel_options.display_dir_attribute_type:
-            split_denominator = split_denominator + 1
-        if panel_options.display_dir_attribute_value:
-            split_denominator = split_denominator + 1
-        split = row.split(factor=1/split_denominator)
-        # add attribute list labels to split
+        # column size sliders
+        row = sub_box.row(align=True)
+        row.prop(ic_panel, "dir_col_size1", slider=True, text="Name")
+        if panel_options.display_dir_attribute_type and panel_options.display_dir_attribute_value:
+            row.prop(ic_panel, "dir_col_size2", slider=True, text="Type / Value")
+        # container row
+        cont_row = sub_box.row(align=True)
+        # attribute list column
+        attr_list_col = cont_row.column()
+        # list labels
+        split = attr_list_col.split(factor=ic_panel.dir_col_size1)
         split.label(text="Name")
         if panel_options.display_dir_attribute_type:
+            if panel_options.display_dir_attribute_value:
+                split = split.split(factor=ic_panel.dir_col_size2)
             split.label(text="Type")
         if panel_options.display_dir_attribute_value:
             split.label(text="Value")
-        # attributes list
-        row = sub_box.row()
+        # list
         list_classname = "PYREC_UL_%s_DirAttributeList%s" % (context_name, ic_panel.name)
-        row.template_list(list_classname, "", ic_panel, "dir_attributes", ic_panel, "dir_attributes_index", rows=5)
-        col = row.column()
-        sub_col = col.column(align=True)
-        sub_col.operator(PYREC_OT_InspectPanelAttrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = self.panel_num
-        col.operator(PYREC_OT_InspectRecordAttribute.bl_idname, icon='DOCUMENTS', text="").panel_num = self.panel_num
-        col.operator(PYREC_OT_InspectCopyAttribute.bl_idname, icon='COPY_ID', text="").panel_num = self.panel_num
-        col.operator(PYREC_OT_InspectPasteAttribute.bl_idname, icon='PASTEDOWN', text="").panel_num = self.panel_num
+        attr_list_col.template_list(list_classname, "", ic_panel, "dir_attributes", ic_panel, "dir_attributes_index",
+                                   rows=5)
+        # functions column
+        function_col = cont_row.column(align=True)
+        function_col.separator()
+        function_col.separator()
+        function_col.operator(PYREC_OT_InspectPanelAttrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
+            self.panel_num
+        function_col.operator(PYREC_OT_InspectRecordAttribute.bl_idname, icon='DOCUMENTS', text="").panel_num = \
+            self.panel_num
+        function_col.operator(PYREC_OT_InspectCopyAttribute.bl_idname, icon='COPY_ID', text="").panel_num = \
+            self.panel_num
+        function_col.operator(PYREC_OT_InspectPasteAttribute.bl_idname, icon='PASTEDOWN', text="").panel_num = \
+            self.panel_num
+
     # current inspect value, type, doc
     box = layout.box()
     if ic_panel.dir_inspect_exec_str != "":

@@ -268,9 +268,7 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             out_text.write("import bpy\n\n" +
                            "# add nodes and links to material\n" +
                            "def add_shader_nodes(material):\n")
-
     if is_tree_node_group:
-        out_text.write(line_prefix + "new_nodes = {}\n")
         out_text.write("%snew_node_group = bpy.data.node_groups.new(name=node_group_name, type='%s')\n" %
                        (line_prefix, mat.edit_tree.bl_idname))
         out_text.write(line_prefix + "# remove old group inputs and outputs\n")
@@ -349,14 +347,12 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
 
         out_text.write(line_prefix + "tree_nodes = new_node_group.nodes\n")
     else:
-        out_text.write(line_prefix + "new_nodes = {}\n")
         out_text.write(line_prefix + "tree_nodes = material.node_tree.nodes\n")
-
     if delete_existing:
         out_text.write(line_prefix + "# delete all nodes\n")
         out_text.write(line_prefix + "tree_nodes.clear()\n")
     out_text.write(line_prefix + "# create nodes\n")
-
+    out_text.write(line_prefix + "new_nodes = {}\n")
     # set parenting order of nodes (e.g. parenting to frames) after creating all the nodes in the tree,
     # so that parent nodes are referenced only after parent nodes are created
     frame_parenting_text = ""
