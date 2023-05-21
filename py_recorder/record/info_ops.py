@@ -472,7 +472,7 @@ class PYREC_OT_VIEW3D_StartRecordInfoLine(Operator):
     bl_description = "Mark current end line of Info lines as 'Start Record' line. When 'Stop Record' is used, " \
         "then lines from Info context will be copied, beginning at 'Start Record' line and ending at 'Stop Record' " \
         "line, inclusive. See Info context window"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     def execute(self, context):
         pr_ir = context.window_manager.py_rec.record_options.info
@@ -487,7 +487,7 @@ class PYREC_OT_VIEW3D_StopRecordInfoLine(Operator):
     bl_description = "Copy Info context lines to Text or Text Object body, and link Text / Text Object to active " \
         "Object (active Object must be selected). Copy begins at 'Start Record' line and ends at 'Stop Record' " \
         "line of Info context, inclusive"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     def execute(self, context):
         pr_ir = context.window_manager.py_rec.record_options.info

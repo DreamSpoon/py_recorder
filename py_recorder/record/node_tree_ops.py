@@ -16,6 +16,7 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+import re
 from mathutils import (Color, Vector)
 import bpy
 from bpy.types import (Operator, Panel, PropertyGroup)
@@ -399,27 +400,29 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
 
         write_filtered_attribs(out_text, line_prefix, tree_node, ignore_attribs)
 
-        # get node input(s) default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), shader ]
-        # TODO: this part needs more testing re: different node input default value(s) and type(s)
-        input_count = -1
-        for node_input in tree_node.inputs:
-            input_count = input_count + 1
-            if node_input.hide_value:
-                continue
-            value_str = get_node_io_value_str(node_input, uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT])
-            if value_str != None:
-                out_text.write("%snode.inputs[%s].default_value = %s\n" % (line_prefix, str(input_count), value_str))
-        # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
-        # TODO: this part needs more testing re: different node output default value(s) and type(s)
-        output_count = -1
-        for node_output in tree_node.outputs:
-            output_count = output_count + 1
-            if tree_node.bl_idname not in NODES_WITH_WRITE_OUTPUTS:
-                continue
-            # always write the value, even if linked, because this node is special
-            value_str = get_node_io_value_str(node_output, True)
-            if value_str != None:
-                out_text.write("%snode.outputs[%s].default_value = %s\n" % (line_prefix, str(output_count), value_str))
+        # if not a Frame or a Reroute, then write tree_node inputs and outputs
+        if tree_node.type not in ["FRAME", "REROUTE"]:
+            # get node input(s) default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), shader ]
+            # TODO: this part needs more testing re: different node input default value(s) and type(s)
+            input_count = -1
+            for node_input in tree_node.inputs:
+                input_count = input_count + 1
+                if node_input.hide_value:
+                    continue
+                value_str = get_node_io_value_str(node_input, uni_node_options[WRITE_LINKED_DEFAULTS_UNI_NODE_OPT])
+                if value_str != None:
+                    out_text.write("%snode.inputs[%s].default_value = %s\n" % (line_prefix, str(input_count), value_str))
+            # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
+            # TODO: this part needs more testing re: different node output default value(s) and type(s)
+            output_count = -1
+            for node_output in tree_node.outputs:
+                output_count = output_count + 1
+                if tree_node.bl_idname not in NODES_WITH_WRITE_OUTPUTS:
+                    continue
+                # always write the value, even if linked, because this node is special
+                value_str = get_node_io_value_str(node_output, True)
+                if value_str != None:
+                    out_text.write("%snode.outputs[%s].default_value = %s\n" % (line_prefix, str(output_count), value_str))
 
         out_text.write("%snew_nodes[\"%s\"] = node\n" % (line_prefix, tree_node.name))
         # save a reference to parent node for later, if parent node exists
@@ -439,11 +442,11 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     else:
         out_text.write(line_prefix + "tree_links = material.node_tree.links\n")
     for tree_link in mat.edit_tree.links:
-        flint = ""
+        keep_link_str = ""
         if keep_links:
-            flint = "link = "
+            keep_link_str = "link = "
         out_text.write("%s%stree_links.new(new_nodes[\"%s\"].outputs[%d], new_nodes[\"%s\"].inputs[%d])\n" %
-        (line_prefix, flint, tree_link.from_socket.node.name, get_output_num_for_link(tree_link),
+        (line_prefix, keep_link_str, tree_link.from_socket.node.name, get_output_num_for_link(tree_link),
          tree_link.to_socket.node.name, get_input_num_for_link(tree_link)))
         if keep_links:
             out_text.write(line_prefix + "new_links.append(link)\n")

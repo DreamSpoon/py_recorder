@@ -106,7 +106,7 @@ def context_exec_textblock(textblock, enable_log):
         return False
 
 class PYREC_OT_ContextExec(Operator):
-    bl_description = ""
+    bl_description = "Run exec() Python command with given string, from either Single Line or Text"
     bl_idname = "py_rec.context_exec"
     bl_label = "Exec"
     bl_options = {'REGISTER', 'UNDO'}

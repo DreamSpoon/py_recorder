@@ -166,8 +166,8 @@ class PYREC_PG_InspectPanel(PropertyGroup):
     dir_attributes: CollectionProperty(type=PYREC_PG_DirAttributeItem)
     dir_attributes_index: IntProperty(update=update_dir_attributes)
 
-    dir_col_size1: FloatProperty(default=0.333333, min=0.01, max=0.99)
-    dir_col_size2: FloatProperty(default=0.666667, min=0.01, max=0.99)
+    dir_col_size1: FloatProperty(default=0.333333, min=0.02, max=0.98)
+    dir_col_size2: FloatProperty(default=0.666667, min=0.02, max=0.98)
 
     dir_item_value_str: StringProperty()
     dir_item_value_typename_str: StringProperty()
@@ -347,7 +347,7 @@ class PYREC_OT_AddInspectPanel(Operator):
     bl_label = "Add Py Inspect Panel"
     bl_description = "Add Py Inspect panel to active context Tools menu. e.g. If View 3D context, then " \
         "Py Inspect panel is in Tools -> Tool menu"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -362,7 +362,7 @@ class PYREC_OT_RemoveInspectPanel(Operator):
     bl_idname = "py_rec.remove_inspect_panel"
     bl_label = "Remove Inspect panel?"
     bl_description = "Remove this Inspect panel"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -428,7 +428,7 @@ class PYREC_OT_InspectPanelAttrZoomIn(Operator):
     bl_label = "Zoom In"
     bl_description = "Zoom in to selected attribute to make it current Inspect object, and refresh Inspect " \
         "Attributes list"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -453,7 +453,7 @@ class PYREC_OT_InspectPanelAttrZoomOut(Operator):
     bl_idname = "py_rec.inspect_attr_zoom_out"
     bl_label = "Zoom Out"
     bl_description = "Zoom out of current Inspect object to inspect parent object, and refresh Inspect Attributes list"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -476,7 +476,7 @@ class PYREC_OT_InspectPanelArrayIndexZoomIn(Operator):
     bl_label = "Zoom In"
     bl_description = "Zoom in to selected Integer Index by appending Integer Index to current exec string, and " \
         "refresh Inspect Attributes list"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -499,7 +499,7 @@ class PYREC_OT_InspectPanelArrayKeyZoomIn(Operator):
     bl_label = "Zoom In"
     bl_description = "Zoom in to selected String Index by appending String Index to current exec string, and " \
         "refresh Inspect Attributes list"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -537,7 +537,7 @@ class PYREC_OT_RestoreInspectContextPanels(Operator):
     bl_label = "Restore Context Inspect Panels"
     bl_description = "Restore 'Py Inspect' panels in current .blend file. Use this if context 'Py Inspect' panels " \
         "are missing, e.g. after .blend file is loaded"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     def execute(self, context):
         restore_inspect_context_panels(context.window_manager.py_rec.inspect_context_collections)
@@ -585,7 +585,7 @@ class PYREC_OT_InspectRecordAttribute(Operator):
     bl_description = "Record single/all attributes to Python code with from/to/output options"
     bl_idname = "py_rec.inspect_record_attribute"
     bl_label = "Record Attribute"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -663,7 +663,7 @@ class PYREC_OT_InspectCopyAttribute(Operator):
     bl_description = "Create a reference copy from selected attribute"
     bl_idname = "py_rec.inspect_copy_attribute"
     bl_label = "Copy"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -689,7 +689,7 @@ class PYREC_OT_InspectPasteAttribute(Operator):
         "Save your work, if needed, before using this function"
     bl_idname = "py_rec.inspect_paste_attribute"
     bl_label = "Paste"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -724,7 +724,7 @@ class PYREC_OT_InspectChoosePy(Operator):
     bl_description = "Open window to choose Python object to inspect"
     bl_idname = "py_rec.inspect_choose_py"
     bl_label = "Inspect"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
@@ -819,14 +819,13 @@ class PYREC_OT_PyInspectActiveObject(Operator):
     bl_description = "Inspect active Object with new Py Inspect panel (see context Tools menu)"
     bl_idname = "py_rec.py_inspect_active_object"
     bl_label = "Object"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     inspect_type: StringProperty(default="OBJECT", options={'HIDDEN'})
 
     @classmethod
     def poll(cls, context):
-        active_types = get_inspect_active_type_items(None, context)
-        return len(active_types) > 0
+        return len( get_inspect_active_type_items(None, context) ) > 0
 
     def execute(self, context):
         start_string = get_active_thing_inspect_str(context, self.inspect_type)
@@ -842,8 +841,7 @@ class PYREC_MT_InspectActive(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        active_types = get_inspect_active_type_items(None, context)
-        for type_name, nice_name, _ in active_types:
+        for type_name, nice_name, _ in get_inspect_active_type_items(None, context):
             layout.operator(PYREC_OT_PyInspectActiveObject.bl_idname, text=nice_name).inspect_type = type_name
 
 def draw_inspect_active_context_menu(self, context):

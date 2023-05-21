@@ -27,7 +27,7 @@ class PYREC_OT_InspectOptions(Operator):
     bl_description = "Open Py Inspect panel Options window"
     bl_idname = "py_rec.inspect_options"
     bl_label = "Options"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     panel_num: IntProperty(default=-1, options={'HIDDEN'})
 
