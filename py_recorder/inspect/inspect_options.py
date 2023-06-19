@@ -71,16 +71,6 @@ class PYREC_OT_InspectOptions(Operator):
         box.prop(panel_options, "panel_option_label")
 
         box = layout.box()
-        box.label(text="Inspect Panel")
-        box.prop(panel_options, "display_value_attributes")
-        box.prop(panel_options, "display_attr_doc")
-
-        row = layout.row()
-        box = row.box()
-        box.label(text="Attribute Column")
-        box.prop(panel_options, "display_dir_attribute_type")
-        box.prop(panel_options, "display_dir_attribute_value")
-        box = row.box()
         box.label(text="Attribute Value")
         box.prop(panel_options, "display_value_selector")
 

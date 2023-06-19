@@ -23,7 +23,8 @@ from bpy.utils import (register_class, unregister_class)
 
 from .inspect_func import (get_dir, get_inspect_context_panel, get_pre_exec_str, get_relevant_doc,
     string_to_lines_collection)
-from ..log_text import (LOG_TEXT_NAME, log_text_append)
+from ..log_text import log_text_append
+from ..exec_func import exec_get_result
 
 # region_type = 'UI'
 inspect_panel_classes = {}
@@ -40,7 +41,7 @@ INSPECT_PANEL_REGISTER = "class PYREC_PT_%s_Inspect%i(bpy.types.Panel):\n" \
     "global inspect_panel_classes\n" \
     "inspect_panel_classes['PYREC_PT_%s_Inspect%i'] = PYREC_PT_%s_Inspect%i\n"
 
-inspect_exec_result = {}
+inspect_result = {}
 
 inspect_exec_panel_draw_func = []
 
@@ -73,7 +74,7 @@ def attribute_list_draw_item(self, context, layout, data, item, icon, active_dat
         # display value selector, if possible
         if panel_options.display_value_selector and data.dir_inspect_exec_str != "" and item.name != "." and \
             not item.name.startswith("__") and item.name != "bl_rna":
-            result_value = get_inspect_exec_result()
+            result_value = get_exec_inspect_value()
             if result_value != None and hasattr(result_value, item.name):
                 attr_val = getattr(result_value, item.name)
                 # do not display if attribute value is None or if it is a zero-length list/tuple
@@ -134,36 +135,30 @@ def unregister_all_inspect_panel_classes():
         unregister_class(panel_class)
     inspect_panel_classes.clear()
 
+def get_exec_inspect_value():
+    return inspect_result.get("ex_inspect_val")
+
 # returns 2-tuple of (output value, error string)
 # error string is None if no error occurred during exec
-def refresh_inspect_exec_result(pre_exec_str, inspect_exec_str, enable_log):
+def refresh_exec_inspect_value(pre_exec_str, inspect_exec_str):
     if inspect_exec_str == "":
         return None, "Empty Inspect Exec string"
-    ie_str = pre_exec_str + "global inspect_exec_result\ninspect_exec_result['result'] = %s" % inspect_exec_str
     # delete previous result if it exists
-    if inspect_exec_result.get("result") != None:
-        del inspect_exec_result["result"]
-    try:
-        exec(ie_str)
-    except:
-        if enable_log:
-            # append newline to ie_str, only if ie_str does not already end with newline character
-            end_newline = ""
-            if ie_str[-1] != "\n":
-                end_newline = "\n"
-            log_text_append("Exception raised during Inspect Exec of string:\n%s%s\n%s" %
-                            (ie_str, end_newline, traceback.format_exc()))
-        return None, "Exception raised during Inspect Exec of string"
-    return inspect_exec_result["result"], None
-
-def get_inspect_exec_result():
-    return inspect_exec_result.get("result")
+    if inspect_result.get("ex_inspect_val") != None:
+        del inspect_result["ex_inspect_val"]
+    result, is_exc, exc_msg = exec_get_result(pre_exec_str, inspect_exec_str)
+    if is_exc:
+        return None, "Exception raised by Inspect Exec of string:\n%s\n%s\n%s" % (pre_exec_str, inspect_exec_str,
+                                                                                  exc_msg)
+    else:
+        inspect_result["ex_inspect_val"] = result
+        return inspect_result["ex_inspect_val"], None
 
 def inspect_refresh_attribute_list(ic_panel):
     panel_options = ic_panel.panel_options
     if panel_options is None:
         return
-    inspect_value = get_inspect_exec_result()
+    inspect_value = get_exec_inspect_value()
     # dir listing can only be performed if 'inspect_value' is not None, because None does not have attributes
     if inspect_value is None:
         dir_array = []
@@ -177,7 +172,9 @@ def inspect_refresh_attribute_list(ic_panel):
     # as dir() attributes, because self is attribute of its parent object, and indexed values are dynamic attributes
     dir_item = ic_panel.dir_attributes.add()
     dir_item.name = "."
-    dir_item.type_name = ". Self value"
+#    dir_item.type_name = ". Self value"
+    dir_item.type_name = type(inspect_value).__name__
+    dir_item.value_str = str(inspect_value)
     for attr_name in dir_array:
         # check that inspect_value has attribute, to avoid errors in case 'inspect_value' is indexed
         # (e.g. array, dictionary)
@@ -220,9 +217,7 @@ def inspect_exec_refresh(context, panel_num):
     ic_panel.array_index_max = 0
     ic_panel.array_key_set.clear()
     ic_panel.dir_inspect_exec_str = ""
-    # clear label strings
-    ic_panel.dir_item_value_str = ""
-    ic_panel.dir_item_value_typename_str = ""
+    # clear '__doc__' lines
     ic_panel.dir_item_doc_lines.clear()
 
     # if Inspect Exec string is empty then quit
@@ -233,10 +228,10 @@ def inspect_exec_refresh(context, panel_num):
     post_exec_str = ic_panel.inspect_exec_str
     pre_exec_str = get_pre_exec_str(ic_panel)
     # get 'Inspect Exec' result value, and update label strings based on result
-    inspect_value, inspect_error = refresh_inspect_exec_result(pre_exec_str, post_exec_str, True)
+    inspect_value, inspect_error = refresh_exec_inspect_value(pre_exec_str, post_exec_str)
     if inspect_error != None:
-        return 'CANCELLED', "Unable to refresh Inspect Value, because exception raised during exec, see " \
-            "details in log Text named '%s'" % LOG_TEXT_NAME
+        return 'CANCELLED', "Unable to refresh Inspect Value, because exception raised by exec, see details in " \
+            "log Text named '%s'" % context.window_manager.py_rec.log_options.output_text_name
 
     ic_panel.dir_inspect_exec_str = ic_panel.inspect_exec_str
 
@@ -276,10 +271,6 @@ def inspect_exec_refresh(context, panel_num):
             ic_panel.array_index_key_type = "str"
     # refresh attribute list after refreshing inspect value
     inspect_refresh_attribute_list(ic_panel)
-    # set 'value' label
-    ic_panel.dir_item_value_str = str(inspect_value)
-    # set 'type name' label
-    ic_panel.dir_item_value_typename_str = type(inspect_value).__name__
     # set '__doc__' lines
     string_to_lines_collection(get_relevant_doc(inspect_value), ic_panel.dir_item_doc_lines)
     return 'FINISHED', ""

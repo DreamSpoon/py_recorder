@@ -94,7 +94,7 @@ def bpy_value_to_string(value):
                     vec_str = vec_str + sub_val_str
             return "{" + vec_str + "}"
         else:
-            for count, sub_value in enumerate(value):
+            for _, sub_value in enumerate(value):
                 if vec_str != "":
                     vec_str = vec_str + ", "
                 sub_val_str = bpy_value_to_string(sub_value)

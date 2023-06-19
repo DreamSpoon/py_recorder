@@ -64,7 +64,7 @@ close_bracket = {
 
 def create_output_token(state_vars):
     # append to output
-    state_vars[OUTPUT_VAR].append( (state_vars[NAME_BEGIN_POS_VAR], state_vars[NAME_END_POS_VAR]) )
+    state_vars[OUTPUT_VAR].append( (state_vars[NAME_BEGIN_POS_VAR], state_vars[NAME_END_POS_VAR]+1) )
     # set position variables to current character
     state_vars[NAME_BEGIN_POS_VAR] = state_vars[NAME_END_POS_VAR] + 1
     state_vars[NAME_END_POS_VAR] = state_vars[NAME_BEGIN_POS_VAR]
@@ -123,12 +123,14 @@ def read_period_func(input_char, state_vars):
 def read_alpha_continue_func(input_char, state_vars):
     # None is 'End Of Input' marker, and trailing spaces are ignored
     if input_char is None or input_char.isspace():
-        create_output_token(state_vars)
+        if state_vars[BRACKET_DEPTH_VAR] == 0:
+            create_output_token(state_vars)
         if input_char is None:
             return STOP_STATE
         return READ_TRAIL_SPACE_STATE
     elif input_char in [".", "[", "("]:
-        create_output_token(state_vars)
+        if state_vars[BRACKET_DEPTH_VAR] == 0:
+            create_output_token(state_vars)
         if input_char == ".":
             return READ_PERIOD_STATE
         else:
@@ -244,6 +246,8 @@ def get_init_state_vars():
         QUOTE_TYPE_VAR: None,
     }
 
+# following functions are intended for export, prior functions are intended for internal usage
+
 def lex_py_attributes(input_str, verbose=0):
     state_vars = get_init_state_vars()
     current_state = START_STATE
@@ -264,61 +268,99 @@ def lex_py_attributes(input_str, verbose=0):
         current_state = state_func(c, state_vars)
         if verbose > 1: print("x       current_state  after = " + str(current_state))
     if verbose > 1: print("x   current_state  final = " + str(current_state))
-    if state_vars[ERROR_VAR] is None:
-        return state_vars["output"], None
-    return None, state_vars[ERROR_VAR]
+    return state_vars[OUTPUT_VAR], state_vars[ERROR_VAR]
+
+# returns 2-tuple of (input_str less last attribute, last attribute)
+def remove_last_py_attribute(input_str):
+    output, _ = lex_py_attributes(input_str)
+    # cannot remove last attribute if too few output attributes
+    if len(output) < 2:
+        return None, None
+    # use end_position of last output item to return input_str up to, and including, end of second last attribute
+    return input_str[ : output[-2][1] ], input_str[ output[-1][0] : output[-1][1] ]
+
+# returns list of strings, each string is a name 'token' representing an attribute in full datapath given by
+# 'input_str' - order of strings is same as it appears in full datapath 'input_str'
+def enumerate_datapath(input_str):
+    output, _ = lex_py_attributes(input_str)
+    return [ input_str[s:e] for s, e in output ]
+
+# progressive full datapath, each entry longer than the last, finishing with 'input_str', '[]' indexes included
+def enumerate_datapath_hierarchy(input_str, remove_bpy_data=False):
+    path_list = []
+    path = ""
+    c = 0
+    for t in enumerate_datapath(input_str):
+        # if t is not an index token then add a '.' character
+        if path != "" and t[0] != "[":
+            path += "."
+        path += t
+        c += 1
+        # do not add 'bpy' and 'bpy.data' if 'remove_bpy_data'
+        if remove_bpy_data and (c == 1 or c == 2):
+            continue
+        path_list.append(path)
+    return path_list
+
+def trim_datapath(input_str):
+    attr_list, _ = lex_py_attributes(input_str)
+    if attr_list is None or len(attr_list) < 1:
+        return ""
+    # return 'input_str' from start to end of attributes (includes '[]' indexes),
+    # which removes any trailing spaces / equals signs / etc.
+    return input_str[ :attr_list[-1][1] ]
 
 #### test suite follows ####
 
 test_data = [
-    ("f", True, [ (0, 0) ]),
-    ("  bpy.data.objects  ", True, [ (2, 4), (6, 9), (11, 17) ]),
-    ("  bpy.data.objects[]  ", True, [ (2, 4), (6, 9), (11, 17), (18, 19) ]),
-    ("s['\\'']", True, [ (0, 0), (1, 6) ]),
-    ("b['asdfe']", True, [ (0, 0), (1, 9) ]),
-    ("b[\"asdfe\"]", True, [ (0, 0), (1, 9) ]),
-    ("b[\"as'd''dfe\"]", True, [ (0, 0), (1, 13) ]),
-    ("b['as\"d\"\"dfe']", True, [ (0, 0), (1, 13) ]),
-    ("bpy.data.objects", True, [(0, 2), (4, 7), (9, 15) ]),
-    ("bpy.data.objects()", True, [ (0, 2), (4, 7), (9, 15), (16, 17) ]),
-    ("bpy.data.objects[]()", True, [ (0, 2), (4, 7), (9, 15), (16, 17), (18, 19) ]),
-    ("bpy.data.objects[]", True, [ (0, 2), (4, 7), (9, 15), (16, 17) ]),
-    ("bpy.data.objects(asfd]][sdaf[sdf]])", True, [ (0, 2), (4, 7), (9, 15), (16, 34) ]),
-    ("bpy.data.objects[f(((fdas))(ds))))sd))]", True, [ (0, 2), (4, 7), (9, 15), (16, 38) ]),
-    ("bpy.data.objects[0]", True, [ (0, 2), (4, 7), (9, 15), (16, 18) ]),
-    ("bpy.data.objects[f].name", True, [ (0, 2), (4, 7), (9, 15), (16, 18), (20, 23) ]),
-    ("bpy.data.objects[f][g].name", True, [ (0, 2), (4, 7), (9, 15), (16, 18), (19, 21), (23, 26) ]),
-    ("bpy.data.objects[f].name[h]", True, [ (0, 2), (4, 7), (9, 15), (16, 18), (20, 23), (24, 26) ]),
-    ("a[]", True, [ (0, 0), (1, 2) ]),
-    ("a[][]", True, [ (0, 0), (1, 2), (3, 4) ]),
-    ("a[f][g]", True, [ (0, 0), (1, 3), (4, 6) ]),
-    ("a()", True, [ (0, 0), (1, 2) ]),
-    ("a()()", True, [ (0, 0), (1, 2), (3, 4) ]),
-    ("a(f)(g)", True, [ (0, 0), (1, 3), (4, 6) ]),
-    ("a[", False, None),
-    ("a]", False, None),
-    ("a(", False, None),
-    ("a)", False, None),
-    ("a(]", False, None),
-    ("a[)", False, None),
-    ("a[[[]", False, None),
-    ("a[[[ ]]]]", False, None),
-    ("a((( ))))", False, None),
-    ("a[]b", False, None),
-    ("a()b", False, None),
-    ("bpy.data.", False, None),
-    ("bpy.data..", False, None),
-    ("bpy..data", False, None),
-    (".data.objects", False, None),
-    ("[]", False, None),
-    ("a[].", False, None),
-    ("()", False, None),
-    ("a().", False, None),
-    ("s['\\\\'']", False, None),
-    ("s[''']", False, None),
-    ("f a", False, None),
-    ("f [a]", False, None),
-    ("f (a)", False, None),
+    ("f", True, [ (0, 1) ]),
+    ("  bpy.data.objects  ", True, [ (2, 5), (6, 10), (11, 18) ]),
+    ("  bpy.data.objects[]  ", True, [ (2, 5), (6, 10), (11, 18), (18, 20) ]),
+    ("s['\\'']", True, [ (0, 1), (1, 7) ]),
+    ("b['asdfe']", True, [ (0, 1), (1, 10) ]),
+    ("b[\"asdfe\"]", True, [ (0, 1), (1, 10) ]),
+    ("b[\"as'd''dfe\"]", True, [ (0, 1), (1, 14) ]),
+    ("b['as\"d\"\"dfe']", True, [ (0, 1), (1, 14) ]),
+    ("bpy.data.objects", True, [(0, 3), (4, 8), (9, 16) ]),
+    ("bpy.data.objects()", True, [ (0, 3), (4, 8), (9, 16), (16, 18) ]),
+    ("bpy.data.objects[]()", True, [ (0, 3), (4, 8), (9, 16), (16, 18), (18, 20) ]),
+    ("bpy.data.objects[]", True, [ (0, 3), (4, 8), (9, 16), (16, 18) ]),
+    ("bpy.data.objects(asfd]][sdaf[sdf]])", True, [ (0, 3), (4, 8), (9, 16), (16, 35) ]),
+    ("bpy.data.objects[f(((fdas))(ds))))sd))]", True, [ (0, 3), (4, 8), (9, 16), (16, 39) ]),
+    ("bpy.data.objects[0]", True, [ (0, 3), (4, 8), (9, 16), (16, 19) ]),
+    ("bpy.data.objects[f].name", True, [ (0, 3), (4, 8), (9, 16), (16, 19), (20, 24) ]),
+    ("bpy.data.objects[f][g].name", True, [ (0, 3), (4, 8), (9, 16), (16, 19), (19, 22), (23, 27) ]),
+    ("bpy.data.objects[f].name[h]", True, [ (0, 3), (4, 8), (9, 16), (16, 19), (20, 24), (24, 27) ]),
+    ("a[]", True, [ (0, 1), (1, 3) ]),
+    ("a[][]", True, [ (0, 1), (1, 3), (3, 5) ]),
+    ("a[f][g]", True, [ (0, 1), (1, 4), (4, 7) ]),
+    ("a()", True, [ (0, 1), (1, 3) ]),
+    ("a()()", True, [ (0, 1), (1, 3), (3, 5) ]),
+    ("a(f)(g)", True, [ (0, 1), (1, 4), (4, 7) ]),
+    ("a[", False, [ (0, 1) ]),
+    ("a]", False, []),
+    ("a(", False, [ (0, 1) ]),
+    ("a)", False, []),
+    ("a(]", False, [ (0, 1) ]),
+    ("a[)", False, [ (0, 1) ]),
+    ("a[[[]", False, [ (0, 1) ]),
+    ("a[[[ ]]]]", False, [ (0, 1) ]),
+    ("a((( ))))", False, [ (0, 1) ]),
+    ("a[]b", False, [ (0, 1) ]),
+    ("a()b", False, [ (0, 1) ]),
+    ("bpy.data.", False, [ (0, 3), (4, 8) ]),
+    ("bpy.data..", False, [ (0, 3), (4, 8) ]),
+    ("bpy..data", False, [ (0, 3) ]),
+    (".data.objects", False, []),
+    ("[]", False, []),
+    ("a[].", False, [ (0, 1), (1, 3) ]),
+    ("()", False, []),
+    ("a().", False, [ (0, 1), (1, 3) ]),
+    ("s['\\\\'']", False, [ (0, 1) ]),
+    ("s[''']", False, [ (0, 1) ]),
+    ("f a", False, [ (0, 1) ]),
+    ("f [a]", False, [ (0, 1) ]),
+    ("f (a)", False, [ (0, 1) ]),
 ]
 
 def run_tests(verbose=1):
@@ -342,7 +384,7 @@ def run_tests(verbose=1):
             print(output)
             if output != None:
                 for x in output:
-                    print("output item =" + test_input[ x[0]:x[1]+1 ] )
+                    print("output item =" + test_input[ x[0]:x[1] ] )
             print("    = output")
         if result_correct == exp_correct:
             if verbose > 0: print("    match, test input = " + test_input)
@@ -361,7 +403,7 @@ def run_tests(verbose=1):
             print("    output strings =")
             print(output)
             for x in output:
-                print("output item =" + test_input[ x[0]:x[1]+1 ] )
+                print("output item =" + test_input[ x[0]:x[1] ] )
             print("    = output strings")
             print("-----------------------------------------------------------")
     if verbose > 0: print("End tests of lexer:\n")

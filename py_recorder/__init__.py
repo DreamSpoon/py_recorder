@@ -18,23 +18,20 @@
 
 bl_info = {
     "name": "Python Recorder",
-    "version": (0, 5, 2),
+    "version": (0, 5, 3),
     "author": "Dave",
     "blender": (2, 80, 0),
-    "description": "Inspect Python object attributes. Record Blender data to Python code. Record Info lines to " \
-        "Text / Text Object script so that user actions in Blender can be recreated later by running the script",
+    "description": "Create and apply Presets. Inspect Python object attributes. Record Blender data to Python code",
     "location": "3DView -> Tools -> Tool -> Py Record Info, Py Exec Object. Right-click Context menu -> " \
         "Add Inspect Panel. Context -> Tool -> Py Inspect",
     "doc_url": "https://github.com/DreamSpoon/py_recorder#readme",
-    "category": "Python",
+    "category": "Presets, Python",
 }
-
-import numpy
 
 import bpy
 from bpy.app.handlers import persistent
 from bpy.types import (Panel, PropertyGroup)
-from bpy.props import (CollectionProperty, PointerProperty)
+from bpy.props import (BoolProperty, CollectionProperty, PointerProperty, StringProperty)
 from bpy.utils import (register_class, unregister_class)
 
 from .inspect.inspect_panel import (PYREC_PG_AttributeRecordOptions, PYREC_PG_InspectPanelCollection,
@@ -55,6 +52,17 @@ from .record.info_ops import (PYREC_OT_VIEW3D_CopyInfoToObjectText, PYREC_OT_VIE
     PYREC_OT_VIEW3D_StopRecordInfoLine, PYREC_PG_InfoRecordOptions, PYREC_PT_VIEW3D_RecordInfo, get_datablock_for_type)
 from .exec_panel import (PYREC_PG_ExecOptions, PYREC_OT_ContextExec, append_exec_context_panel_all,
     remove_exec_context_panel_all)
+from .preset.preset_ui import (PYREC_OT_PresetClipboardClear, PYREC_OT_PresetClipboardRemoveItem,
+    PYREC_OT_PresetClipboardCreatePreset, PYREC_UL_PresetClipboardProps,
+    PYREC_UL_PresetApplyProps, PYREC_UL_PresetModifyProps, PYREC_UL_PresetModifyCollections,
+    PYREC_UL_PresetModifyPresets, PYREC_OT_PresetPropsRemoveItem, PYREC_OT_PresetApply,
+    PYREC_OT_PresetModifyCollection, PYREC_OT_PresetRemoveCollection, PYREC_OT_PresetModifyPreset,
+    PYREC_OT_PresetRemovePreset, PYREC_OT_QuicksavePreferences, PYREC_PT_Preset)
+from .preset.preset_prop import (PYREC_PG_BoolProp, PYREC_PG_IntProp, PYREC_PG_FloatProp, PYREC_PG_VectorXYZ_Prop,
+    PYREC_PG_StringProp, PYREC_PG_PresetPropDetail, PYREC_PG_Preset, PYREC_PG_PresetCollection,
+    PYREC_PG_PresetTypeCollection, PYREC_PG_PresetClipboardPropDetail, PYREC_PG_PresetClipboard,
+    PYREC_PG_PresetClipboardOptions, PYREC_PG_PresetOptions)
+from .addon_prefs import (PYREC_PG_LogAddonPrefs, PYREC_PG_InterfaceAddonPrefs, PYREC_AddonPreferences)
 
 class PYREC_PT_OBJ_AdjustCustomProp(Panel):
     bl_space_type = 'PROPERTIES'
@@ -68,7 +76,7 @@ class PYREC_PT_OBJ_AdjustCustomProp(Panel):
         return context.active_object != None
 
     def draw(self, context):
-        pr_ir = context.window_manager.py_rec.record_options.info
+        py_rec_record_options_info = context.window_manager.py_rec.record_options.info
         layout = self.layout
         act_ob = context.active_object
 
@@ -83,12 +91,17 @@ class PYREC_PT_OBJ_AdjustCustomProp(Panel):
 
         layout.label(text="New Property")
         box = layout.box()
-        box.prop(pr_ir, "add_cp_data_name")
-        box.prop(pr_ir, "add_cp_data_type")
-        box.prop_search(pr_ir, "add_cp_datablock", bpy.data, pr_ir.add_cp_data_type, text="")
+        box.prop(py_rec_record_options_info, "add_cp_data_name")
+        box.prop(py_rec_record_options_info, "add_cp_data_type")
+        box.prop_search(py_rec_record_options_info, "add_cp_datablock", bpy.data,
+                        py_rec_record_options_info.add_cp_data_type, text="")
         box.operator(PYREC_OT_OBJ_AddCP_Data.bl_idname)
 
-########################
+class PYREC_PG_LogOptions(PropertyGroup):
+    output_text_name: StringProperty(name="Log Text Name", description="Name of Textblock that receives log entries " \
+        "(see builtin Text-Editor)", default="py_rec_log")
+    enable_timestamp: BoolProperty(name="Timestamp", description="If enabled then log entries include time and date " \
+        "at beginning of each entry", default=True)
 
 class PYREC_PG_RecordOptions(PropertyGroup):
     attribute: PointerProperty(type=PYREC_PG_AttributeRecordOptions)
@@ -97,9 +110,12 @@ class PYREC_PG_RecordOptions(PropertyGroup):
     nodetree: PointerProperty(type=PYREC_PG_NodetreeRecordOptions)
 
 class PYREC_PG_PyRec(PropertyGroup):
-    inspect_context_collections: CollectionProperty(type=PYREC_PG_InspectPanelCollection)
+    log_options: PointerProperty(type=PYREC_PG_LogOptions)
     record_options: PointerProperty(type=PYREC_PG_RecordOptions)
     exec_options: PointerProperty(type=PYREC_PG_ExecOptions)
+    preset_options: PointerProperty(type=PYREC_PG_PresetOptions)
+    preset_collections: CollectionProperty(type=PYREC_PG_PresetTypeCollection)
+    inspect_context_collections: CollectionProperty(type=PYREC_PG_InspectPanelCollection)
 
 classes = [
     PYREC_OT_RecordNodetree,
@@ -131,6 +147,7 @@ classes = [
     PYREC_OT_InspectCopyAttribute,
     PYREC_OT_InspectPasteAttribute,
     PYREC_OT_InspectChoosePy,
+    PYREC_OT_ContextExec,
     PYREC_PT_RecordDriver,
     PYREC_PG_DirAttributeItem,
     PYREC_PG_InspectPanelOptions,
@@ -140,10 +157,45 @@ classes = [
     PYREC_PG_DriverRecordOptions,
     PYREC_PG_InfoRecordOptions,
     PYREC_PG_NodetreeRecordOptions,
+    PYREC_PG_LogOptions,
     PYREC_PG_RecordOptions,
     PYREC_PG_ExecOptions,
-    PYREC_OT_ContextExec,
+
+    PYREC_UL_PresetClipboardProps,
+    PYREC_UL_PresetApplyProps,
+    PYREC_UL_PresetModifyProps,
+    PYREC_UL_PresetModifyCollections,
+    PYREC_UL_PresetModifyPresets,
+    PYREC_OT_PresetPropsRemoveItem,
+    PYREC_OT_PresetApply,
+    PYREC_OT_PresetModifyCollection,
+    PYREC_OT_PresetRemoveCollection,
+    PYREC_OT_PresetModifyPreset,
+    PYREC_OT_PresetRemovePreset,
+    PYREC_OT_QuicksavePreferences,
+    PYREC_PT_Preset,
+
+    PYREC_PG_BoolProp,
+    PYREC_PG_IntProp,
+    PYREC_PG_FloatProp,
+    PYREC_PG_VectorXYZ_Prop,
+    PYREC_PG_StringProp,
+    PYREC_PG_PresetPropDetail,
+    PYREC_PG_Preset,
+    PYREC_PG_PresetCollection,
+    PYREC_PG_PresetTypeCollection,
+    PYREC_OT_PresetClipboardClear,
+    PYREC_OT_PresetClipboardRemoveItem,
+    PYREC_OT_PresetClipboardCreatePreset,
+    PYREC_PG_PresetClipboardPropDetail,
+    PYREC_PG_PresetClipboard,
+    PYREC_PG_PresetClipboardOptions,
+    PYREC_PG_PresetOptions,
+
     PYREC_PG_PyRec,
+    PYREC_PG_LogAddonPrefs,
+    PYREC_PG_InterfaceAddonPrefs,
+    PYREC_AddonPreferences,
 ]
 
 def duplicate_prop(to_prop, from_prop):
@@ -164,7 +216,7 @@ def duplicate_prop(to_prop, from_prop):
             if hasattr(to_prop, "clear") and callable(getattr(to_prop, "clear")):
                 to_item = to_prop.add()
                 to_item.name = from_item.name
-            if isinstance(from_item, bpy.types.PropertyGroup) or \
+            if isinstance(from_item, PropertyGroup) or \
                 (hasattr(from_item, "__len__") and not isinstance(from_item, str)):
                 duplicate_prop(to_item, from_item)
             else:
@@ -190,6 +242,13 @@ def save_pre_handler_func(dummy):
     # save state of py_rec before saving .blend file, so Py Inspect panel info is saved
     save_py_rec_to_scene()
 
+# context exec panels must be registered after addon is registered, so a timer is used with call to this function,
+# a short time after a file is loaded
+def timed_reg_exec():
+    addon_prefs = bpy.context.preferences.addons[__name__].preferences
+    if addon_prefs.interface.draw_context_exec:
+        append_exec_context_panel_all()
+
 def register():
     register_inspect_exec_panel_draw_func(draw_inspect_panel)
     for cls in classes:
@@ -209,7 +268,9 @@ def register():
     # append 'Add Inspect Panel' button to all Context menus (all Context types)
     append_inspect_context_menu_all()
     append_inspect_active_context_menu_all()
-    append_exec_context_panel_all()
+    # set a timer, so bpy.context can be accessed, to register 'context exec' panels, because 'context exec' panels
+    # can be disabled in AddonPreferences, and AddonPreferences is only accessible from a valid context
+    bpy.app.timers.register(timed_reg_exec, first_interval=0)
 
 def unregister():
     remove_exec_context_panel_all()

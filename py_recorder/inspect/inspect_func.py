@@ -22,8 +22,6 @@ import re
 import bpy
 import mathutils
 
-from .lex_py_attributes import lex_py_attributes
-
 INSPECT_PANEL_CLASS_MATCH_STR = "^PYREC_PT_[A-Za-z0-9_]+_Inspect[0-9]+$"
 
 # returns dir(val) without duplicates (e.g. '__doc__' duplicates)
@@ -69,15 +67,6 @@ def get_inspect_context_panel(panel_num, context_name, inspect_context_collectio
         return None
     return coll.inspect_context_panels.get(str(panel_num))
 
-# returns 2-tuple of (exec_str less last attribute, last attribute)
-def remove_last_py_attribute(exec_str):
-    output, e = lex_py_attributes(exec_str)
-    # cannot remove last attribute if error, or no output, or too few output attributes
-    if e != None or output is None or len(output) < 2:
-        return None, None
-    # use end_position of last output item to return exec_str up to, and including, end of second last attribute
-    return exec_str[ : output[-2][1]+1 ], exec_str[ output[-1][0] : output[-1][1]+1 ]
-
 def match_inspect_panel_name(input_str):
     return re.match(INSPECT_PANEL_CLASS_MATCH_STR, input_str)
 
@@ -88,10 +77,10 @@ def get_action_fcurve_index(fcurves, data_path, array_index):
     return None
 
 def get_inspect_active_type_items(self, context):
-    active_items = []
     if context is None or context.space_data is None:
         return [ (" ", "", "") ]
     # add 'Inspect Active' item(s) available in all contexts
+    active_items = []
     active_items.append( ("ACTIVE_SPACE_DATA", "Space Data", "") )
     active_items.append( ("CONTEXT", "Context", "") )
     active_items.append( ("SCENE", "Scene", "") )

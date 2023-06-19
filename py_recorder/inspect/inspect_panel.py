@@ -26,12 +26,13 @@ from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProp
 from bpy.utils import unregister_class
 
 from .inspect_options import PYREC_OT_InspectOptions
-from .inspect_func import (get_inspect_context_panel, remove_last_py_attribute, match_inspect_panel_name,
+from .inspect_func import (get_inspect_context_panel, match_inspect_panel_name,
     get_active_thing_inspect_str, get_inspect_active_type_items, string_to_lines_collection, get_relevant_doc)
-from .inspect_exec import (get_inspect_exec_result, inspect_exec_refresh, register_inspect_panel,
+from .inspect_exec import (get_exec_inspect_value, inspect_exec_refresh, register_inspect_panel,
     unregister_inspect_panel)
+from ..lex_py_attributes import remove_last_py_attribute
 from ..bpy_value_string import (BPY_DATA_TYPE_ITEMS, bpy_value_to_string)
-from ..log_text import (LOG_TEXT_NAME, log_text_append)
+from ..log_text import log_text_append
 
 RECORD_ATTRIBUTE_TEXT_NAME = "pyrec_attribute.py"
 
@@ -69,9 +70,6 @@ class PYREC_PG_InspectPanelOptions(PropertyGroup):
     display_attr_type_bl: BoolProperty(name="bl_", description="Display 'Blender builtin' type attributes in " +
         "Inspect Attributes area. 'Blender builtin' type attributes have names beginning with 'bl_' ", default=True,
         options={'HIDDEN'})
-    display_value_attributes: BoolProperty(name="Attributes List", description="Display Inspect Attributes area, " +
-        "to inspect list of attributes of current Inspect value (i.e. view result of dir() in list format)",
-        default=True, options={'HIDDEN'})
     display_value_selector: BoolProperty(name="Try value entry", description="Try to display attribute value entry " +
         "box, to allow real-time editing of attribute value. Display value as string if try fails", default=True,
         options={'HIDDEN'})
@@ -84,7 +82,6 @@ def set_array_index(self, value):
     if value < 0 or value > self.array_index_max:
         return
     self["array_index"] = value
-    return
 
 def get_array_index(self):
     return self.get("array_index", 0)
@@ -101,15 +98,13 @@ def populate_index_strings(self, context):
 
 def update_dir_attributes(self, value):
     panel_props = self
-    panel_props.dir_item_value_str = ""
-    panel_props.dir_item_value_typename_str = ""
     panel_props.dir_item_doc_lines.clear()
     # quit if dir() listing is empty
     if len(panel_props.dir_attributes) < 1:
         return
     attr_name = panel_props.dir_attributes[panel_props.dir_attributes_index].name
     # get the current result value
-    result_value = get_inspect_exec_result()
+    result_value = get_exec_inspect_value()
     # get the current result attribute's value
     if attr_name == ".":
         attr_value = result_value
@@ -117,9 +112,6 @@ def update_dir_attributes(self, value):
         attr_value = getattr(result_value, attr_name)
     else:
         attr_value = None
-    panel_props.dir_item_value_str = str(attr_value)
-    # set 'type name' label
-    panel_props.dir_item_value_typename_str = type(attr_value).__name__
     # set '__doc__' label, if available as string type
     string_to_lines_collection(get_relevant_doc(attr_value), panel_props.dir_item_doc_lines)
 
@@ -169,9 +161,6 @@ class PYREC_PG_InspectPanel(PropertyGroup):
     dir_col_size1: FloatProperty(default=0.333333, min=0.02, max=0.98)
     dir_col_size2: FloatProperty(default=0.666667, min=0.02, max=0.98)
 
-    dir_item_value_str: StringProperty()
-    dir_item_value_typename_str: StringProperty()
-
     dir_item_doc_lines: CollectionProperty(type=PropertyGroup)
     dir_item_doc_lines_index: IntProperty()
 
@@ -188,14 +177,14 @@ def draw_panel_dir_attribute_value(layout, panel_props, panel_options):
         if attr_name == ".":
             first_part, last_part = remove_last_py_attribute(panel_props.dir_inspect_exec_str)
             if first_part != None and last_part != None:
-                result_value = get_inspect_exec_result()
+                result_value = get_exec_inspect_value()
                 # if last part is indexed then force value to be displayed as label
                 if (last_part[0]+last_part[-1]) == "[]":
                     result_value = None
                 else:
                     attr_name = last_part
         else:
-            result_value = get_inspect_exec_result()
+            result_value = get_exec_inspect_value()
     # try to use a real-time entry field (selector), and display label string if real-time entry field fails
     if result_value != None and attr_name != "bl_rna" and not attr_name.startswith("__") and \
         hasattr(result_value, attr_name):
@@ -233,79 +222,80 @@ def draw_inspect_panel(self, context):
     row.operator(PYREC_OT_InspectChoosePy.bl_idname, icon='HIDE_OFF', text="").panel_num = self.panel_num
     row.separator()
     row.operator(PYREC_OT_InspectPanelAttrZoomOut.bl_idname, icon='ZOOM_OUT', text="").panel_num = self.panel_num
+
     # array index / key
-    if panel_options.display_value_attributes:
-        box = layout.box()
-        array_index_key_type = ic_panel.array_index_key_type
-        if array_index_key_type == "int" or array_index_key_type == "str" or array_index_key_type == "int_str":
-            sub_box = box.box()
-            sub_box.label(text="Index Item Count: "+str(max(len(ic_panel.array_key_set),
-                                                            ic_panel.array_index_max+1)))
-        if array_index_key_type == "int" or array_index_key_type == "int_str":
-            row = sub_box.row()
-            row.prop(ic_panel, "array_index", text="")
-            row.operator(PYREC_OT_InspectPanelArrayIndexZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
-                self.panel_num
-        if array_index_key_type == "str" or array_index_key_type == "int_str":
-            row = sub_box.row()
-            row.prop(ic_panel, "array_key", text="")
-            row.operator(PYREC_OT_InspectPanelArrayKeyZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
-                self.panel_num
+    box = layout.box()
+    array_index_key_type = ic_panel.array_index_key_type
+    if array_index_key_type == "int" or array_index_key_type == "str" or array_index_key_type == "int_str":
+        sub_box = box.box()
+        sub_box.label(text="Index Item Count: "+str(max(len(ic_panel.array_key_set),
+                                                        ic_panel.array_index_max+1)))
+    if array_index_key_type == "int" or array_index_key_type == "int_str":
+        row = sub_box.row()
+        row.prop(ic_panel, "array_index", text="")
+        row.operator(PYREC_OT_InspectPanelArrayIndexZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
+            self.panel_num
+    if array_index_key_type == "str" or array_index_key_type == "int_str":
+        row = sub_box.row()
+        row.prop(ic_panel, "array_key", text="")
+        row.operator(PYREC_OT_InspectPanelArrayKeyZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
+            self.panel_num
+
     # current inspect exec string
     sub_box = box.box()
     sub_box.label(text="Exec: " + ic_panel.dir_inspect_exec_str)
     # attributes of inspect exec value
-    if panel_options.display_value_attributes:
-        # subtract 1 to account for the '.' list item (which represents 'self' value)
-        sub_box.label(text="Inspect Attributes ( %i )" % ( 0 if len(ic_panel.dir_attributes)-1 < 0 else \
-                                                           len(ic_panel.dir_attributes)-1 ))
-        # column size sliders
+    # subtract 1 to account for the '.' list item (which represents 'self' value)
+    sub_box.label(text="Inspect Attributes ( %i )" % ( 0 if len(ic_panel.dir_attributes)-1 < 0 else \
+                                                       len(ic_panel.dir_attributes)-1 ))
+    # column size sliders
+    if panel_options.display_dir_attribute_type or panel_options.display_dir_attribute_value:
         row = sub_box.row(align=True)
         row.prop(ic_panel, "dir_col_size1", slider=True, text="Name")
         if panel_options.display_dir_attribute_type and panel_options.display_dir_attribute_value:
             row.prop(ic_panel, "dir_col_size2", slider=True, text="Type / Value")
-        # container row
-        cont_row = sub_box.row(align=True)
-        # attribute list column
-        attr_list_col = cont_row.column()
-        # list labels
-        split = attr_list_col.split(factor=ic_panel.dir_col_size1)
-        split.label(text="Name")
-        if panel_options.display_dir_attribute_type:
-            if panel_options.display_dir_attribute_value:
-                split = split.split(factor=ic_panel.dir_col_size2)
-            split.label(text="Type")
+    # container row
+    cont_row = sub_box.row(align=True)
+    # attribute list column
+    attr_list_col = cont_row.column()
+    # list labels
+    split = attr_list_col.split(factor=ic_panel.dir_col_size1)
+    split.label(text="Name")
+    if panel_options.display_dir_attribute_type:
         if panel_options.display_dir_attribute_value:
-            split.label(text="Value")
-        # list
-        list_classname = "PYREC_UL_%s_DirAttributeList%s" % (context_name, ic_panel.name)
-        attr_list_col.template_list(list_classname, "", ic_panel, "dir_attributes", ic_panel, "dir_attributes_index",
-                                   rows=5)
-        # functions column
-        function_col = cont_row.column(align=True)
-        function_col.separator()
-        function_col.separator()
-        function_col.operator(PYREC_OT_InspectPanelAttrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
-            self.panel_num
-        function_col.operator(PYREC_OT_InspectRecordAttribute.bl_idname, icon='DOCUMENTS', text="").panel_num = \
-            self.panel_num
-        function_col.operator(PYREC_OT_InspectCopyAttribute.bl_idname, icon='COPY_ID', text="").panel_num = \
-            self.panel_num
-        function_col.operator(PYREC_OT_InspectPasteAttribute.bl_idname, icon='PASTEDOWN', text="").panel_num = \
-            self.panel_num
+            split = split.split(factor=ic_panel.dir_col_size2)
+        split.label(text="Type")
+    if panel_options.display_dir_attribute_value:
+        split.label(text="Value")
+    # list
+    list_classname = "PYREC_UL_%s_DirAttributeList%s" % (context_name, ic_panel.name)
+    attr_list_col.template_list(list_classname, "", ic_panel, "dir_attributes", ic_panel, "dir_attributes_index",
+                               rows=5)
+    # functions column
+    function_col = cont_row.column(align=True)
+    function_col.separator(factor=4)
+    function_col.operator(PYREC_OT_InspectPanelAttrZoomIn.bl_idname, icon='ZOOM_IN', text="").panel_num = \
+        self.panel_num
+    function_col.operator(PYREC_OT_InspectRecordAttribute.bl_idname, icon='DOCUMENTS', text="").panel_num = \
+        self.panel_num
+    function_col.operator(PYREC_OT_InspectCopyAttribute.bl_idname, icon='COPY_ID', text="").panel_num = \
+        self.panel_num
+    function_col.operator(PYREC_OT_InspectPasteAttribute.bl_idname, icon='PASTEDOWN', text="").panel_num = \
+        self.panel_num
+    function_col.separator(factor=2)
+    function_col.prop(panel_options, "display_dir_attribute_type", text="", icon='CON_TRANSFORM_CACHE', toggle=True)
+    function_col.prop(panel_options, "display_dir_attribute_value", text="", icon='CON_TRANSFORM', toggle=True)
+    function_col.prop(panel_options, "display_attr_doc", text="", icon='HELP', toggle=True)
 
-    # current inspect value, type, doc
-    box = layout.box()
-    if ic_panel.dir_inspect_exec_str != "":
-        box.label(text="Type: " + ic_panel.dir_item_value_typename_str)
-        draw_panel_dir_attribute_value(box, ic_panel, panel_options)
+    # current inspect item's doc
+    if ic_panel.dir_inspect_exec_str != "" and panel_options.display_attr_doc:
         # display documentation / description
-        if panel_options.display_attr_doc:
-            box.label(text="__doc__:")
-            split = box.split(factor=0.95)
-            list_classname = "PYREC_UL_%s_DocLineList%s" % (context_name, ic_panel.name)
-            split.template_list(list_classname, "", ic_panel, "dir_item_doc_lines", ic_panel,
-                              "dir_item_doc_lines_index", rows=2)
+        box = layout.box()
+        box.label(text="__doc__:")
+        split = box.split(factor=0.95)
+        list_classname = "PYREC_UL_%s_DocLineList%s" % (context_name, ic_panel.name)
+        split.template_list(list_classname, "", ic_panel, "dir_item_doc_lines", ic_panel, "dir_item_doc_lines_index",
+                            rows=2)
 
 def create_context_inspect_panel(context, context_name, inspect_context_collections, begin_exec_str=None):
     # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
@@ -554,7 +544,7 @@ def get_commented_splitlines(input_str):
 def get_attribute_python_str(inspect_str, attr_name, ic_panel, attr_record_options):
     out_first_str = ""
     out_last_str = inspect_str if attr_name == "." else inspect_str + "." + attr_name
-    result_value = get_inspect_exec_result()
+    result_value = get_exec_inspect_value()
     if attr_name == ".":
         attr_value = result_value
     elif result_value != None and hasattr(result_value, attr_name):
@@ -702,9 +692,9 @@ class PYREC_OT_InspectPasteAttribute(Operator):
         if copy_attribute_ref.get("attribute_ref") is None:
             self.report({'ERROR'}, "Unable to Paste Attribute Reference because Copy reference is empty")
             return {'CANCELLED'}
-        return self.paste_attribute_ref(ic_panel)
+        return self.paste_attribute_ref(context, ic_panel)
 
-    def paste_attribute_ref(self, ic_panel):
+    def paste_attribute_ref(self, context, ic_panel):
         set_val_str = ic_panel.dir_inspect_exec_str
         attr_name = ic_panel.dir_attributes[ic_panel.dir_attributes_index].name
         if attr_name != ".":
@@ -713,10 +703,11 @@ class PYREC_OT_InspectPasteAttribute(Operator):
         try:
             exec(set_val_str + " = " + get_val_str)
         except:
-            log_text_append("Exception raised during Paste Attribute exec of:\n  %s\n%s" %
+            log_text_append("Exception raised by Paste Attribute exec of:\n  %s\n%s" %
                             (set_val_str + " = " + get_val_str, traceback.format_exc()) )
-            self.report({'ERROR'}, "Unable to Paste Attribute, exception raised during exec() with paste " \
-                "reference string. See Text named '%s' for details" % LOG_TEXT_NAME)
+            self.report({'ERROR'}, "Unable to Paste Attribute, exception raised by exec() with paste " \
+                "reference string. See Text named '%s' for details" %
+                context.window_manager.py_rec.log_options.output_text_name)
             return {'CANCELLED'}
         return {'FINISHED'}
 
@@ -841,6 +832,7 @@ class PYREC_MT_InspectActive(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
+        layout.label(text=str(context.space_data.type)+" context")
         for type_name, nice_name, _ in get_inspect_active_type_items(None, context):
             layout.operator(PYREC_OT_PyInspectActiveObject.bl_idname, text=nice_name).inspect_type = type_name
 

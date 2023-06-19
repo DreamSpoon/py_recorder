@@ -23,7 +23,8 @@ from bpy.props import (BoolProperty, EnumProperty, PointerProperty, StringProper
 from bpy.types import (Operator, PropertyGroup)
 from bpy.utils import (register_class, unregister_class)
 
-from .log_text import (LOG_TEXT_NAME, log_text_append)
+from .exec_func import exec_get_exception
+from .log_text import log_text_append
 
 exec_panel_classes = {}
 EXEC_PANEL_REGISTER = "class PYREC_PT_%s_Exec(bpy.types.Panel):\n" \
@@ -62,13 +63,18 @@ def unregister_exec_panel(context_name):
 #    'OUTLINER', 'PROPERTIES', 'FILE_BROWSER', 'SPREADSHEET', 'PREFERENCES')
 EXEC_CONTEXT_NAMES = ('VIEW_3D', 'IMAGE_EDITOR', 'NODE_EDITOR', 'SEQUENCE_EDITOR', 'CLIP_EDITOR', 'DOPESHEET_EDITOR',
     'GRAPH_EDITOR', 'NLA_EDITOR', 'TEXT_EDITOR', 'SPREADSHEET')
+exec_panels_registered = [ False ]
 def append_exec_context_panel_all():
-    for context_name in EXEC_CONTEXT_NAMES:
-        register_exec_panel(context_name)
+    if not exec_panels_registered[0]:
+        for context_name in EXEC_CONTEXT_NAMES:
+            register_exec_panel(context_name)
+        exec_panels_registered[0] = True
 
 def remove_exec_context_panel_all():
-    for context_name in EXEC_CONTEXT_NAMES:
-        unregister_exec_panel(context_name)
+    if exec_panels_registered[0]:
+        for context_name in EXEC_CONTEXT_NAMES:
+            unregister_exec_panel(context_name)
+        exec_panels_registered[0] = False
 
 class PYREC_PG_ExecOptions(PropertyGroup):
     exec_type: EnumProperty(name="Type", items=[ ("single_line", "Single Line", ""), ("textblock", "Text", "") ],
@@ -86,24 +92,20 @@ class PYREC_PG_ExecOptions(PropertyGroup):
         default=True)
 
 def context_exec_single_line(single_line, enable_log):
-    try:
-        exec(single_line)
-        return True
-    except:
+    is_exc, exc_msg = exec_get_exception(single_line)
+    if is_exc:
         if enable_log:
-            log_text_append("Exception raised during Exec of single line:\n%s\n\n%s" %
-                            (single_line, traceback.format_exc()))
+            log_text_append("Exception raised by Exec of single line:\n%s\nException:\n%s" % (single_line, exc_msg))
         return False
+    return True
 
 def context_exec_textblock(textblock, enable_log):
-    try:
-        exec(textblock.as_string())
-        return True
-    except:
+    is_exc, exc_msg = exec_get_exception(textblock.as_string())
+    if is_exc:
         if enable_log:
-            log_text_append("Exception raised during Exec of Text:\n%s\n\n%s" %
-                            (textblock.name, traceback.format_exc()))
+            log_text_append("Exception raised by Exec of Text named: %s\n%s" % (textblock.name, exc_msg))
         return False
+    return True
 
 class PYREC_OT_ContextExec(Operator):
     bl_description = "Run exec() Python command with given string, from either Single Line or Text"
@@ -120,7 +122,7 @@ class PYREC_OT_ContextExec(Operator):
                 return {'CANCELLED'}
             if not context_exec_single_line(single_line, True):
                 self.report({'INFO'}, "Exception occurred during exec() of Single Line, see '%s' in Text Editor" % \
-                            LOG_TEXT_NAME)
+                            context.window_manager.py_rec.log_options.output_text_name)
                 return {'CANCELLED'}
         else:
             textblock = pr_eo.textblock
@@ -130,7 +132,7 @@ class PYREC_OT_ContextExec(Operator):
             text_name = textblock.name
             if not context_exec_textblock(textblock, True):
                 self.report({'INFO'}, "Exception occurred during exec() of Text named '%s', see '%s' in Text Editor"% \
-                            (text_name, LOG_TEXT_NAME))
+                            (text_name, context.window_manager.py_rec.log_options.output_text_name))
         return {'FINISHED'}
 
 def exec_panel_draw(self, context):

@@ -24,8 +24,8 @@ import traceback
 import bpy
 from bpy.types import (Operator, Panel)
 
-from .string_exec import exec_str
 from .object_custom_prop import CPROP_NAME_INIT_PY
+from .exec_func import exec_get_exception
 
 SCRIPT_RUN_NAME_APPEND = "_RunTemp"
 ERROR_RUN_NAME_APPEND = "_Error"
@@ -83,10 +83,9 @@ def run_script_in_text_editor(context, textblock):
         bpy.ops.text.run_script()
     except:
         # return False because script caused an error, so Text Editor will remain as current context, and user has
-        # quick access to script with error
-        tb = traceback.format_exc()
+        # quick access to script with error, and
         # create Text to receive error traceback message as string
-        return create_error_text(textblock.name+ERROR_RUN_NAME_APPEND, tb)
+        return create_error_text(textblock.name+ERROR_RUN_NAME_APPEND, traceback.format_exc())
     # change context to previous type
     context.area.ui_type = prev_type
     # return None because script did not cause error
@@ -116,7 +115,7 @@ def run_object_init(context, ob, run_as_text_script, auto_import_bpy):
     init_thing = ob.get(CPROP_NAME_INIT_PY)
     if init_thing != None:
         if isinstance(init_thing, bpy.types.Text):
-            print("Py Recorder: Exec Object with Text named: " + init_thing.name)
+            print("Py Recorder: Exec Object named '%s', with Text named '%s'" % (ob.name, init_thing.name))
             script_str = init_thing.as_string()
             if run_as_text_script:
                 # prepend 'import bpy' line if needed
@@ -134,9 +133,10 @@ def run_object_init(context, ob, run_as_text_script, auto_import_bpy):
                     remove_text_prepend_import_bpy(init_thing)
             else:
                 exec_globals = { "bpy": bpy }
-                succeed, error_msg = exec_str(script_str, exec_globals)
-                if not succeed:
-                    return create_error_text(init_thing.name+ERROR_RUN_NAME_APPEND, error_msg)
+                is_exc, exc_msg = exec_get_exception(script_str, exec_globals)
+                if is_exc:
+                    full_msg = "Exception raised by Exec of Object named '%s'\n%s" % (ob.name, exc_msg)
+                    return create_error_text(init_thing.name+ERROR_RUN_NAME_APPEND, full_msg)
                 return get_operator_functions(exec_globals)
         elif isinstance(init_thing, bpy.types.Object) and init_thing.type == 'FONT':
             script_str = init_thing.data.body
@@ -147,8 +147,8 @@ def run_object_init(context, ob, run_as_text_script, auto_import_bpy):
                 temp_text.write(script_str)
                 if auto_import_bpy and not re.match(script_str, PY_IMPORT_BPY_RE, flags=(re.MULTILINE | re.DOTALL)):
                     add_text_prepend_import_bpy(temp_text)
-                print("Py Recorder: Exec Object with Text Object named '%s', and Temporary Text named '%s'" % \
-                      (init_thing.name, temp_text.name))
+                print("Py Recorder: Exec Object named '%s', with Text Object named '%s', and Temporary Text " \
+                      "named '%s'" % (ob.name, init_thing.name, temp_text.name))
                 # return error message if run script resulted in error
                 error_text = run_script_in_text_editor(context, temp_text)
                 if error_text != None:
@@ -156,11 +156,12 @@ def run_object_init(context, ob, run_as_text_script, auto_import_bpy):
                 # remove temporary Text, only if run script did not result in error
                 bpy.data.texts.remove(temp_text)
             else:
-                print("Py Recorder: Exec Object with Text Object named: " + init_thing.name)
+                print("Py Recorder: Exec Object named '%s' with Text Object named '%s'" % (ob.name, init_thing.name))
                 exec_globals = { "bpy": bpy }
-                succeed, error_msg = exec_str(script_str, exec_globals)
-                if not succeed:
-                    return create_error_text(init_thing.name+ERROR_RUN_NAME_APPEND, error_msg)
+                is_exc, exc_msg = exec_get_exception(script_str, exec_globals)
+                if is_exc:
+                    full_msg = "Exception raised by Exec of Object named '%s'\n%s" % (ob.name, exc_msg)
+                    return create_error_text(init_thing.name+ERROR_RUN_NAME_APPEND, full_msg)
                 return get_operator_functions(exec_globals)
     # zero errors and zero operator functions, so return empty dictionary
     return {}
@@ -192,7 +193,7 @@ class PYREC_OT_BatchExecObject(Operator):
             context.view_layer.objects.active = ob
             # if run results in error, then halt and print name of Object that has script with error
             run_result = run_object_init(context, ob, pr_eo.run_as_text_script, pr_eo.run_auto_import_bpy)
-            if isinstance(run_result, str):
+            if isinstance(run_result, bpy.types.Text):
                 self.report({'ERROR'}, "Error, see details of run of Object named '%s' in error message " \
                             "Textblock named '%s'" % (o_name, run_result.name))
                 return {'CANCELLED'}
@@ -247,7 +248,7 @@ class PYREC_OT_ExecObject(Operator):
         act_ob = context.active_object
         o_name = act_ob.name
         run_result = run_object_init(context, act_ob, pr_eo.run_as_text_script, pr_eo.run_auto_import_bpy)
-        if isinstance(run_result, str):
+        if isinstance(run_result, bpy.types.Text):
             self.report({'ERROR'}, "Error, see details of run of Object named '%s' in error message " \
                         "Textblock named '%s'" % (o_name, run_result.name))
             return {'CANCELLED'}

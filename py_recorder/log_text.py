@@ -16,17 +16,23 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+from datetime import datetime as dt
+
 import bpy
 
-LOG_TEXT_NAME = "pyrec_log"
+PREFS_ADDONS_NAME = "py_recorder"
 
 def log_text_append(log_str):
+    addon_prefs_log = bpy.context.preferences.addons[PREFS_ADDONS_NAME].preferences.log
     # get log Text, or create if needed
-    text = bpy.data.texts.get(LOG_TEXT_NAME)
+    text = bpy.data.texts.get(addon_prefs_log.output_text_name)
     if text is None:
-        text = bpy.data.texts.new(name=LOG_TEXT_NAME)
+        text = bpy.data.texts.new(name=addon_prefs_log.output_text_name)
     # set current/select line/character to end line/character of text, before writing 'log_str'
     end_line = len(text.lines) - 1
     end_char = len(text.lines[end_line].body) - 1
     text.cursor_set(end_line, character=end_char, select=False)
-    text.write("\n" + log_str + "\n")
+    if addon_prefs_log.enable_timestamp:
+        date_time = dt.now().strftime("Exception date: %m/%d/%Y\nException time: %H:%M:%S")
+        text.write("\n%s" % date_time)
+    text.write("\n%s\n" % (log_str))
