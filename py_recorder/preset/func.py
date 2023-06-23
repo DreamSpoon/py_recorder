@@ -19,7 +19,7 @@
 import bpy
 from mathutils import Vector
 
-from ..lex_py_attributes import (enumerate_datapath_hierarchy, trim_datapath)
+from ..py_code_utils import (enumerate_datapath_hierarchy, trim_datapath)
 
 PREFS_ADDONS_NAME = "py_recorder"
 
@@ -446,6 +446,7 @@ def get_apply_base_val(base_val, datapath):
 
 def apply_preset_to_base_value(base_val, preset):
     for p_d in preset.prop_details:
+        print("applying a thing=", p_d.name)
         # get 'apply base value', and set value of named Python 'attribute' (Blender 'property'), recursing
         # through datapath hierarchy if needed
         apply_base_val, attr_name = get_apply_base_val(base_val, p_d.name)
@@ -481,20 +482,24 @@ def preset_apply_preset(preset_options, preset_collections):
         return
     if apply_preset == " ":
         return
+    print("past the hurdles 2")
     # remove ': datapath' from end of base type name, to get base type only
     apply_base_type = apply_base_type[:apply_base_type.find(":")]
     preset = preset_collections[apply_collection].base_types[apply_base_type].presets[apply_preset]
     # if zero property details available then exit, because zero properties to set
     if len(preset.prop_details) == 0:
         return
-    path_type_paths, _ = digest_full_datapath(apply_full_datapath)
+    print("past the hurdles 3")
+    path_type_paths, _ = digest_full_datapath(apply_full_datapath, all_bpy_types=True)
     # exit if no data for next steps
     if path_type_paths is None:
         return
+    print("past the hurdles 4")
     # find full base type path, by given base type, and apply preset to value from eval() of full data path
     for bt_path, bt_name, _ in path_type_paths:
         # filter by base type
         if bt_name == apply_base_type:
+            print("apply that thang")
             apply_preset_to_base_value(eval(bt_path), preset)
             break
 
@@ -504,6 +509,13 @@ def preset_collection_remove_collection(preset_options, preset_collections):
 def preset_collection_remove_preset(preset_options, preset_collections):
     preset_collections[preset_options.modify_active_collection].\
         base_types[preset_options.modify_base_type].presets.remove(preset_options.modify_active_preset)
+
+# force screen to redraw, known to work in Blender 3.3+
+def do_tag_redraw():
+    for a in bpy.context.screen.areas:
+        if a.type == 'VIEW_3D' or a.type == 'TEXT_EDITOR':
+            for r in a.regions:
+                r.tag_redraw()
 
 def preset_collection_modify_rename(p_options, p_collections):
     new_name = p_options.modify_collection_rename
@@ -520,6 +532,8 @@ def preset_collection_modify_rename(p_options, p_collections):
             # rename active collection
             p_coll = p_collections[p_options.modify_active_collection]
             p_coll.name = new_name
+            # redraw screen to show new_name
+            do_tag_redraw()
 
 def preset_modify_rename(p_options, p_collections):
     new_name = p_options.modify_preset_rename
@@ -541,3 +555,5 @@ def preset_modify_rename(p_options, p_collections):
             # rename active Preset
             preset = presets[p_options.modify_active_preset]
             preset.name = new_name
+            # redraw screen to show new_name
+            do_tag_redraw()

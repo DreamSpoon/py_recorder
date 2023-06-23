@@ -17,15 +17,14 @@
 # ##### END GPL LICENSE BLOCK #####
 
 from datetime import datetime as dt
-import inspect
+from inspect import getargs
 import re
 import traceback
 
 import bpy
-from bpy.types import (Operator, Panel)
 
-from .object_custom_prop import CPROP_NAME_INIT_PY
-from .exec_func import exec_get_exception
+from ..object_custom_prop import CPROP_NAME_INIT_PY
+from ..exec_func import exec_get_exception
 
 SCRIPT_RUN_NAME_APPEND = "_RunTemp"
 ERROR_RUN_NAME_APPEND = "_Error"
@@ -103,7 +102,7 @@ def get_operator_functions(exec_globals):
     for k in search_for:
         test_func = exec_globals.get(k)
         if test_func != None and callable(test_func) and hasattr(test_func, "__code__"):
-            test_args = inspect.getargs(test_func.__code__)
+            test_args = getargs(test_func.__code__)
             search_args = search_for[k]
             if test_args[0] == search_args:
                 found_funcs[k] = test_func
@@ -165,131 +164,3 @@ def run_object_init(context, ob, run_as_text_script, auto_import_bpy):
                 return get_operator_functions(exec_globals)
     # zero errors and zero operator functions, so return empty dictionary
     return {}
-
-# TODO display INFO about results of operator, e.g. number of Objects (with links to code) that were run
-class PYREC_OT_BatchExecObject(Operator):
-    bl_idname = "py_rec.batch_exec_object"
-    bl_label = "Batch Exec"
-    bl_description = "Run Python code linked to all selected Objects. Python code is linked by Object Custom " \
-        "Property '"+CPROP_NAME_INIT_PY+"'. Link to Text Object type: run code from Text Object body. Link "\
-        "to Text type (see Text Editor): run code from Text"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context):
-        return len(context.selected_objects) > 0
-
-    def execute(self, context):
-        pr_eo = context.window_manager.py_rec.exec_options
-        # make a static copy of selected objects, in case it changes when Object code is run
-        selected_objects = [ ob for ob in context.selected_objects ]
-        for ob in selected_objects:
-            # to avoid errors, do not run code from Objects that have been dereferenced/deleted
-            if bpy.data.objects.get(ob.name) is None:
-                continue
-            # get this Object name before running init, to prevent errors in case Object is removed by running init
-            o_name = ob.name
-            # make this Object the active Object before running this Object's linked code
-            context.view_layer.objects.active = ob
-            # if run results in error, then halt and print name of Object that has script with error
-            run_result = run_object_init(context, ob, pr_eo.run_as_text_script, pr_eo.run_auto_import_bpy)
-            if isinstance(run_result, bpy.types.Text):
-                self.report({'ERROR'}, "Error, see details of run of Object named '%s' in error message " \
-                            "Textblock named '%s'" % (o_name, run_result.name))
-                return {'CANCELLED'}
-            elif isinstance(run_result, dict) and pr_eo.use_operator_functions:
-                execute_func = run_result.get("execute")
-                # run 'execute' operator function, if found - do not return result of running execute
-                if execute_func != None:
-                    execute_func(self, context)
-        return {'FINISHED'}
-
-class PYREC_OT_ExecObject(Operator):
-    bl_idname = "py_rec.exec_object"
-    bl_label = "Exec Object"
-    bl_description = "Run Python code linked to active Object. Python code is linked by Object Custom " \
-        "Property '"+CPROP_NAME_INIT_PY+"'. Link to Text Object type: lines from Text Object body are run. Link "\
-        "to Text type (see Text Editor): lines of Text are run"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    operator_functions = {}
-
-    @classmethod
-    def poll(cls, context):
-        return context.active_object != None
-
-    def execute(self, context):
-        pr_eo = context.window_manager.py_rec.exec_options
-        ret_val = {'FINISHED'}
-        if pr_eo.use_operator_functions:
-            execute_func = self.operator_functions.get("execute")
-            # reset operator functions dictionary
-            self.operator_functions = {}
-            # run 'execute' operator function, if found
-            if execute_func != None:
-                ef_val = execute_func(self, context)
-                # prevent a common error, where execute() did not return a value
-                if ef_val != None:
-                    ret_val = ef_val
-        return ret_val
-
-    def draw(self, context):
-        pr_eo = context.window_manager.py_rec.exec_options
-        if not pr_eo.use_operator_functions:
-            return
-        # run 'draw' operator function, if found
-        draw_func = self.operator_functions.get("draw")
-        if draw_func != None:
-            draw_func(self, context)
-
-    def invoke(self, context, event):
-        pr_eo = context.window_manager.py_rec.exec_options
-        # get active Object and run its linked code, if linked code is found
-        act_ob = context.active_object
-        o_name = act_ob.name
-        run_result = run_object_init(context, act_ob, pr_eo.run_as_text_script, pr_eo.run_auto_import_bpy)
-        if isinstance(run_result, bpy.types.Text):
-            self.report({'ERROR'}, "Error, see details of run of Object named '%s' in error message " \
-                        "Textblock named '%s'" % (o_name, run_result.name))
-            return {'CANCELLED'}
-        # check/do Operator function 'invoke'
-        invoke_ret_val = None
-        if isinstance(run_result, dict) and pr_eo.use_operator_functions:
-            # copy operator functions found
-            for k in run_result:
-                self.operator_functions[k] = run_result[k]
-            # run 'invoke' operator function, if found
-            invoke_func = run_result.get("invoke")
-            if invoke_func != None:
-                temp = invoke_func(self, context, event)
-                if isinstance(temp, set):
-                    invoke_ret_val = temp
-        # if not already 'running modal', and if Operator function for draw() is found, then invoke props dialog
-        if (not isinstance(invoke_ret_val, set) or len(invoke_ret_val.intersection({"RUNNING_MODAL"})) < 1) and \
-            run_result.get("draw") != None:
-            return context.window_manager.invoke_props_dialog(self)
-        if invoke_ret_val is None:
-            return {'FINISHED'}
-        return invoke_ret_val
-
-class PYREC_PT_VIEW3D_ExecObject(Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "Tool"
-    bl_label = "Py Exec Object"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw(self, context):
-        pr_eo = context.window_manager.py_rec.exec_options
-        layout = self.layout
-        box = layout.box()
-        box.operator(PYREC_OT_ExecObject.bl_idname)
-        box = layout.box()
-        box.operator(PYREC_OT_BatchExecObject.bl_idname)
-        box = layout.box()
-        box.label(text="Options")
-        box.prop(pr_eo, "run_auto_import_bpy")
-        box.prop(pr_eo, "run_as_text_script")
-        col = box.column()
-        col.active = not pr_eo.run_as_text_script
-        col.prop(pr_eo, "use_operator_functions")

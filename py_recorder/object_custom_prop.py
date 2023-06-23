@@ -17,9 +17,57 @@
 # ##### END GPL LICENSE BLOCK #####
 
 import bpy
-from bpy.types import Operator
+from bpy.types import (Operator, Panel)
 
 CPROP_NAME_INIT_PY = "__init__.py"
+
+DATABLOCK_DUAL_TYPES = (
+    (bpy.types.Action, "actions"),
+    (bpy.types.Armature, "armatures"),
+    (bpy.types.Brush, "brushes"),
+    (bpy.types.CacheFile, "cache_files"),
+    (bpy.types.Camera, "cameras"),
+    (bpy.types.Collection, "collections"),
+    (bpy.types.Curve, "curves"),
+    (bpy.types.VectorFont, "fonts"),
+    (bpy.types.GreasePencil, "grease_pencils"),
+    (bpy.types.Image, "images"),
+    (bpy.types.Lattice, "lattices"),
+    (bpy.types.Library, "libraries"),
+    (bpy.types.Light, "lights"),
+    (bpy.types.LightProbe, "lightprobes"),
+    (bpy.types.FreestyleLineStyle, "linestyles"),
+    (bpy.types.Mask, "masks"),
+    (bpy.types.Material, "materials"),
+    (bpy.types.Mesh, "meshes"),
+    (bpy.types.MetaBall, "metaballs"),
+    (bpy.types.MovieClip, "movieclips"),
+    (bpy.types.NodeGroup, "node_groups"),
+    (bpy.types.Object, "objects"),
+    (bpy.types.PaintCurve, "paint_curves"),
+    (bpy.types.Palette, "palettes"),
+    (bpy.types.ParticleSettings, "particles"),
+    (bpy.types.ShapeKey, "shape_keys"),
+    (bpy.types.Scene, "scenes"),
+    (bpy.types.Screen, "screens"),
+    (bpy.types.Sound, "sounds"),
+    (bpy.types.Speaker, "speakers"),
+    (bpy.types.Text, "texts"),
+    (bpy.types.Texture, "textures"),
+    (bpy.types.Volume, "volumes"),
+    (bpy.types.WorkSpace, "workspaces"),
+    (bpy.types.World, "worlds"),
+)
+if bpy.app.version >= (3,10,0):
+    DATABLOCK_DUAL_TYPES = DATABLOCK_DUAL_TYPES + (bpy.types.PointCloud, "pointclouds"),
+if bpy.app.version >= (3,30,0):
+    DATABLOCK_DUAL_TYPES = DATABLOCK_DUAL_TYPES + (bpy.types.Curves, "hair_curves"),
+
+def get_datablock_for_type(data):
+    for dd in DATABLOCK_DUAL_TYPES:
+        if isinstance(data, dd[0]):
+            return dd[1]
+    return None
 
 class PYREC_OT_OBJ_ModifyInit(Operator):
     bl_description = "Modify active Object's custom property '"+CPROP_NAME_INIT_PY+""
@@ -76,3 +124,36 @@ class PYREC_OT_OBJ_AddCP_Data(Operator):
         if v != None:
             act_ob[pr_ir.add_cp_data_name] = v
         return {'FINISHED'}
+
+class PYREC_PT_OBJ_AdjustCustomProp(Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = 'object'
+    bl_label = "Py Custom Properties"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def draw(self, context):
+        py_rec_record_options_info = context.window_manager.py_rec.record_options.info
+        layout = self.layout
+        act_ob = context.active_object
+
+        layout.label(text="Init")
+        box = layout.box()
+        if act_ob.get(CPROP_NAME_INIT_PY) is None:
+            box.label(text=CPROP_NAME_INIT_PY+":  None")
+        else:
+            box.prop_search(act_ob, '["'+CPROP_NAME_INIT_PY+'"]', bpy.data,
+                            get_datablock_for_type(act_ob[CPROP_NAME_INIT_PY]))
+        box.operator(PYREC_OT_OBJ_ModifyInit.bl_idname)
+
+        layout.label(text="New Property")
+        box = layout.box()
+        box.prop(py_rec_record_options_info, "add_cp_data_name")
+        box.prop(py_rec_record_options_info, "add_cp_data_type")
+        box.prop_search(py_rec_record_options_info, "add_cp_datablock", bpy.data,
+                        py_rec_record_options_info.add_cp_data_type, text="")
+        box.operator(PYREC_OT_OBJ_AddCP_Data.bl_idname)

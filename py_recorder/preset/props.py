@@ -20,7 +20,7 @@ from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProp
     IntProperty, PointerProperty, StringProperty)
 from bpy.types import PropertyGroup
 
-from .preset_func import (PRESET_SOURCE_TYPES, PRESET_VIEW_TYPES, MODIFY_COLL_FUNC, MODIFY_PRESET_FUNC,
+from .func import (PRESET_SOURCE_TYPES, PRESET_VIEW_TYPES, MODIFY_COLL_FUNC, MODIFY_PRESET_FUNC,
     set_input_full_datapath, get_input_full_datapath, create_base_type_items, set_apply_input_full_datapath,
     get_apply_input_full_datapath, apply_base_type_items, apply_collection_items, apply_preset_items,
     modify_base_type_items)

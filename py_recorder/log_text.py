@@ -24,10 +24,14 @@ PREFS_ADDONS_NAME = "py_recorder"
 
 def log_text_append(log_str):
     addon_prefs_log = bpy.context.preferences.addons[PREFS_ADDONS_NAME].preferences.log
+    output_text_name = addon_prefs_log.output_text_name
+    # use default name if custom name is not available
+    if output_text_name == "":
+        output_text_name = "py_rec_log"
     # get log Text, or create if needed
-    text = bpy.data.texts.get(addon_prefs_log.output_text_name)
+    text = bpy.data.texts.get(output_text_name)
     if text is None:
-        text = bpy.data.texts.new(name=addon_prefs_log.output_text_name)
+        text = bpy.data.texts.new(name=output_text_name)
     # set current/select line/character to end line/character of text, before writing 'log_str'
     end_line = len(text.lines) - 1
     end_char = len(text.lines[end_line].body) - 1
@@ -36,3 +40,13 @@ def log_text_append(log_str):
         date_time = dt.now().strftime("Exception date: %m/%d/%Y\nException time: %H:%M:%S")
         text.write("\n%s" % date_time)
     text.write("\n%s\n" % (log_str))
+    return text
+
+def log_text_name():
+    addon_prefs_log = bpy.context.preferences.addons[PREFS_ADDONS_NAME].preferences.log
+    output_text_name = addon_prefs_log.output_text_name
+    # use default name if custom name is not available
+    if output_text_name == "":
+        return "py_rec_log"
+    else:
+        return output_text_name

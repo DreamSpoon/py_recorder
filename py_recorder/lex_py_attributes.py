@@ -270,46 +270,6 @@ def lex_py_attributes(input_str, verbose=0):
     if verbose > 1: print("x   current_state  final = " + str(current_state))
     return state_vars[OUTPUT_VAR], state_vars[ERROR_VAR]
 
-# returns 2-tuple of (input_str less last attribute, last attribute)
-def remove_last_py_attribute(input_str):
-    output, _ = lex_py_attributes(input_str)
-    # cannot remove last attribute if too few output attributes
-    if len(output) < 2:
-        return None, None
-    # use end_position of last output item to return input_str up to, and including, end of second last attribute
-    return input_str[ : output[-2][1] ], input_str[ output[-1][0] : output[-1][1] ]
-
-# returns list of strings, each string is a name 'token' representing an attribute in full datapath given by
-# 'input_str' - order of strings is same as it appears in full datapath 'input_str'
-def enumerate_datapath(input_str):
-    output, _ = lex_py_attributes(input_str)
-    return [ input_str[s:e] for s, e in output ]
-
-# progressive full datapath, each entry longer than the last, finishing with 'input_str', '[]' indexes included
-def enumerate_datapath_hierarchy(input_str, remove_bpy_data=False):
-    path_list = []
-    path = ""
-    c = 0
-    for t in enumerate_datapath(input_str):
-        # if t is not an index token then add a '.' character
-        if path != "" and t[0] != "[":
-            path += "."
-        path += t
-        c += 1
-        # do not add 'bpy' and 'bpy.data' if 'remove_bpy_data'
-        if remove_bpy_data and (c == 1 or c == 2):
-            continue
-        path_list.append(path)
-    return path_list
-
-def trim_datapath(input_str):
-    attr_list, _ = lex_py_attributes(input_str)
-    if attr_list is None or len(attr_list) < 1:
-        return ""
-    # return 'input_str' from start to end of attributes (includes '[]' indexes),
-    # which removes any trailing spaces / equals signs / etc.
-    return input_str[ :attr_list[-1][1] ]
-
 #### test suite follows ####
 
 test_data = [

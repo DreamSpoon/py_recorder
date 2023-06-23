@@ -16,13 +16,11 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-import re
 from mathutils import (Color, Vector)
-import bpy
-from bpy.types import (Operator, Panel, PropertyGroup)
-from bpy.props import (BoolProperty, IntProperty)
 
-from ..bpy_value_string import bpy_value_to_string
+import bpy
+
+from ...bpy_value_string import bpy_value_to_string
 
 RECORD_NODETREE_TEXT_NAME = "pyrec_nodetree.py"
 
@@ -52,61 +50,6 @@ FILTER_OUT_ATTRIBS = ['color', 'dimensions', 'height', 'hide', 'inputs', 'intern
                          'is_active_output', 'interface']
 
 NODES_WITH_WRITE_OUTPUTS = ['ShaderNodeValue', 'ShaderNodeRGB', 'CompositorNodeValue', 'CompositorNodeRGB']
-
-class PYREC_PG_NodetreeRecordOptions(PropertyGroup):
-    num_space_pad: IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +
-        "line of code output in text-block", default=4, min=0)
-    keep_links: BoolProperty(name="Keep Links List", description="Add created links to a list variable",
-        default=False)
-    make_function: BoolProperty(name="Make into Function", description="Add lines of Python code to " +
-        "create runnable script (instead of just the bare essential code)", default=True)
-    delete_existing: BoolProperty(name="Delete Existing Nodes",
-        description="Include code in the output that deletes all nodes in Shader Material / Geometry Node Setup " +
-        "before creating new nodes", default=True)
-    write_loc_decimal_places: IntProperty(name="Location Decimal Places", description="Number of " +
-        "decimal places to use when writing location values", default=0)
-    write_default_values: BoolProperty(name="Write Defaults", description="Write node attributes " +
-        "that are set to default values (e.g. node attributes: label, name)", default=False)
-    write_linked_default_values: BoolProperty(name="Linked Default Values", description="Write default " +
-        "values, of node inputs and outputs, where the input/output is linked to another node", default=False)
-    write_attrib_name: BoolProperty(name="Name", description="Include node attribute 'name'", default=False)
-    write_attrib_width_and_height: BoolProperty(name="Width and Height", description="Include node " +
-        "attributes for width and height", default=False)
-    write_attrib_select: BoolProperty(name="Select", description="Include node " +
-        "attribute for select state (e.g. selected nodes can be 'marked' for easy search later)", default=False)
-    ng_output_min_max_def: BoolProperty(name="Output Min/Max/Default", description="Include Minimum, Maximum, " +
-        "and Default value for each node group output", default=False)
-
-class PYREC_PT_RecordNodetree(Panel):
-    bl_space_type = "NODE_EDITOR"
-    bl_region_type = "UI"
-    bl_category = "Tool"
-    bl_label = "Py Record Nodetree"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw(self, context):
-        ntr = context.window_manager.py_rec.record_options.nodetree
-        layout = self.layout
-        box = layout.box()
-        box.operator(PYREC_OT_RecordNodetree.bl_idname)
-        box = layout.box()
-        box.label(text="General Options")
-        box.prop(ntr, "num_space_pad")
-        box.prop(ntr, "keep_links")
-        box.prop(ntr, "make_function")
-        box.prop(ntr, "delete_existing")
-        box.prop(ntr, "ng_output_min_max_def")
-        box = layout.box()
-        box.label(text="Node Attribute Options")
-        box.prop(ntr, "write_attrib_name")
-        box.prop(ntr, "write_attrib_select")
-        sub_box = box.box()
-        sub_box.prop(ntr, "write_attrib_width_and_height")
-        sub_box.prop(ntr, "write_loc_decimal_places")
-        box = layout.box()
-        box.label(text="Write Defaults Options")
-        box.prop(ntr, "write_default_values")
-        box.prop(ntr, "write_linked_default_values")
 
 # add escape characters to backslashes and double-quote chars in given string
 def esc_char_string(in_str):
@@ -492,32 +435,3 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
     out_text.current_line_index = 0
     out_text.cursor_set(0)
     return out_text
-
-class PYREC_OT_RecordNodetree(Operator):
-    bl_idname = "py_rec.node_editor_record_nodetree"
-    bl_label = "Record Nodetree"
-    bl_description = "Make Python text-block from current node tree"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context):
-        s = context.space_data
-        if s.type == 'NODE_EDITOR' and s.node_tree != None and \
-            s.tree_type in ('CompositorNodeTree', 'ShaderNodeTree', 'TextureNodeTree', 'GeometryNodeTree'):
-            return True
-        return False
-
-    def execute(self, context):
-        ntr = context.window_manager.py_rec.record_options.nodetree
-        uni_node_options = {
-            LOC_DEC_PLACES_UNI_NODE_OPT: ntr.write_loc_decimal_places,
-            WRITE_DEFAULTS_UNI_NODE_OPT: ntr.write_default_values,
-            WRITE_LINKED_DEFAULTS_UNI_NODE_OPT: ntr.write_linked_default_values,
-            WRITE_ATTR_NAME_UNI_NODE_OPT: ntr.write_attrib_name,
-            WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT: ntr.write_attrib_width_and_height,
-            WRITE_ATTR_SELECT_UNI_NODE_OPT: ntr.write_attrib_select,
-        }
-        text = create_code_text(context, ntr.num_space_pad, ntr.keep_links, ntr.make_function, ntr.delete_existing,
-                                ntr.ng_output_min_max_def, uni_node_options)
-        self.report({'INFO'}, "Nodetree recorded to Python in Text named '%s'" % text.name)
-        return {'FINISHED'}

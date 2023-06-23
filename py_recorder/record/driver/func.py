@@ -16,11 +16,7 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-import numpy
-
 import bpy
-from bpy.props import (BoolProperty, BoolVectorProperty, IntProperty)
-from bpy.types import (Operator, Panel, PropertyGroup)
 
 RECORD_DRIVER_TEXT_NAME = "pyrec_drivers.py"
 
@@ -79,35 +75,6 @@ def get_animdata_bool_names():
     return names
 
 ANIMDATA_BOOL_NAMES = get_animdata_bool_names()
-
-class PYREC_PG_DriverRecordOptions(PropertyGroup):
-    num_space_pad: IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +
-        "line of code output in text-block", default=4, min=0)
-    make_function: BoolProperty(name="Make into Function", description="Add lines of Python code to " +
-        "create runnable script (instead of just the bare essential code)", default=True)
-    animdata_bool_vec: BoolVectorProperty(size=len(ANIMDATA_BOOL_NAMES),
-                                           default=tuple(numpy.ones((len(ANIMDATA_BOOL_NAMES)), dtype=int)))
-
-class PYREC_PT_RecordDriver(Panel):
-    bl_space_type = "GRAPH_EDITOR"
-    bl_region_type = "UI"
-    bl_category = "Tool"
-    bl_label = "Py Record Drivers"
-
-    def draw(self, context):
-        layout = self.layout
-        dr = context.window_manager.py_rec.record_options.driver
-
-        box = layout.box()
-        box.label(text="Driver Data Source")
-        box.operator(PYREC_OT_DriversToPython.bl_idname)
-        box.prop(dr, "num_space_pad")
-        box.prop(dr, "make_function")
-        box.operator(PYREC_OT_SelectAnimdataSrcAll.bl_idname)
-        box.operator(PYREC_OT_SelectAnimdataSrcNone.bl_idname)
-        box = box.box()
-        for i in range(len(ANIMDATA_BOOL_NAMES)):
-            box.prop(dr, "animdata_bool_vec", index=i, text=ANIMDATA_BOOL_NAMES[i])
 
 def add_quotes_and_backslashes(in_str):
     return in_str.replace("\\", "\\\\").replace("\"", "\\\"")
@@ -271,40 +238,6 @@ def create_driver_py_from_data_item(space_pad, make_into_function, animdata_bool
     out_text.cursor_set(0)
     return out_text
 
-class PYREC_OT_DriversToPython(Operator):
-    bl_description = "Convert all drivers of selected data sources to Python code, available in the Text Editor"
-    bl_idname = "py_rec.driver_editor_record_driver"
-    bl_label = "Record Driver"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        dr = context.window_manager.py_rec.record_options.driver
-        text = create_driver_py_from_data_item(dr.num_space_pad, dr.make_function, dr.animdata_bool_vec)
-        self.report({'INFO'}, "Driver(s) recorded to Python in Text named '%s'" % text.name)
-        return {'FINISHED'}
-
 def set_bool_vec_state(bool_vec, state):
     for c in range(len(bool_vec)):
         bool_vec[c] = state
-
-class PYREC_OT_SelectAnimdataSrcAll(Operator):
-    bl_description = "Select all available data sources"
-    bl_idname = "py_rec.driver_editor_select_animdata_src_all"
-    bl_label = "Select All"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        dr = context.window_manager.py_rec.record_options.driver
-        set_bool_vec_state(dr.animdata_bool_vec, True)
-        return {'FINISHED'}
-
-class PYREC_OT_SelectAnimdataSrcNone(Operator):
-    bl_description = "Select all available data sources"
-    bl_idname = "py_rec.driver_editor_select_animdata_src_none"
-    bl_label = "Select None"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        dr = context.window_manager.py_rec.record_options.driver
-        set_bool_vec_state(dr.animdata_bool_vec, False)
-        return {'FINISHED'}

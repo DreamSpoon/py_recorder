@@ -21,8 +21,8 @@ import bpy
 from bpy.types import (AddonPreferences, PropertyGroup)
 from bpy.props import (BoolProperty, CollectionProperty, PointerProperty, StringProperty)
 
-from .exec_panel import (append_exec_context_panel_all, remove_exec_context_panel_all)
-from .preset.preset_prop import PYREC_PG_PresetTypeCollection
+from .context_exec.panel import (append_exec_context_panel_all, remove_exec_context_panel_all)
+from .preset.props import PYREC_PG_PresetTypeCollection
 
 def set_draw_exec_context_panels(self, value):
     self["draw_context_exec"] = value
@@ -37,7 +37,7 @@ def get_draw_exec_context_panels(self):
 class PYREC_PG_LogAddonPrefs(PropertyGroup):
     enable_timestamp: BoolProperty(name="Timestamp", description="Prepend timestamp to each log entry")
     output_text_name: StringProperty(name="Log Text Name", description="Name of Text to receive log entries (see" \
-        "builtin Text-Editor)")
+        "builtin Text-Editor)", default="py_rec_log")
 
 class PYREC_PG_InterfaceAddonPrefs(PropertyGroup):
     draw_context_exec: BoolProperty(name="Context Exec", description="Exec panel for every available Context type, " \
