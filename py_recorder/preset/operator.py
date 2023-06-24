@@ -58,6 +58,7 @@
 # with 'custom properties', e.g.
 #     bpy.data.objects['Cube']['preset_collections'] = { <Preset Collections data structure, including Presets> }
 
+import bpy
 from bpy.types import Operator
 
 from .func import (PRESET_SOURCE_ADDON_PREFS, MODIFY_COLL_FUNC_RENAME, MODIFY_PRESET_FUNC_RENAME,
@@ -120,8 +121,11 @@ class PYREC_OT_PresetClipboardCreatePreset(Operator):
 
     @classmethod
     def poll(cls, context):
-        clipboard = context.window_manager.py_rec.preset_options.clipboard
-        cb_options = context.window_manager.py_rec.preset_options.clipboard_options
+        p_r = context.window_manager.py_rec
+        if p_r.preset_options.lock_changes:
+            return False
+        clipboard = p_r.preset_options.clipboard
+        cb_options = p_r.preset_options.clipboard_options
         return len(clipboard.prop_details) > 0 and cb_options.create_base_type != " "
 
     def execute(self, context):
@@ -147,6 +151,8 @@ class PYREC_OT_PresetPropsRemoveItem(Operator):
     @classmethod
     def poll(cls, context):
         p_r = context.window_manager.py_rec
+        if p_r.preset_options.lock_changes:
+            return False
         p_options = p_r.preset_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
@@ -214,6 +220,8 @@ class PYREC_OT_PresetModifyCollection(Operator):
     @classmethod
     def poll(cls, context):
         p_r = context.window_manager.py_rec
+        if p_r.preset_options.lock_changes:
+            return False
         if p_r.preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
             p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
         else:
@@ -271,6 +279,8 @@ class PYREC_OT_PresetRemoveCollection(Operator):
     @classmethod
     def poll(cls, context):
         p_r = context.window_manager.py_rec
+        if p_r.preset_options.lock_changes:
+            return False
         p_options = p_r.preset_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
@@ -308,6 +318,8 @@ class PYREC_OT_PresetModifyPreset(Operator):
     @classmethod
     def poll(cls, context):
         p_r = context.window_manager.py_rec
+        if p_r.preset_options.lock_changes:
+            return False
         p_options = p_r.preset_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
@@ -379,6 +391,8 @@ class PYREC_OT_PresetRemovePreset(Operator):
     @classmethod
     def poll(cls, context):
         p_r = context.window_manager.py_rec
+        if p_r.preset_options.lock_changes:
+            return False
         p_options = p_r.preset_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:

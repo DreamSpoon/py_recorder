@@ -22,10 +22,38 @@ from .func import PRESET_SOURCE_ADDON_PREFS
 
 PREFS_ADDONS_NAME = "py_recorder"
 
+def draw_prop_value(layout, value_type_base, prop_base, lock_changes):
+    if lock_changes:
+        # display the property's value
+        if value_type_base.value_type == "bool":
+            layout.label(text=str(prop_base.bool_props[value_type_base.name].value))
+        elif value_type_base.value_type == "float":
+            layout.label(text=str(prop_base.float_props[value_type_base.name].value))
+        elif value_type_base.value_type == "int":
+            layout.label(text=str(prop_base.int_props[value_type_base.name].value))
+        elif value_type_base.value_type == "str":
+            layout.label(text=str(prop_base.string_props[value_type_base.name].value))
+        elif value_type_base.value_type == "VectorXYZ":
+            v = prop_base.vector_xyz_props[value_type_base.name].value
+            layout.label(text="(%f, %f, %f)" % (v[0], v[1], v[2]))
+    else:
+        # display the property's value
+        if value_type_base.value_type == "bool":
+            layout.prop(prop_base.bool_props[value_type_base.name], "value", text="")
+        elif value_type_base.value_type == "float":
+            layout.prop(prop_base.float_props[value_type_base.name], "value", text="", slider=False)
+        elif value_type_base.value_type == "int":
+            layout.prop(prop_base.int_props[value_type_base.name], "value", text="", slider=False)
+        elif value_type_base.value_type == "str":
+            layout.prop(prop_base.string_props[value_type_base.name], "value", text="")
+        elif value_type_base.value_type == "VectorXYZ":
+            layout.prop(prop_base.vector_xyz_props[value_type_base.name], "value", text="", slider=False)
+
 class PYREC_UL_PresetClipboardProps(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
-        clipboard = context.window_manager.py_rec.preset_options.clipboard
-        cb_options = context.window_manager.py_rec.preset_options.clipboard_options
+        p_r = context.window_manager.py_rec
+        clipboard = p_r.preset_options.clipboard
+        cb_options = p_r.preset_options.clipboard_options
         # item type is PYREC_PG_PresetClipboardPropDetail
         ob = item
         sp = layout
@@ -40,23 +68,14 @@ class PYREC_UL_PresetClipboardProps(UIList):
             prop_path = ""
         sp = sp.split(factor=cb_options.list_col_size3)
         sp.label(text=prop_path)
-        # display the property's value
-        if ob.value_type == "bool":
-            sp.prop(clipboard.bool_props[ob.name], "value", text="")
-        elif ob.value_type == "float":
-            sp.prop(clipboard.float_props[ob.name], "value", text="", slider=False)
-        elif ob.value_type == "int":
-            sp.prop(clipboard.int_props[ob.name], "value", text="", slider=False)
-        elif ob.value_type == "str":
-            sp.prop(clipboard.string_props[ob.name], "value", text="")
-        elif ob.value_type == "VectorXYZ":
-            sp.prop(clipboard.vector_xyz_props[ob.name], "value", text="", slider=False)
+        draw_prop_value(sp, ob, clipboard, p_r.preset_options.lock_changes)
 
 class PYREC_UL_PresetApplyProps(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         # item type is PYREC_PG_PresetPropDetail
         p_r = context.window_manager.py_rec
         p_options = p_r.preset_options
+        cb_options = p_options.clipboard_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
             p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
@@ -69,19 +88,9 @@ class PYREC_UL_PresetApplyProps(UIList):
             apply_base_type = apply_base_type[:apply_base_type.find(":")]
         preset = base_types[apply_base_type].presets[p_options.apply_preset]
 
-        sp = layout.split(factor=0.5)
+        sp = layout.split(factor=cb_options.list_col_size3)
         sp.label(text=item.name)
-        # display the property's value
-        if item.value_type == "bool":
-            sp.prop(preset.bool_props[item.name], "value", text="")
-        elif item.value_type == "float":
-            sp.prop(preset.float_props[item.name], "value", text="", slider=False)
-        elif item.value_type == "int":
-            sp.prop(preset.int_props[item.name], "value", text="", slider=False)
-        elif item.value_type == "str":
-            sp.prop(preset.string_props[item.name], "value", text="")
-        elif item.value_type == "VectorXYZ":
-            sp.prop(preset.vector_xyz_props[item.name], "value", text="", slider=False)
+        draw_prop_value(sp, item, preset, p_r.preset_options.lock_changes)
 
 class PYREC_UL_PresetModifyCollections(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
@@ -97,6 +106,7 @@ class PYREC_UL_PresetModifyProps(UIList):
         # item type is PYREC_PG_PresetPropDetail
         p_r = context.window_manager.py_rec
         p_options = p_r.preset_options
+        cb_options = p_options.clipboard_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
             p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
@@ -105,16 +115,6 @@ class PYREC_UL_PresetModifyProps(UIList):
         base_types = p_collections[p_options.modify_active_collection].base_types
         preset = base_types[p_options.modify_base_type].presets[p_options.modify_active_preset]
 
-        sp = layout.split(factor=0.5)
+        sp = layout.split(factor=cb_options.list_col_size3)
         sp.label(text=item.name)
-        # display the property's value
-        if item.value_type == "bool":
-            sp.prop(preset.bool_props[item.name], "value", text="")
-        elif item.value_type == "float":
-            sp.prop(preset.float_props[item.name], "value", text="", slider=False)
-        elif item.value_type == "int":
-            sp.prop(preset.int_props[item.name], "value", text="", slider=False)
-        elif item.value_type == "str":
-            sp.prop(preset.string_props[item.name], "value", text="")
-        elif item.value_type == "VectorXYZ":
-            sp.prop(preset.vector_xyz_props[item.name], "value", text="", slider=False)
+        draw_prop_value(sp, item, preset, p_r.preset_options.lock_changes)

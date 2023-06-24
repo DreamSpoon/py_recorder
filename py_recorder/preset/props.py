@@ -138,6 +138,7 @@ class PYREC_PG_PresetOptions(PropertyGroup):
         "in selected location. Changes to Presets and Preset Collections will only be applied to saved data in " \
         "this location", items=PRESET_SOURCE_TYPES)
     view_type: EnumProperty(name="View", items=PRESET_VIEW_TYPES)
+    lock_changes: BoolProperty(name="Lock Changes", default=True)
 
     clipboard: PointerProperty(type=PYREC_PG_PresetClipboard)
     clipboard_options: PointerProperty(type=PYREC_PG_PresetClipboardOptions)

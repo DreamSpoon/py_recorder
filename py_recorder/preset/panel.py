@@ -144,6 +144,7 @@ class PresetBaseClass(Panel):
                 presets = base_types[apply_type_name].presets
                 if apply_preset_name in presets:
                     named_prop_preset = presets[apply_preset_name]
+        layout.prop(p_options.clipboard_options, "list_col_size3", slider=True, text="Prop")
         if named_prop_preset is None:
             layout.box().label(text="")
         else:
@@ -188,6 +189,7 @@ class PresetBaseClass(Panel):
         row.operator(PYREC_OT_PresetRemovePreset.bl_idname, text="", icon='REMOVE')
 
         layout.separator()
+        layout.prop(p_options.clipboard_options, "list_col_size3", slider=True, text="Prop")
         row = layout.row()
         preset_coll_index = p_options.modify_active_collection
         preset_type_name= p_options.modify_base_type
@@ -215,8 +217,8 @@ class PresetBaseClass(Panel):
         row.prop(p_r.preset_options, "data_source", text="Save to")
         if p_r.preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
             row.operator(PYREC_OT_QuicksavePreferences.bl_idname, text="", icon="DOCUMENTS")
-        box.separator()
-        box.prop(p_r.preset_options, "view_type", text="View")
+        box.prop(p_r.preset_options, "lock_changes")
+        box.prop(p_r.preset_options, "view_type")
         layout.separator()
         pf = p_r.preset_options.view_type
         if pf == PRESET_VIEW_APPLY:
