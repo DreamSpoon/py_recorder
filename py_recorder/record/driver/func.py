@@ -18,63 +18,9 @@
 
 import bpy
 
+from ...version_bpy_data import ANIMDATA_SOURCES
+
 RECORD_DRIVER_TEXT_NAME = "pyrec_drivers.py"
-
-# Animation Data sources, where drivers can exist - with rows added, as needed, for each new version
-# [
-#     ( data_source_name, (attribute_name1, attribute_name2, ...) ),
-# ]
-ANIMDATA_SOURCES = [
-    # TODO: add bpy.data.images? or add comment explaining absence of bpy.data.images
-    # TODO: sort alphabetically?
-    ( "Armature", ["armatures"] ),
-    ( "Cache File", ["cache_files"] ),
-    ( "Camera", ["cameras"] ),
-    ( "Curve", ["curves"] ),
-    ( "Grease Pencil", ["grease_pencils"] ),
-    ( "Lattice", ["lattices"] ),
-    ( "Light", ["lights"] ),
-    ( "Light Probe", ["lightprobes"] ),
-    ( "Linestyle", ["linestyles"] ),
-    ( "Linestyle Nodes", ["linestyles", "node_tree"] ),
-    ( "Mask", ["masks"] ),
-    ( "Material", ["materials"] ),
-    ( "Material Nodes", ["materials", "node_tree"] ),
-    ( "Geometry Nodes / Node Group", ["node_groups"] ),
-    ( "Shape Key", ["shape_keys"] ),
-    ( "Mesh", ["meshes"] ),
-    ( "Metaball", ["metaballs"] ),
-    ( "Movie Clip", ["movieclips"] ),
-    ( "Object", ["objects"] ),
-    ( "Particle Settings", ["particles"] ),
-    ( "Scene", ["scenes"] ),
-    ( "Compositor Nodes", ["scenes", "node_tree"] ),
-    ( "Speaker", ["speakers"] ),
-    ( "Texture", ["textures"] ),
-    ( "Texture Nodes", ["textures", "node_tree"] ),
-    ( "Volume", ["volumes"] ),
-    ( "World", ["worlds"] ),
-    ( "World Material Nodes", ["worlds", "node_tree"] ),
-]
-if bpy.app.version >= (3,10,0):
-    ANIMDATA_SOURCES.append( ( "Point Cloud", ["pointclouds"] ) )
-if bpy.app.version >= (3,30,0):
-    ANIMDATA_SOURCES.append( ( "Hair Curve", ["hair_curves"] ) )
-
-# sort tuples alphabetically by first value in each tuple
-def sort_tup(tup):
-    return(sorted(tup, key = lambda x: x[0]))
-
-# sort alphabetically by first value in each tuple
-ANIMDATA_SOURCES = sort_tup(ANIMDATA_SOURCES)
-
-def get_animdata_bool_names():
-    names = []
-    for dst in ANIMDATA_SOURCES:
-        names.append(dst[0])
-    return names
-
-ANIMDATA_BOOL_NAMES = get_animdata_bool_names()
 
 def add_quotes_and_backslashes(in_str):
     return in_str.replace("\\", "\\\\").replace("\"", "\\\"")

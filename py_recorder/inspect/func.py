@@ -94,6 +94,7 @@ def create_context_inspect_panel(context, context_name, inspect_context_collecti
     i_panel = ic_coll.inspect_context_panels.add()
     i_panel.name = str(ic_coll.inspect_context_panel_next_num)
     ic_coll.inspect_context_panel_next_num = ic_coll.inspect_context_panel_next_num + 1
+    i_panel.inspect_exec_state[context_name + i_panel.name] = {}
     i_panel.panel_label = panel_label
     i_panel.panel_options.panel_option_label = panel_label
     if begin_exec_str is None or begin_exec_str == "":
@@ -492,7 +493,9 @@ def attribute_list_draw_item(self, context, layout, data, item, icon, active_dat
         if panel_options.display_value_selector and data.dir_inspect_exec_str != "" and item.name != "." and \
             not item.name.startswith("__") and item.name != "bl_rna":
             # get current inspect_value
-            result_value = data.inspect_exec_state.get("exec_value")
+            context_name = context.space_data.type
+            exec_state = data.inspect_exec_state.get(context_name + data.name)
+            result_value = exec_state.get("exec_value")
             try:
                 if result_value != None and hasattr(result_value, item.name):
                     attr_val = getattr(result_value, item.name)
@@ -628,8 +631,8 @@ def inspect_exec_refresh(context, panel_num):
     ic_panel.dir_inspect_exec_str = ""
     # clear '__doc__' lines
     ic_panel.dir_item_doc_lines.clear()
-
-    ic_panel.inspect_exec_state.clear()
+    context_name = context.space_data.type
+    ic_panel.inspect_exec_state.get(context_name + str(panel_num)).clear()
 
     # if Inspect Exec string is empty then quit
     if ic_panel.inspect_exec_str == "":
@@ -646,12 +649,13 @@ def inspect_exec_refresh(context, panel_num):
             "log Text named '%s'" % log_text.name
     ic_panel.dir_inspect_exec_str = ic_panel.inspect_exec_str
 
-    ic_panel.inspect_exec_state["exec_value"] = inspect_value
-    ic_panel.inspect_exec_state["exec_value_str"] = str(inspect_value)
-    ic_panel.inspect_exec_state["exec_value_type"] = str(type(inspect_value))
+    inspect_exec_state = ic_panel.inspect_exec_state.get(context_name + str(panel_num))
+    inspect_exec_state["exec_value"] = inspect_value
+    inspect_exec_state["exec_value_str"] = str(inspect_value)
+    inspect_exec_state["exec_value_type"] = str(type(inspect_value))
     attr_names = set(get_dir(inspect_value))
-    ic_panel.inspect_exec_state["exec_value_attr_names"] = attr_names
-    ic_panel.inspect_exec_state["exec_value_attr_name_count"] = len(attr_names)
+    inspect_exec_state["exec_value_attr_names"] = attr_names
+    inspect_exec_state["exec_value_attr_name_count"] = len(attr_names)
 
     # update index props
     if inspect_value != None and hasattr(inspect_value, "__len__"):

@@ -46,7 +46,7 @@ def draw_inspect_panel(self, context):
     post_exec_str = ic_panel.dir_inspect_exec_str
     inspect_value, inspect_error = refresh_exec_inspect_value(pre_exec_str, post_exec_str)
     # check new inspect exec state against old state
-    exec_state = ic_panel.inspect_exec_state
+    exec_state = ic_panel.inspect_exec_state.get(context_name + str(self.panel_num))
     show_attr_list = True
     # check for empty state / inspect error
     if len(exec_state) == 0 or inspect_error != None:
@@ -70,7 +70,7 @@ def draw_inspect_panel(self, context):
     # if unable to display list, then clear dictionary to prevent invalid references,
     # i.e. exec_state["exec_value"]
     if not show_attr_list:
-        ic_panel.inspect_exec_state.clear()
+        exec_state.clear()
     # top row of Py Inspect panel buttons, always visible
     row = layout.row()
     row.operator(PYREC_OT_RemoveInspectPanel.bl_idname, icon='REMOVE', text="").panel_num = self.panel_num

@@ -446,7 +446,6 @@ def get_apply_base_val(base_val, datapath):
 
 def apply_preset_to_base_value(base_val, preset):
     for p_d in preset.prop_details:
-        print("applying a thing=", p_d.name)
         # get 'apply base value', and set value of named Python 'attribute' (Blender 'property'), recursing
         # through datapath hierarchy if needed
         apply_base_val, attr_name = get_apply_base_val(base_val, p_d.name)
@@ -482,24 +481,20 @@ def preset_apply_preset(preset_options, preset_collections):
         return
     if apply_preset == " ":
         return
-    print("past the hurdles 2")
     # remove ': datapath' from end of base type name, to get base type only
     apply_base_type = apply_base_type[:apply_base_type.find(":")]
     preset = preset_collections[apply_collection].base_types[apply_base_type].presets[apply_preset]
     # if zero property details available then exit, because zero properties to set
     if len(preset.prop_details) == 0:
         return
-    print("past the hurdles 3")
     path_type_paths, _ = digest_full_datapath(apply_full_datapath, all_bpy_types=True)
     # exit if no data for next steps
     if path_type_paths is None:
         return
-    print("past the hurdles 4")
     # find full base type path, by given base type, and apply preset to value from eval() of full data path
     for bt_path, bt_name, _ in path_type_paths:
         # filter by base type
         if bt_name == apply_base_type:
-            print("apply that thang")
             apply_preset_to_base_value(eval(bt_path), preset)
             break
 

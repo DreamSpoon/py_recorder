@@ -21,7 +21,7 @@ from numpy import ones as numpy_ones
 from bpy.types import PropertyGroup
 from bpy.props import (BoolProperty, BoolVectorProperty, IntProperty)
 
-from .func import ANIMDATA_BOOL_NAMES
+from ...version_bpy_data import ANIMDATA_BOOL_NAMES
 
 class PYREC_PG_DriverRecordOptions(PropertyGroup):
     num_space_pad: IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +

@@ -18,8 +18,8 @@
 
 from bpy.types import Panel
 
-from .func import ANIMDATA_BOOL_NAMES
 from .operator import (PYREC_OT_DriversToPython, PYREC_OT_SelectAnimdataSrcAll, PYREC_OT_SelectAnimdataSrcNone)
+from ...version_bpy_data import ANIMDATA_BOOL_NAMES
 
 class PYREC_PT_RecordDriver(Panel):
     bl_space_type = "GRAPH_EDITOR"

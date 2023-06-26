@@ -21,8 +21,8 @@ from bpy.props import (BoolProperty, EnumProperty, IntProperty, PointerProperty,
 from bpy.types import PropertyGroup
 
 from .func import text_object_poll
-from ...bpy_value_string import BPY_DATA_TYPE_ITEMS
 from ...object_custom_prop import CPROP_NAME_INIT_PY
+from ...version_bpy_data import BPY_DATA_TYPE_ITEMS
 
 class PYREC_PG_InfoRecordOptions(PropertyGroup):
     create_root_object: BoolProperty(name="Create Root", description="New root Object will be created, instead of " +

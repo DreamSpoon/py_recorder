@@ -20,7 +20,7 @@ import bpy
 from bpy.types import PropertyGroup
 from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty,
      StringProperty)
-from ..bpy_value_string import BPY_DATA_TYPE_ITEMS
+from ..version_bpy_data import BPY_DATA_TYPE_ITEMS
 
 from .func import (get_array_index, set_array_index, get_inspect_active_type_items, populate_index_strings,
     update_dir_attributes)
