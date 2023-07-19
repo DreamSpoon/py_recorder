@@ -494,6 +494,9 @@ def attribute_list_draw_item(self, context, layout, data, item, icon, active_dat
             not item.name.startswith("__") and item.name != "bl_rna":
             # get current inspect_value
             context_name = context.space_data.type
+            # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+            if context_name == "PROPERTIES":
+                context_name = "VIEW_3D"
             exec_state = data.inspect_exec_state.get(context_name + data.name)
             result_value = exec_state.get("exec_value")
             try:
@@ -632,7 +635,16 @@ def inspect_exec_refresh(context, panel_num):
     # clear '__doc__' lines
     ic_panel.dir_item_doc_lines.clear()
     context_name = context.space_data.type
-    ic_panel.inspect_exec_state.get(context_name + str(panel_num)).clear()
+    # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+    if context_name == "PROPERTIES":
+        context_name = "VIEW_3D"
+    inspect_exec_state = ic_panel.inspect_exec_state.get(context_name + str(panel_num))
+    # create inspect exec state if None available
+    if inspect_exec_state is None:
+        inspect_exec_state = {}
+        ic_panel.inspect_exec_state[context_name + str(panel_num)] = inspect_exec_state
+    else:
+        inspect_exec_state.clear()
 
     # if Inspect Exec string is empty then quit
     if ic_panel.inspect_exec_str == "":
@@ -698,6 +710,9 @@ def inspect_exec_refresh(context, panel_num):
     return 'FINISHED', ""
 
 def apply_inspect_options(context, panel_num, ic_panel, panel_options, context_name):
+    # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+    if context_name == "PROPERTIES":
+        context_name = "VIEW_3D"
     # check for change of panel name
     old_label = ic_panel.panel_label
     new_label = panel_options.panel_option_label

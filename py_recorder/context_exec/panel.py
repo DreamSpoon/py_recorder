@@ -46,14 +46,19 @@ def exec_panel_draw(self, context):
     box.operator(PYREC_OT_ContextExec.bl_idname)
 
 def register_exec_panel(context_name):
+    # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+    if context_name == "PROPERTIES":
+        context_name = "VIEW_3D"
     try:
         exec(EXEC_PANEL_REGISTER % (context_name, context_name, context_name, context_name, context_name))
     except:
         return False
-#    exec(EXEC_PANEL_REGISTER % (context_name, context_name, context_name, context_name, context_name))
     return True
 
 def unregister_exec_panel(context_name):
+    # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+    if context_name == "PROPERTIES":
+        context_name = "VIEW_3D"
     panel_classname = "PYREC_PT_%s_Exec" % context_name
     panel_class = exec_panel_classes.get(panel_classname)
     if panel_class is None:

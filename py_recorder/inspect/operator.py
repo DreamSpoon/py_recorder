@@ -41,6 +41,9 @@ class PYREC_OT_InspectOptions(Operator):
     def execute(self, context):
         p_r = context.window_manager.py_rec
         context_name = context.space_data.type
+        # Py Inspect panel in View3D context also shows in Properties context -> Tool properties
+        if context_name == "PROPERTIES":
+            context_name = "VIEW_3D"
         ic_panel = get_inspect_context_panel(self.panel_num, context_name, p_r.inspect_context_collections)
         if ic_panel is None:
             return

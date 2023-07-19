@@ -42,7 +42,12 @@ class PresetBaseClass(Panel):
         else:
             data_source = p_r
         layout = self.layout
-        layout.label(text="Preset Clipboard")
+
+        row = layout.row()
+        row.label(text="", icon='RNA')
+        row.prop(cb_options, "input_full_datapath", text="")
+        layout.separator()
+
         row = layout.row()
         if cb_options.create_preset_coll_name_search:
             row.prop_search(cb_options, "create_preset_coll_name", data_source, "preset_collections",
@@ -65,12 +70,6 @@ class PresetBaseClass(Panel):
         row.prop(cb_options, "create_preset_name_search", icon='VIEWZOOM', text="", toggle=True)
 
         layout.operator(PYREC_OT_PresetClipboardCreatePreset.bl_idname)
-        layout.separator()
-
-        layout.label(text="Paste Full Data Path")
-        row = layout.row()
-        row.label(text="", icon='RNA')
-        row.prop(cb_options, "input_full_datapath", text="")
         layout.separator()
 
         # column size (factor) sliders
