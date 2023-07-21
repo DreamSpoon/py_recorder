@@ -21,9 +21,9 @@ from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProp
 from bpy.types import PropertyGroup
 
 from .func import (PRESET_SOURCE_TYPES, PRESET_VIEW_TYPES, MODIFY_COLL_FUNC, MODIFY_PRESET_FUNC,
-    set_input_full_datapath, get_input_full_datapath, create_base_type_items, set_apply_input_full_datapath,
-    get_apply_input_full_datapath, apply_base_type_items, apply_collection_items, apply_preset_items,
-    modify_base_type_items)
+    IMPEXP_DUP_COLL_ITEMS, set_input_full_datapath, get_input_full_datapath, create_base_type_items,
+    set_apply_input_full_datapath, get_apply_input_full_datapath, apply_base_type_items, apply_collection_items,
+    apply_preset_items, modify_base_type_items)
 
 class PYREC_PG_BoolProp(PropertyGroup):
     name: StringProperty()
@@ -87,9 +87,12 @@ class PYREC_PG_PresetClipboardOptions(PropertyGroup):
     list_show_datapath: BoolProperty(name="Show Datapath", description="Show copied full datapath in Property " \
         "Clipboard list", default=False)
     # list column sizes (factors)
-    list_col_size1: FloatProperty(default=0.2, min=0.1, max=0.9)
-    list_col_size2: FloatProperty(default=0.4, min=0.1, max=0.9)
-    list_col_size3: FloatProperty(default=0.4, min=0.1, max=0.9)
+    list_col_size1: FloatProperty(name="List Column Size Factor 1", description="Adjust column width",
+        default=0.2, min=0.1, max=0.9)
+    list_col_size2: FloatProperty(name="List Column Size Factor 2", description="Adjust column width",
+        default=0.4, min=0.1, max=0.9)
+    list_col_size3: FloatProperty(name="List Column Size Factor 3", description="Adjust column width",
+        default=0.4, min=0.1, max=0.9)
     active_prop_detail: IntProperty()
     # selected base_type for creating new preset
     create_base_type: EnumProperty(name="Base Type", description="Base Type for new Preset, when 'Create Preset' " \
@@ -163,3 +166,9 @@ class PYREC_PG_PresetOptions(PropertyGroup):
     modify_collection_rename: StringProperty()
     modify_preset_function: EnumProperty(items=MODIFY_PRESET_FUNC)
     modify_preset_rename: StringProperty()
+
+    impexp_dup_coll_action: EnumProperty(name="Duplicate Collection", description="Choose action for imported " \
+        "Collection where imported Collection name is duplicate of existing Collection", items=IMPEXP_DUP_COLL_ITEMS)
+    impexp_replace_preset: BoolProperty(name="Replace Duplicate Presets", description="If enabled then imported " \
+        "Presets with names already used will replace existing Presets. If disabled then imported Presets will " \
+        "be renamed (e.g. append .001)", default=False)

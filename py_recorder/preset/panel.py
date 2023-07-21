@@ -19,101 +19,16 @@
 from bpy.types import Panel
 
 from .func import (PRESET_SOURCE_ADDON_PREFS, PRESET_VIEW_APPLY, PRESET_VIEW_MODIFY,
-    PRESET_VIEW_CLIPBOARD, PRESET_VIEW_EXPLORE)
+    PRESET_VIEW_CLIPBOARD, PRESET_VIEW_IMPORT_EXPORT)
 from .operator import (PYREC_OT_PresetClipboardCreatePreset, PYREC_OT_PresetClipboardRemoveItem,
     PYREC_OT_PresetClipboardClear, PYREC_OT_PresetApply, PYREC_OT_PresetModifyCollection,
     PYREC_OT_PresetRemovePreset, PYREC_OT_PresetRemoveCollection, PYREC_OT_PresetModifyPreset,
-    PYREC_OT_PresetPropsRemoveItem, PYREC_OT_QuicksavePreferences)
+    PYREC_OT_PresetPropsRemoveItem, PYREC_OT_QuicksavePreferences, PYREC_OT_PresetImportFile,
+    PYREC_OT_PresetExportFile, PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject)
 
 PREFS_ADDONS_NAME = "py_recorder"
 
 class PresetBaseClass(Panel):
-    def draw_func_explore(self):
-        layout = self.layout
-        layout.label(text="Explore")
-
-    # draw Preset Clipboard
-    def draw_func_create(self, context, p_r):
-        clipboard = p_r.preset_options.clipboard
-        cb_options = p_r.preset_options.clipboard_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_r.preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            data_source = context.preferences.addons[PREFS_ADDONS_NAME].preferences
-        else:
-            data_source = p_r
-        layout = self.layout
-
-        row = layout.row()
-        row.label(text="", icon='RNA')
-        row.prop(cb_options, "input_full_datapath", text="")
-        layout.separator()
-
-        row = layout.row()
-        if cb_options.create_preset_coll_name_search:
-            row.prop_search(cb_options, "create_preset_coll_name", data_source, "preset_collections",
-                text="Collection", results_are_suggestions=True)
-        else:
-            row.prop(cb_options, "create_preset_coll_name", text="Collection")
-        row.prop(cb_options, "create_preset_coll_name_search", icon='VIEWZOOM', text="", toggle=True)
-        layout.prop(cb_options, "create_base_type", text="Type")
-        row = layout.row()
-
-        coll_name = cb_options.create_preset_coll_name
-        p_collections = data_source.preset_collections
-        bt = cb_options.create_base_type
-        name_search = cb_options.create_preset_name_search
-        if name_search  and coll_name in p_collections and bt in p_collections[coll_name].base_types:
-            row.prop_search(cb_options, "create_preset_name", p_collections[coll_name].base_types[bt], "presets",
-                text="Collection", results_are_suggestions=True)
-        else:
-            row.prop(cb_options, "create_preset_name", text="Preset")
-        row.prop(cb_options, "create_preset_name_search", icon='VIEWZOOM', text="", toggle=True)
-
-        layout.operator(PYREC_OT_PresetClipboardCreatePreset.bl_idname)
-        layout.separator()
-
-        # column size (factor) sliders
-        row = layout.row(align=True)
-        if cb_options.list_show_datapath:
-            row.prop(cb_options, "list_col_size1", slider=True, text="Full")
-        row.prop(cb_options, "list_col_size2", slider=True, text="Type")
-        row.prop(cb_options, "list_col_size3", slider=True, text="Prop")
-
-        # container row
-        cont_row = layout.row(align=True)
-
-        # attribute list column
-        attr_list_col = cont_row.column()
-
-        # list labels
-        sp = attr_list_col
-        if cb_options.list_show_datapath:
-            sp = sp.split(factor=cb_options.list_col_size1)
-            sp.label(text="Full")
-        sp = sp.split(factor=cb_options.list_col_size2)
-        sp.label(text="Type")
-        sp = sp.split(factor=cb_options.list_col_size3)
-        sp.label(text="Prop")
-        sp.label(text="Value")
-        # list
-        attr_list_col.template_list("PYREC_UL_PresetClipboardProps", "", clipboard, "prop_details", cb_options,
-                                    "active_prop_detail")
-        # functions column
-        function_col = cont_row.column()
-        function_col.separator(factor=4)
-        function_col.operator(PYREC_OT_PresetClipboardRemoveItem.bl_idname, text="", icon='REMOVE')
-        function_col.separator(factor=2)
-        function_col.prop(cb_options, "list_show_datapath", text="", icon='RNA', toggle=True)
-
-        path_text = ""
-        try:
-            path_text += " " + clipboard.prop_details[cb_options.active_prop_detail].name[9:]
-        except:
-            pass
-        layout.label(text=path_text)
-
-        layout.operator(PYREC_OT_PresetClipboardClear.bl_idname)
-
     def draw_func_apply(self, context, p_r):
         layout = self.layout
         p_r = context.window_manager.py_rec
@@ -208,6 +123,97 @@ class PresetBaseClass(Panel):
         function_col = row.column()
         function_col.operator(PYREC_OT_PresetPropsRemoveItem.bl_idname, text="", icon='REMOVE')
 
+    # draw Preset Clipboard
+    def draw_func_clipboard(self, context, p_r):
+        clipboard = p_r.preset_options.clipboard
+        cb_options = p_r.preset_options.clipboard_options
+        # use Blender Addon Preferences or .blend file as Preset save data source
+        if p_r.preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
+            data_source = context.preferences.addons[PREFS_ADDONS_NAME].preferences
+        else:
+            data_source = p_r
+        layout = self.layout
+
+        row = layout.row()
+        row.label(text="", icon='RNA')
+        row.prop(cb_options, "input_full_datapath", text="")
+        layout.separator()
+
+        row = layout.row()
+        if cb_options.create_preset_coll_name_search:
+            row.prop_search(cb_options, "create_preset_coll_name", data_source, "preset_collections",
+                text="Collection", results_are_suggestions=True)
+        else:
+            row.prop(cb_options, "create_preset_coll_name", text="Collection")
+        row.prop(cb_options, "create_preset_coll_name_search", icon='VIEWZOOM', text="", toggle=True)
+        layout.prop(cb_options, "create_base_type", text="Type")
+        row = layout.row()
+
+        coll_name = cb_options.create_preset_coll_name
+        p_collections = data_source.preset_collections
+        bt = cb_options.create_base_type
+        name_search = cb_options.create_preset_name_search
+        if name_search  and coll_name in p_collections and bt in p_collections[coll_name].base_types:
+            row.prop_search(cb_options, "create_preset_name", p_collections[coll_name].base_types[bt], "presets",
+                text="Collection", results_are_suggestions=True)
+        else:
+            row.prop(cb_options, "create_preset_name", text="Preset")
+        row.prop(cb_options, "create_preset_name_search", icon='VIEWZOOM', text="", toggle=True)
+
+        layout.operator(PYREC_OT_PresetClipboardCreatePreset.bl_idname)
+        layout.separator()
+
+        # column size (factor) sliders
+        row = layout.row(align=True)
+        if cb_options.list_show_datapath:
+            row.prop(cb_options, "list_col_size1", slider=True, text="Full")
+        row.prop(cb_options, "list_col_size2", slider=True, text="Type")
+        row.prop(cb_options, "list_col_size3", slider=True, text="Prop")
+
+        # container row
+        cont_row = layout.row(align=True)
+
+        # attribute list column
+        attr_list_col = cont_row.column()
+
+        # list labels
+        sp = attr_list_col
+        if cb_options.list_show_datapath:
+            sp = sp.split(factor=cb_options.list_col_size1)
+            sp.label(text="Full")
+        sp = sp.split(factor=cb_options.list_col_size2)
+        sp.label(text="Type")
+        sp = sp.split(factor=cb_options.list_col_size3)
+        sp.label(text="Prop")
+        sp.label(text="Value")
+        # list
+        attr_list_col.template_list("PYREC_UL_PresetClipboardProps", "", clipboard, "prop_details", cb_options,
+                                    "active_prop_detail")
+        # functions column
+        function_col = cont_row.column()
+        function_col.separator(factor=4)
+        function_col.operator(PYREC_OT_PresetClipboardRemoveItem.bl_idname, text="", icon='REMOVE')
+        function_col.separator(factor=2)
+        function_col.prop(cb_options, "list_show_datapath", text="", icon='RNA', toggle=True)
+
+        path_text = ""
+        try:
+            path_text += " " + clipboard.prop_details[cb_options.active_prop_detail].name[9:]
+        except:
+            pass
+        layout.label(text=path_text)
+
+        layout.operator(PYREC_OT_PresetClipboardClear.bl_idname)
+
+    def draw_func_import_export(self):
+        layout = self.layout
+        layout.label(text="File")
+        layout.operator(PYREC_OT_PresetImportFile.bl_idname)
+        layout.operator(PYREC_OT_PresetExportFile.bl_idname)
+        layout.label(text="Object")
+        layout.operator(PYREC_OT_PresetImportObject.bl_idname)
+        layout.operator(PYREC_OT_PresetExportObject.bl_idname)
+
     def draw(self, context):
         p_r = context.window_manager.py_rec
         layout = self.layout
@@ -225,9 +231,9 @@ class PresetBaseClass(Panel):
         elif pf == PRESET_VIEW_MODIFY:
             self.draw_func_modify(context, p_r)
         elif pf == PRESET_VIEW_CLIPBOARD:
-            self.draw_func_create(context, p_r)
-        elif pf == PRESET_VIEW_EXPLORE:
-            self.draw_func_explore()
+            self.draw_func_clipboard(context, p_r)
+        elif pf == PRESET_VIEW_IMPORT_EXPORT:
+            self.draw_func_import_export()
 
 class PYREC_PT_View3dPreset(PresetBaseClass):
     bl_space_type = 'VIEW_3D'

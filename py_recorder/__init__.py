@@ -18,10 +18,10 @@
 
 bl_info = {
     "name": "Python Recorder",
-    "version": (0, 5, 4),
+    "version": (0, 5, 5),
     "author": "Dave",
     "blender": (2, 80, 0),
-    "description": "Create and apply Presets. Inspect Python object attributes. Record Blender data to Python code",
+    "description": "Create and apply Presets. Inspect Python value attributes. Record Blender data to Python code",
     "location": "3DView -> Tools -> Tool -> Py Record Info, Py Exec Object. Right-click Context menu -> " \
         "Add Inspect Panel. Context -> Tool -> Py Inspect",
     "doc_url": "https://github.com/DreamSpoon/py_recorder#readme",
@@ -61,7 +61,8 @@ from .preset.list import (PYREC_UL_PresetClipboardProps, PYREC_UL_PresetApplyPro
 from .preset.operator import (PYREC_OT_PresetClipboardClear, PYREC_OT_PresetClipboardRemoveItem,
     PYREC_OT_PresetClipboardCreatePreset, PYREC_OT_PresetPropsRemoveItem, PYREC_OT_PresetApply,
     PYREC_OT_PresetModifyCollection, PYREC_OT_PresetRemoveCollection, PYREC_OT_PresetModifyPreset,
-    PYREC_OT_PresetRemovePreset, PYREC_OT_QuicksavePreferences)
+    PYREC_OT_PresetRemovePreset, PYREC_OT_QuicksavePreferences, PYREC_OT_PresetExportFile, PYREC_OT_PresetImportFile,
+    PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject)
 from .preset.panel import (PYREC_PT_View3dPreset, PYREC_PT_TextEditorPreset)
 from .preset.props import (PYREC_PG_BoolProp, PYREC_PG_IntProp, PYREC_PG_FloatProp, PYREC_PG_VectorXYZ_Prop,
     PYREC_PG_StringProp, PYREC_PG_PresetPropDetail, PYREC_PG_Preset, PYREC_PG_PresetCollection,
@@ -149,6 +150,10 @@ classes = [
     PYREC_OT_PresetModifyPreset,
     PYREC_OT_PresetRemovePreset,
     PYREC_OT_QuicksavePreferences,
+    PYREC_OT_PresetExportFile,
+    PYREC_OT_PresetImportFile,
+    PYREC_OT_PresetExportObject,
+    PYREC_OT_PresetImportObject,
     PYREC_PT_View3dPreset,
     PYREC_PT_TextEditorPreset,
 

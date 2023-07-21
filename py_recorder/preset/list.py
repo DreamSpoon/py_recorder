@@ -59,7 +59,10 @@ class PYREC_UL_PresetClipboardProps(UIList):
         sp = layout
         if cb_options.list_show_datapath:
             sp = sp.split(factor=cb_options.list_col_size1)
-            sp.label(text=ob.name[9:])
+            if ob.name.startswith("bpy.data."):
+                sp.label(text=ob.name[9:])
+            else:
+                sp.label(text=ob.name)
         sp = sp.split(factor=cb_options.list_col_size2)
         sp.prop_search(ob, "base_type", ob, "available_base_types", text="")
         try:
