@@ -18,7 +18,7 @@
 
 bl_info = {
     "name": "Python Recorder",
-    "version": (0, 5, 5),
+    "version": (0, 5, 6),
     "author": "Dave",
     "blender": (2, 80, 0),
     "description": "Create and apply Presets. Inspect Python value attributes. Record Blender data to Python code",
@@ -38,6 +38,7 @@ from bpy.props import (BoolProperty, CollectionProperty, PointerProperty, String
 from bpy.utils import (register_class, unregister_class)
 
 from .addon_prefs import (PYREC_PG_LogAddonPrefs, PYREC_PG_InterfaceAddonPrefs, PYREC_AddonPreferences)
+from .bl_util import set_addon_module_name
 from .object_custom_prop import (PYREC_OT_OBJ_AddCP_Data, PYREC_OT_OBJ_ModifyInit, PYREC_PT_OBJ_AdjustCustomProp)
 from .context_exec.panel import (append_exec_context_panel_all, remove_exec_context_panel_all)
 from .context_exec.operator import PYREC_OT_ContextExec
@@ -62,12 +63,13 @@ from .preset.operator import (PYREC_OT_PresetClipboardClear, PYREC_OT_PresetClip
     PYREC_OT_PresetClipboardCreatePreset, PYREC_OT_PresetPropsRemoveItem, PYREC_OT_PresetApply,
     PYREC_OT_PresetModifyCollection, PYREC_OT_PresetRemoveCollection, PYREC_OT_PresetModifyPreset,
     PYREC_OT_PresetRemovePreset, PYREC_OT_QuicksavePreferences, PYREC_OT_PresetExportFile, PYREC_OT_PresetImportFile,
-    PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject)
+    PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject, PYREC_OT_TransferObjectPresets)
 from .preset.panel import (PYREC_PT_View3dPreset, PYREC_PT_TextEditorPreset)
 from .preset.props import (PYREC_PG_BoolProp, PYREC_PG_IntProp, PYREC_PG_FloatProp, PYREC_PG_VectorXYZ_Prop,
     PYREC_PG_StringProp, PYREC_PG_PresetPropDetail, PYREC_PG_Preset, PYREC_PG_PresetCollection,
     PYREC_PG_PresetTypeCollection, PYREC_PG_PresetClipboardPropDetail, PYREC_PG_PresetClipboard,
-    PYREC_PG_PresetClipboardOptions, PYREC_PG_PresetOptions)
+    PYREC_PG_PresetClipboardOptions, PYREC_PG_PresetApplyOptions, PYREC_PG_PresetModifyOptions,
+    PYREC_PG_PresetOptions, PYREC_PG_PresetImpExpOptions)
 from .record.driver.operator import (PYREC_OT_DriversToPython, PYREC_OT_SelectAnimdataSrcAll,
     PYREC_OT_SelectAnimdataSrcNone)
 from .record.driver.panel import PYREC_PT_RecordDriver
@@ -154,6 +156,7 @@ classes = [
     PYREC_OT_PresetImportFile,
     PYREC_OT_PresetExportObject,
     PYREC_OT_PresetImportObject,
+    PYREC_OT_TransferObjectPresets,
     PYREC_PT_View3dPreset,
     PYREC_PT_TextEditorPreset,
 
@@ -172,6 +175,9 @@ classes = [
     PYREC_PG_PresetClipboardPropDetail,
     PYREC_PG_PresetClipboard,
     PYREC_PG_PresetClipboardOptions,
+    PYREC_PG_PresetApplyOptions,
+    PYREC_PG_PresetModifyOptions,
+    PYREC_PG_PresetImpExpOptions,
     PYREC_PG_PresetOptions,
 
     PYREC_PG_PyRec,
@@ -232,6 +238,7 @@ def timed_reg_exec():
         append_exec_context_panel_all()
 
 def register():
+    set_addon_module_name(__name__)
     register_inspect_panel_draw_func(draw_inspect_panel)
     for cls in classes:
         register_class(cls)

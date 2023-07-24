@@ -62,13 +62,18 @@ import bpy
 from bpy_extras.io_utils import ImportHelper
 from bpy.types import Operator
 
-from .func import (PRESET_SOURCE_ADDON_PREFS, MODIFY_COLL_FUNC_RENAME, MODIFY_PRESET_FUNC_RENAME,
-    MODIFY_PRESET_FUNC_COPY_TO_CLIPBOARD, preset_clipboard_clear, preset_clipboard_remove_item,
-    preset_clipboard_create_preset, preset_remove_prop, preset_apply_preset, preset_collection_remove_collection,
-    preset_collection_remove_preset, preset_collection_modify_rename, preset_modify_rename, export_presets_file,
-    import_presets_file, export_presets_object, import_presets_object, copy_active_preset_to_clipboard)
-
-PREFS_ADDONS_NAME = "py_recorder"
+from ..bl_util import (get_addon_module_name, do_tag_redraw)
+from .func import (PRESET_SOURCE_ADDON_PREFS, get_source_preset_collections)
+from .apply_func import preset_apply_preset
+from .clipboard_func import (preset_clipboard_clear, preset_clipboard_remove_item, preset_clipboard_create_preset,
+    copy_active_preset_to_clipboard)
+from .impexp_func import (export_presets_file, import_presets_file, export_presets_object, import_presets_object,
+    transfer_object_presets)
+from .modify_func import (MODIFY_COLL_FUNC_MOVE, MODIFY_COLL_FUNC_RENAME, MODIFY_PRESET_FUNC_MOVE,
+    MODIFY_PRESET_FUNC_RENAME, MODIFY_PRESET_FUNC_UPDATE, MODIFY_PRESET_FUNC_COPY_TO_CLIPBOARD, preset_remove_prop,
+    preset_collection_modify_rename, preset_collection_remove_collection, preset_modify_rename,
+    preset_collection_remove_preset, preset_collection_modify_move, update_preset, is_valid_update_datapath,
+    get_modify_active_preset_collection, get_modify_active_single_preset, move_active_preset)
 
 class PYREC_OT_PresetClipboardClear(Operator):
     bl_idname = "py_rec.preset_clipboard_clear"
@@ -84,6 +89,7 @@ class PYREC_OT_PresetClipboardClear(Operator):
         clipboard = context.window_manager.py_rec.preset_options.clipboard
         cb_options = context.window_manager.py_rec.preset_options.clipboard_options
         preset_clipboard_clear(cb_options, clipboard)
+        do_tag_redraw()
         return {'FINISHED'}
 
     def draw(self, context):
@@ -112,6 +118,7 @@ class PYREC_OT_PresetClipboardRemoveItem(Operator):
         clipboard = context.window_manager.py_rec.preset_options.clipboard
         cb_options = context.window_manager.py_rec.preset_options.clipboard_options
         preset_clipboard_remove_item(cb_options, clipboard)
+        do_tag_redraw()
         return {'FINISHED'}
 
 class PYREC_OT_PresetClipboardCreatePreset(Operator):
@@ -123,24 +130,17 @@ class PYREC_OT_PresetClipboardCreatePreset(Operator):
 
     @classmethod
     def poll(cls, context):
-        p_r = context.window_manager.py_rec
-        if p_r.preset_options.lock_changes:
+        preset_options = context.window_manager.py_rec.preset_options
+        if preset_options.lock_changes:
             return False
-        clipboard = p_r.preset_options.clipboard
-        cb_options = p_r.preset_options.clipboard_options
+        clipboard = preset_options.clipboard
+        cb_options = preset_options.clipboard_options
         return len(clipboard.prop_details) > 0 and cb_options.create_base_type != " "
 
     def execute(self, context):
         p_r = context.window_manager.py_rec
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_r.preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        clipboard = context.window_manager.py_rec.preset_options.clipboard
-        cb_options = context.window_manager.py_rec.preset_options.clipboard_options
-        preset_name = preset_clipboard_create_preset(p_collections, clipboard, cb_options)
-        # report 'Preset created'
+        preset_name = preset_clipboard_create_preset(get_source_preset_collections(context),
+            p_r.preset_options.clipboard, p_r.preset_options.clipboard_options)
         self.report({'INFO'}, "New Preset created named: " + preset_name)
         return {'FINISHED'}
 
@@ -155,32 +155,18 @@ class PYREC_OT_PresetPropsRemoveItem(Operator):
         p_r = context.window_manager.py_rec
         if p_r.preset_options.lock_changes:
             return False
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        if p_options.modify_active_collection >= len(p_collections):
+        preset_options = p_r.preset_options
+        p_collections = get_source_preset_collections(context)
+        preset = get_modify_active_single_preset(preset_options, p_collections)
+        if preset is None:
             return False
-        base_types = p_collections[p_options.modify_active_collection].base_types
-        if p_options.modify_base_type not in base_types:
-            return False
-        presets = base_types[p_options.modify_base_type].presets
-        if p_options.modify_active_preset >= len(presets):
-            return False
-        prop_details = presets[p_options.modify_active_preset].prop_details
-        return p_options.modify_detail < len(prop_details)
+        prop_details = preset.prop_details
+        return preset_options.modify_options.active_detail < len(prop_details)
 
     def execute(self, context):
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        preset_remove_prop(p_options, p_collections)
+        p_collections = get_source_preset_collections(context)
+        preset_remove_prop(context.window_manager.py_rec.preset_options, p_collections)
+        do_tag_redraw()
         return {'FINISHED'}
 
     def draw(self, context):
@@ -200,17 +186,14 @@ class PYREC_OT_PresetApply(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.window_manager.py_rec.preset_options.apply_preset != " "
+        return context.window_manager.py_rec.preset_options.apply_options.preset != " "
 
     def execute(self, context):
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        preset_apply_preset(p_options, p_collections)
+        p_collections = get_source_preset_collections(context)
+        err_msg = preset_apply_preset(context.window_manager.py_rec.preset_options, p_collections)
+        if isinstance(err_msg, str):
+            self.report({'ERROR'}, err_msg)
+            return {'CANCELLED'}
         return {'FINISHED'}
 
 class PYREC_OT_PresetModifyCollection(Operator):
@@ -221,59 +204,51 @@ class PYREC_OT_PresetModifyCollection(Operator):
 
     @classmethod
     def poll(cls, context):
-        p_r = context.window_manager.py_rec
-        if p_r.preset_options.lock_changes:
+        if context.window_manager.py_rec.preset_options.lock_changes:
             return False
-        if p_r.preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        return len(p_collections) > 0
+        return len(get_source_preset_collections(context)) > 0
 
     def execute(self, context):
-        p_options = context.window_manager.py_rec.preset_options
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = context.window_manager.py_rec.preset_collections
-        f = p_options.modify_collection_function
-        if f == MODIFY_COLL_FUNC_RENAME:
-            preset_collection_modify_rename(p_options, p_collections)
+        preset_options = context.window_manager.py_rec.preset_options
+        f = preset_options.modify_options.collection_function
+        if f == MODIFY_COLL_FUNC_MOVE:
+            preset_collection_modify_move(context, preset_options, preset_options.impexp_options.dup_coll_action,
+                                          preset_options.impexp_options.replace_preset)
+            self.report({'INFO'}, "Moved Presets Collection from one Data Source to another")
+        elif f == MODIFY_COLL_FUNC_RENAME:
+            preset_collection_modify_rename(preset_options, get_source_preset_collections(context))
+            do_tag_redraw()
             self.report({'INFO'}, "Renamed Presets Collection")
         return {'FINISHED'}
 
     def draw(self, context):
         layout = self.layout
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        f = p_options.modify_collection_function
-        if f == MODIFY_COLL_FUNC_RENAME:
-            if len(p_collections) > p_options.modify_active_collection:
-                label_text = p_collections[p_options.modify_active_collection].name
+        preset_options = context.window_manager.py_rec.preset_options
+        f = preset_options.modify_options.collection_function
+        if f == MODIFY_COLL_FUNC_MOVE:
+            if preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
+                new_data_source = ".blend File"
             else:
-                label_text = ""
+                new_data_source = "Addons Preferences"
+            layout.label(text="Move Presets Collection to Data Source:")
+            layout.label(text="  " + new_data_source)
+            layout.prop(preset_options.impexp_options, "replace_preset")
+            layout.label(text="  Duplicate Collection Action")
+            layout.prop(preset_options.impexp_options, "dup_coll_action", text="")
+        elif f == MODIFY_COLL_FUNC_RENAME:
+            active_coll = get_modify_active_preset_collection(preset_options, get_source_preset_collections(context))
+            label_text = "" if active_coll is None else active_coll.name
             layout.label(text="Rename Preset Collection: " + label_text)
-            layout.prop(p_options, "modify_collection_rename", text="")
+            layout.prop(preset_options.modify_options, "collection_rename", text="")
 
     def invoke(self, context, event):
-        wm = context.window_manager
-        p_options = wm.py_rec.preset_options
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = wm.py_rec.preset_collections
-        f = p_options.modify_collection_function
+        preset_options = context.window_manager.py_rec.preset_options
+        f = preset_options.modify_options.collection_function
         if f == MODIFY_COLL_FUNC_RENAME:
             # set initial rename string to original name string, if available
-            if len(p_collections) > p_options.modify_active_collection:
-                p_options.modify_collection_rename = p_collections[p_options.modify_active_collection].name
-            else:
-                p_options.modify_collection_rename = ""
-        return wm.invoke_props_dialog(self)
+            p_coll = get_modify_active_preset_collection(preset_options, get_source_preset_collections(context))
+            preset_options.modify_options.collection_rename = "" if p_coll is None else p_coll.name
+        return context.window_manager.invoke_props_dialog(self)
 
 class PYREC_OT_PresetRemoveCollection(Operator):
     bl_idname = "py_rec.preset_remove_collection"
@@ -286,23 +261,12 @@ class PYREC_OT_PresetRemoveCollection(Operator):
         p_r = context.window_manager.py_rec
         if p_r.preset_options.lock_changes:
             return False
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        return p_options.modify_active_collection < len(p_collections)
+        return p_r.preset_options.modify_options.active_collection < len(get_source_preset_collections(context))
 
     def execute(self, context):
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        preset_collection_remove_collection(p_options, p_collections)
+        preset_collection_remove_collection(context.window_manager.py_rec.preset_options,
+                                            get_source_preset_collections(context))
+        do_tag_redraw()
         self.report({'INFO'}, "Removed Presets Collection")
         return {'FINISHED'}
 
@@ -323,78 +287,80 @@ class PYREC_OT_PresetModifyPreset(Operator):
 
     @classmethod
     def poll(cls, context):
-        p_r = context.window_manager.py_rec
-        if p_r.preset_options.lock_changes:
+        preset_options = context.window_manager.py_rec.preset_options
+        if preset_options.lock_changes:
             return False
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        if p_options.modify_active_collection >= len(p_collections):
-            return False
-        tp = p_collections[p_options.modify_active_collection].base_types
-        if p_options.modify_base_type not in tp:
-            return False
-        return p_options.modify_active_preset < len(tp[p_options.modify_base_type].presets)
+        return get_modify_active_single_preset(preset_options, get_source_preset_collections(context)) != None
 
     def execute(self, context):
-        p_options = context.window_manager.py_rec.preset_options
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = context.window_manager.py_rec.preset_collections
-        f = p_options.modify_preset_function
-        if f == MODIFY_PRESET_FUNC_RENAME:
-            preset_modify_rename(p_options, p_collections)
-            self.report({'INFO'}, "Renamed Preset")
-        elif f == MODIFY_PRESET_FUNC_COPY_TO_CLIPBOARD:
-            copy_result = copy_active_preset_to_clipboard(context, p_options, p_collections)
+        preset_options = context.window_manager.py_rec.preset_options
+        p_collections = get_source_preset_collections(context)
+        f = preset_options.modify_options.preset_function
+        if f == MODIFY_PRESET_FUNC_COPY_TO_CLIPBOARD:
+            copy_result = copy_active_preset_to_clipboard(context, preset_options, p_collections)
             if copy_result is None:
                 self.report({'ERROR'}, "Unable to copy active Preset to Preset Clipboard")
                 return {'CANCELLED'}
             self.report({'INFO'}, "Copied %d properties from Preset to Preset Clipboard" % copy_result)
+        elif f == MODIFY_PRESET_FUNC_MOVE:
+            move_result = move_active_preset(context, preset_options, p_collections,
+                                             preset_options.impexp_options.replace_preset)
+            if move_result == False:
+                self.report({'ERROR'}, "Unable to move active Preset to another Collection")
+                return {'CANCELLED'}
+            self.report({'INFO'}, "Moved Preset")
+        elif f == MODIFY_PRESET_FUNC_RENAME:
+            preset_modify_rename(preset_options, p_collections)
+            do_tag_redraw()
+            self.report({'INFO'}, "Renamed Preset")
+        elif f == MODIFY_PRESET_FUNC_UPDATE:
+            update_preset(preset_options, p_collections)
         return {'FINISHED'}
 
     def draw(self, context):
         layout = self.layout
         p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        f = p_options.modify_preset_function
-        if f == MODIFY_PRESET_FUNC_RENAME:
-            label_text = ""
-            if len(p_collections) > p_options.modify_active_collection:
-                active_coll = p_collections[p_options.modify_active_collection]
-                if p_options.modify_base_type in active_coll.base_types:
-                    presets = active_coll.base_types[p_options.modify_base_type].presets
-                    if len(presets) > p_options.modify_active_preset:
-                        label_text = presets[p_options.modify_active_preset].name
+        preset_options = p_r.preset_options
+        p_collections = get_source_preset_collections(context)
+        f = preset_options.modify_options.preset_function
+        if f == MODIFY_PRESET_FUNC_MOVE:
+            layout.label(text="Data Source")
+            layout.prop(preset_options.modify_options, "move_to_data_source", text="")
+            layout.label(text="Move to Collection")
+            layout.prop(preset_options.modify_options, "move_to_collection", text="")
+            layout.prop(preset_options.impexp_options, "replace_preset", text="Replace Existing")
+        elif f == MODIFY_PRESET_FUNC_RENAME:
+            preset = get_modify_active_single_preset(preset_options, p_collections)
+            label_text = "" if preset is None else preset.name
             layout.label(text="Rename Preset: " + label_text)
-            layout.prop(p_options, "modify_preset_rename", text="")
-
+            layout.prop(preset_options.modify_options, "preset_rename", text="")
+        elif f == MODIFY_PRESET_FUNC_UPDATE:
+            layout.label(text="Update from Copy Full Datapath")
+            layout.prop(preset_options.modify_options, "update_full_datapath", text="")
+            layout.label(text="  Expected Type: " + preset_options.modify_options.base_type)
+            if is_valid_update_datapath():
+                layout.label(text="Datapath validated")
+            else:
+                layout.label(text="Enter valid Datapath")
     def invoke(self, context, event):
         wm = context.window_manager
-        p_options = wm.py_rec.preset_options
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = wm.py_rec.preset_collections
-        f = p_options.modify_collection_function
-        if f == MODIFY_PRESET_FUNC_RENAME:
+        preset_options = wm.py_rec.preset_options
+        p_collections = get_source_preset_collections(context)
+        f = preset_options.modify_options.preset_function
+        if f == MODIFY_PRESET_FUNC_MOVE:
+            return wm.invoke_props_dialog(self)
+        elif f == MODIFY_PRESET_FUNC_RENAME:
             # set initial rename string to original name string, if available
             temp_name = ""
-            if len(p_collections) > p_options.modify_active_collection:
-                active_coll = p_collections[p_options.modify_active_collection]
-                if p_options.modify_base_type in active_coll.base_types:
-                    presets = active_coll.base_types[p_options.modify_base_type].presets
-                    if len(presets) > p_options.modify_active_preset:
-                        temp_name = presets[p_options.modify_active_preset].name
-            p_options.modify_preset_rename = temp_name
+            if len(p_collections) > preset_options.modify_options.active_collection:
+                active_coll = p_collections[preset_options.modify_options.active_collection]
+                if preset_options.modify_options.base_type in active_coll.base_types:
+                    presets = active_coll.base_types[preset_options.modify_options.base_type].presets
+                    if len(presets) > preset_options.modify_options.active_preset:
+                        temp_name = presets[preset_options.modify_options.active_preset].name
+            preset_options.modify_options.preset_rename = temp_name
+            return wm.invoke_props_dialog(self)
+        elif f == MODIFY_PRESET_FUNC_UPDATE:
             return wm.invoke_props_dialog(self)
         return self.execute(context)
 
@@ -406,31 +372,20 @@ class PYREC_OT_PresetRemovePreset(Operator):
 
     @classmethod
     def poll(cls, context):
-        p_r = context.window_manager.py_rec
-        if p_r.preset_options.lock_changes:
+        preset_options = context.window_manager.py_rec.preset_options
+        if preset_options.lock_changes:
             return False
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        if p_options.modify_active_collection >= len(p_collections):
+        p_collections = get_source_preset_collections(context)
+        if preset_options.modify_options.active_collection >= len(p_collections):
             return False
-        tp = p_collections[p_options.modify_active_collection].base_types
-        if p_options.modify_base_type not in tp:
+        tp = p_collections[preset_options.modify_options.active_collection].base_types
+        if preset_options.modify_options.base_type not in tp:
             return False
-        return p_options.modify_active_preset < len(tp[p_options.modify_base_type].presets)
+        return preset_options.modify_options.active_preset < len(tp[preset_options.modify_options.base_type].presets)
 
     def execute(self, context):
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        preset_collection_remove_preset(p_options, p_collections)
+        preset_collection_remove_preset(context.window_manager.py_rec.preset_options,
+                                        get_source_preset_collections(context))
         self.report({'INFO'}, "Removed Preset")
         return {'FINISHED'}
 
@@ -440,8 +395,7 @@ class PYREC_OT_PresetRemovePreset(Operator):
         layout.label(text="or click outside this window.")
 
     def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self)
+        return context.window_manager.invoke_props_dialog(self)
 
 class PYREC_OT_QuicksavePreferences(Operator):
     bl_idname = "py_rec.quicksave_preferences"
@@ -461,8 +415,7 @@ class PYREC_OT_QuicksavePreferences(Operator):
         layout.label(text="pressing Esc, or click outside this window.")
 
     def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self)
+        return context.window_manager.invoke_props_dialog(self)
 
 class PYREC_OT_PresetExportFile(Operator, ImportHelper):
     bl_idname = "py_rec.preset_export_file"
@@ -474,14 +427,7 @@ class PYREC_OT_PresetExportFile(Operator, ImportHelper):
     filter_glob: bpy.props.StringProperty(default="*.py", options={'HIDDEN'})
 
     def execute(self, context):
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        export_result = export_presets_file(p_collections, self.filepath)
+        export_result = export_presets_file(get_source_preset_collections(context), self.filepath)
         if isinstance(export_result, str):
             self.report({'ERROR'}, "Unable to export Presets Collections to file with path " + self.filepath)
             return {'CANCELLED'}
@@ -508,22 +454,21 @@ class PYREC_OT_PresetImportFile(Operator, ImportHelper):
 
     filter_glob: bpy.props.StringProperty(default="*.py", options={'HIDDEN'})
 
+    @classmethod
+    def poll(cls, context):
+        return context.window_manager.py_rec.preset_options.lock_changes == False
+
     def execute(self, context):
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        import_result = import_presets_file(p_collections, self.filepath, p_options.impexp_dup_coll_action,
-                                            p_options.impexp_replace_preset)
+        preset_options = context.window_manager.py_rec.preset_options
+        import_result = import_presets_file(get_source_preset_collections(context), self.filepath,
+            preset_options.impexp_options.dup_coll_action, preset_options.impexp_options.replace_preset)
         if isinstance(import_result, str):
             self.report({'ERROR'}, import_result)
             return {'CANCELLED'}
         if isinstance(import_result, (int, int)):
             self.report({'INFO'}, "Imported %d Presets Collections with total of %d Presets from file with path %s" \
                         % (import_result[0], import_result[1], self.filepath))
+        do_tag_redraw()
         return {'FINISHED'}
 
     def draw(self, context):
@@ -533,9 +478,9 @@ class PYREC_OT_PresetImportFile(Operator, ImportHelper):
         layout.prop(p_r.preset_options, "data_source", text="")
         layout.separator()
         layout.label(text="Import Options")
-        layout.prop(p_r.preset_options, "impexp_replace_preset")
+        layout.prop(p_r.preset_options.impexp_options, "replace_preset")
         layout.label(text="  Duplicate Collection Action")
-        layout.prop(p_r.preset_options, "impexp_dup_coll_action", text="")
+        layout.prop(p_r.preset_options.impexp_options, "dup_coll_action", text="")
 
     def invoke(self, context, events):
         self.filepath = "bl_presets.py"
@@ -558,14 +503,7 @@ class PYREC_OT_PresetExportObject(Operator):
         if act_ob is None:
             self.report({'ERROR'}, "Unable to Export Presets Collections, no active Object")
             return {'CANCELLED'}
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        export_result = export_presets_object(p_collections, act_ob)
+        export_result = export_presets_object(get_source_preset_collections(context), act_ob)
         if isinstance(export_result, str):
             self.report({'ERROR'}, "Unable to export Presets Collections to Object named " + act_ob.name)
             return {'CANCELLED'}
@@ -583,24 +521,19 @@ class PYREC_OT_PresetImportObject(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.active_object != None
+        return context.active_object != None and context.window_manager.py_rec.preset_options.lock_changes == False
 
     def execute(self, context):
         if context.active_object is None:
             self.report({'ERROR'}, "Unable to Import Presets Collections, no active Object")
             return {'CANCELLED'}
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        import_result = import_presets_object(p_collections, context.active_object, p_options.impexp_dup_coll_action,
-                                              p_options.impexp_replace_preset)
+        preset_options = context.window_manager.py_rec.preset_options
+        import_result = import_presets_object(get_source_preset_collections(context), context.active_object,
+            preset_options.impexp_options.dup_coll_action, preset_options.impexp_options.replace_preset)
         if isinstance(import_result, str):
             self.report({'ERROR'}, import_result)
             return {'CANCELLED'}
+        do_tag_redraw()
         self.report({'INFO'}, "Imported %d Presets Collections with total of %d Presets from Object named %s" \
                     % (import_result[0], import_result[1], context.active_object.name))
         return {'FINISHED'}
@@ -612,10 +545,33 @@ class PYREC_OT_PresetImportObject(Operator):
         layout.prop(p_r.preset_options, "data_source", text="")
         layout.separator()
         layout.label(text="Import Options")
-        layout.prop(p_r.preset_options, "impexp_replace_preset")
+        layout.prop(p_r.preset_options.impexp_options, "replace_preset")
         layout.label(text="  Duplicate Collection Action")
-        layout.prop(p_r.preset_options, "impexp_dup_coll_action", text="")
+        layout.prop(p_r.preset_options.impexp_options, "dup_coll_action", text="")
 
     def invoke(self, context, events):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
+
+class PYREC_OT_TransferObjectPresets(Operator):
+    bl_idname = "py_rec.transfer_object_presets"
+    bl_label = "Transfer Presets"
+    bl_description = "Copy Presets Collections data from active Object to all other selected Objects"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        sel_ob = [ ob for ob in context.selected_objects if ob != context.active_object ]
+        return context.active_object != None and len(sel_ob) >= 1
+
+    def execute(self, context):
+        sel_ob = [ ob for ob in context.selected_objects if ob != context.active_object ]
+        if context.active_object is None or len(sel_ob) < 1:
+            self.report({'ERROR'}, "Unable to Transfer Presets between Objects, no active Object or not enough " \
+                        "other selected Objects")
+            return {'CANCELLED'}
+        err_msg = transfer_object_presets(context.active_object, sel_ob)
+        if isinstance(err_msg, str):
+            self.report({'ERROR'}, "Unable to Transfer Presets between Objects, " + err_msg)
+            return {'CANCELLED'}
+        return {'FINISHED'}

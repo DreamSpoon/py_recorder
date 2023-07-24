@@ -15,26 +15,23 @@
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # ##### END GPL LICENSE BLOCK #####
-import bpy
 
-exec_result = {}
+import bpy
 
 # returns 3-tuple of (result value, exception, exception message)
 #   result value: exec of pre_exec_str, then result value is evaluation of exec_str
 #   exception: boolean is True if exception was raised
-def exec_get_result(pre_exec_str, exec_str, globs=None, locs=None):
+def exec_get_result(pre_exec_str, exec_str):
     if not isinstance(exec_str, str) or exec_str == "":
         return None, True, "Invalid exec() string"
-    # delete previous result if it exists
-    if exec_result.get("ex_result_val") != None:
-        del exec_result["ex_result_val"]
     if not isinstance(pre_exec_str, str):
         pre_exec_str = ""
-    full_exec_str = "%s\nglobal exec_result\nexec_result['ex_result_val'] = %s" % (pre_exec_str, exec_str)
-    is_exc, exc_msg = exec_get_exception(full_exec_str, globs, locs)
-    if is_exc:
+    full_exec_str = "%s\nexec_result = %s" % (pre_exec_str, exec_str)
+    locals_dict = {}
+    is_exc, exc_msg = exec_get_exception(full_exec_str, globals(), locals_dict)
+    if is_exc or not "exec_result" in locals_dict:
         return None, True, exc_msg
-    return exec_result["ex_result_val"], False, None
+    return locals_dict["exec_result"], False, None
 
 # returns 2-tuple of (exception, exception message)
 #   exception: boolean is True if exception was raised

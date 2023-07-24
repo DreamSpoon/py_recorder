@@ -20,10 +20,12 @@ from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProp
     IntProperty, PointerProperty, StringProperty)
 from bpy.types import PropertyGroup
 
-from .func import (PRESET_SOURCE_TYPES, PRESET_VIEW_TYPES, MODIFY_COLL_FUNC, MODIFY_PRESET_FUNC,
-    IMPEXP_DUP_COLL_ITEMS, set_input_full_datapath, get_input_full_datapath, create_base_type_items,
-    set_apply_input_full_datapath, get_apply_input_full_datapath, apply_base_type_items, apply_collection_items,
-    apply_preset_items, modify_base_type_items)
+from .func import (PRESET_SOURCE_TYPES, PRESET_VIEW_TYPES, DUP_COLL_ACTION_ITEMS)
+from .apply_func import (set_apply_full_datapath, get_apply_full_datapath, apply_base_type_items,
+    apply_collection_items, apply_preset_items)
+from .clipboard_func import (set_input_full_datapath, get_input_full_datapath, create_base_type_items)
+from .modify_func import (MODIFY_COLL_FUNC, MODIFY_PRESET_FUNC, modify_base_type_items,
+    get_update_full_datapath, set_update_full_datapath, preset_move_to_collection_items)
 
 class PYREC_PG_BoolProp(PropertyGroup):
     name: StringProperty()
@@ -55,7 +57,7 @@ class PYREC_PG_StringProp(PropertyGroup):
 #         # 'AXISANGLE', 'XYZ', 'COLOR_GAMMA', 'LAYER'
 #         )
 #
-# do more research, re: subtype
+# TODO full implementation of Vector subtype, e.g. Rotation, Color
 class PYREC_PG_VectorXYZ_Prop(PropertyGroup):
     name: StringProperty()
     value: FloatVectorProperty(subtype='XYZ')
@@ -136,6 +138,41 @@ class PYREC_PG_PresetTypeCollection(PropertyGroup):
     # 'name' of each item in this collection is Blender Python type name
     base_types: CollectionProperty(type=PYREC_PG_PresetCollection)
 
+class PYREC_PG_PresetApplyOptions(PropertyGroup):
+    # copy/paste input box
+    full_datapath: StringProperty(name="Data Path", set=set_apply_full_datapath, get=get_apply_full_datapath,
+        description="Full Data Path for preset type list. 'Copy Full Data Path', in right-click menu of a " \
+        "property, and paste here. e.g. right-click on Object's Location values to see menu with 'Copy Full " \
+        "Data Path'", default="bpy.data.objects[0].location")
+    available_types: CollectionProperty(type=PropertyGroup)
+    base_type: EnumProperty(items=apply_base_type_items)
+    collection: EnumProperty(items=apply_collection_items)
+    preset: EnumProperty(items=apply_preset_items)
+    detail: IntProperty()
+
+class PYREC_PG_PresetImpExpOptions(PropertyGroup):
+    dup_coll_action: EnumProperty(name="Duplicate Collection", description="Choose action for imported " \
+        "Collection where imported Collection name is duplicate of existing Collection", items=DUP_COLL_ACTION_ITEMS)
+    replace_preset: BoolProperty(name="Replace Duplicate Presets", description="If enabled then new " \
+        "Presets with names already used will replace existing Presets. If disabled then new Presets will " \
+        "be renamed (e.g. append .001)", default=False)
+
+class PYREC_PG_PresetModifyOptions(PropertyGroup):
+    active_collection: IntProperty()
+    base_type: EnumProperty(items=modify_base_type_items)
+    active_preset: IntProperty()
+    active_detail: IntProperty()
+    collection_function: EnumProperty(items=MODIFY_COLL_FUNC)
+    collection_rename: StringProperty()
+    preset_function: EnumProperty(items=MODIFY_PRESET_FUNC)
+    preset_rename: StringProperty()
+    update_full_datapath: StringProperty(description="Paste here after using 'Copy Full Data Path' function " \
+        "(right-click context menu)", get=get_update_full_datapath, set=set_update_full_datapath)
+    move_to_data_source: EnumProperty(description="Preset will be moved to Presets Collection from this Data Source",
+        items=PRESET_SOURCE_TYPES)
+    move_to_collection:  EnumProperty(description="Preset will be moved to this Presets Collection",
+        items=preset_move_to_collection_items)
+
 class PYREC_PG_PresetOptions(PropertyGroup):
     data_source: EnumProperty(name="Data Source", description="Presets and Preset Collections Data will be saved " \
         "in selected location. Changes to Presets and Preset Collections will only be applied to saved data in " \
@@ -146,29 +183,6 @@ class PYREC_PG_PresetOptions(PropertyGroup):
 
     clipboard: PointerProperty(type=PYREC_PG_PresetClipboard)
     clipboard_options: PointerProperty(type=PYREC_PG_PresetClipboardOptions)
-
-    # copy/paste input box
-    apply_input_full_datapath: StringProperty(name="Data Path", set=set_apply_input_full_datapath,
-        get=get_apply_input_full_datapath, description="Full Data Path for preset type list. 'Copy Full Data " +
-        "Path', in right-click menu of a property, and paste here. e.g. right-click on Object's Location values " +
-        "to see menu with 'Copy Full Data Path'", default="bpy.data.objects[0].location")
-    apply_available_types: CollectionProperty(type=PropertyGroup)
-    apply_base_type: EnumProperty(items=apply_base_type_items)
-    apply_collection: EnumProperty(items=apply_collection_items)
-    apply_preset: EnumProperty(items=apply_preset_items)
-    apply_detail: IntProperty()
-
-    modify_active_collection: IntProperty()
-    modify_base_type: EnumProperty(items=modify_base_type_items)
-    modify_active_preset: IntProperty()
-    modify_detail: IntProperty()
-    modify_collection_function: EnumProperty(items=MODIFY_COLL_FUNC)
-    modify_collection_rename: StringProperty()
-    modify_preset_function: EnumProperty(items=MODIFY_PRESET_FUNC)
-    modify_preset_rename: StringProperty()
-
-    impexp_dup_coll_action: EnumProperty(name="Duplicate Collection", description="Choose action for imported " \
-        "Collection where imported Collection name is duplicate of existing Collection", items=IMPEXP_DUP_COLL_ITEMS)
-    impexp_replace_preset: BoolProperty(name="Replace Duplicate Presets", description="If enabled then imported " \
-        "Presets with names already used will replace existing Presets. If disabled then imported Presets will " \
-        "be renamed (e.g. append .001)", default=False)
+    apply_options: PointerProperty(type=PYREC_PG_PresetApplyOptions)
+    impexp_options: PointerProperty(type=PYREC_PG_PresetImpExpOptions)
+    modify_options: PointerProperty(type=PYREC_PG_PresetModifyOptions)

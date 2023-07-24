@@ -18,9 +18,8 @@
 
 from bpy.types import UIList
 
-from .func import PRESET_SOURCE_ADDON_PREFS
-
-PREFS_ADDONS_NAME = "py_recorder"
+from ..bl_util import get_addon_module_name
+from .func import (get_source_preset_collections, get_modify_active_single_preset)
 
 def draw_prop_value(layout, value_type_base, prop_base, lock_changes):
     if lock_changes:
@@ -76,24 +75,18 @@ class PYREC_UL_PresetClipboardProps(UIList):
 class PYREC_UL_PresetApplyProps(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         # item type is PYREC_PG_PresetPropDetail
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        cb_options = p_options.clipboard_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        base_types = p_collections[p_options.apply_collection].base_types
-        apply_base_type = p_options.apply_base_type
+        p_options = context.window_manager.py_rec.preset_options
+        p_collections = get_source_preset_collections(context)
+        base_types = p_collections[p_options.apply_options.collection].base_types
+        apply_base_type = p_options.apply_options.base_type
         # remove ': datapath' from apply_base_type
         if apply_base_type.find(":") != -1:
             apply_base_type = apply_base_type[:apply_base_type.find(":")]
-        preset = base_types[apply_base_type].presets[p_options.apply_preset]
-
-        sp = layout.split(factor=cb_options.list_col_size3)
+        preset = base_types[apply_base_type].presets[p_options.apply_options.preset]
+        # draw row
+        sp = layout.split(factor=p_options.clipboard_options.list_col_size3)
         sp.label(text=item.name)
-        draw_prop_value(sp, item, preset, p_r.preset_options.lock_changes)
+        draw_prop_value(sp, item, preset, p_options.lock_changes)
 
 class PYREC_UL_PresetModifyCollections(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
@@ -107,17 +100,10 @@ class PYREC_UL_PresetModifyPresets(UIList):
 class PYREC_UL_PresetModifyProps(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         # item type is PYREC_PG_PresetPropDetail
-        p_r = context.window_manager.py_rec
-        p_options = p_r.preset_options
-        cb_options = p_options.clipboard_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
-        base_types = p_collections[p_options.modify_active_collection].base_types
-        preset = base_types[p_options.modify_base_type].presets[p_options.modify_active_preset]
-
-        sp = layout.split(factor=cb_options.list_col_size3)
+        preset_options = context.window_manager.py_rec.preset_options
+        sp = layout.split(factor=preset_options.clipboard_options.list_col_size3)
         sp.label(text=item.name)
-        draw_prop_value(sp, item, preset, p_r.preset_options.lock_changes)
+        preset = get_modify_active_single_preset(preset_options, get_source_preset_collections(context))
+        if preset is None:
+            return
+        draw_prop_value(sp, item, preset, preset_options.lock_changes)

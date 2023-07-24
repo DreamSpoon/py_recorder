@@ -18,39 +18,34 @@
 
 from bpy.types import Panel
 
+from ..bl_util import get_addon_module_name
 from .func import (PRESET_SOURCE_ADDON_PREFS, PRESET_VIEW_APPLY, PRESET_VIEW_MODIFY,
-    PRESET_VIEW_CLIPBOARD, PRESET_VIEW_IMPORT_EXPORT)
+    PRESET_VIEW_CLIPBOARD, PRESET_VIEW_IMPORT_EXPORT, get_source_preset_collections)
 from .operator import (PYREC_OT_PresetClipboardCreatePreset, PYREC_OT_PresetClipboardRemoveItem,
     PYREC_OT_PresetClipboardClear, PYREC_OT_PresetApply, PYREC_OT_PresetModifyCollection,
     PYREC_OT_PresetRemovePreset, PYREC_OT_PresetRemoveCollection, PYREC_OT_PresetModifyPreset,
     PYREC_OT_PresetPropsRemoveItem, PYREC_OT_QuicksavePreferences, PYREC_OT_PresetImportFile,
-    PYREC_OT_PresetExportFile, PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject)
-
-PREFS_ADDONS_NAME = "py_recorder"
+    PYREC_OT_PresetExportFile, PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject,
+    PYREC_OT_TransferObjectPresets)
 
 class PresetBaseClass(Panel):
     def draw_func_apply(self, context, p_r):
         layout = self.layout
-        p_r = context.window_manager.py_rec
         p_options = p_r.preset_options
-        # use Blender Addon Preferences or .blend file as Preset save data source
-        if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            p_collections = context.preferences.addons[PREFS_ADDONS_NAME].preferences.preset_collections
-        else:
-            p_collections = p_r.preset_collections
+        p_collections = get_source_preset_collections(context)
         layout.operator(PYREC_OT_PresetApply.bl_idname)
-        layout.prop(p_options, "apply_input_full_datapath")
-        layout.prop(p_options, "apply_base_type", text="Type")
-        layout.prop(p_options, "apply_collection", text="Collection")
-        layout.prop(p_options, "apply_preset", text="Preset")
+        layout.prop(p_options.apply_options, "full_datapath")
+        layout.prop(p_options.apply_options, "base_type", text="Type")
+        layout.prop(p_options.apply_options, "collection", text="Collection")
+        layout.prop(p_options.apply_options, "preset", text="Preset")
 
         layout.separator()
-        apply_coll_name = p_options.apply_collection
-        apply_type_name = p_options.apply_base_type
+        apply_coll_name = p_options.apply_options.collection
+        apply_type_name = p_options.apply_options.base_type
         # remove ': datapath' from apply_type_name
         if apply_type_name.find(":") != -1:
             apply_type_name = apply_type_name[:apply_type_name.find(":")]
-        apply_preset_name = p_options.apply_preset
+        apply_preset_name = p_options.apply_options.preset
         named_prop_preset = None
         if apply_coll_name in p_collections:
             base_types = p_collections[apply_coll_name].base_types
@@ -63,41 +58,44 @@ class PresetBaseClass(Panel):
             layout.box().label(text="")
         else:
             layout.template_list("PYREC_UL_PresetApplyProps", "", named_prop_preset, "prop_details",
-                                 p_options, "apply_detail")
+                                 p_options.apply_options, "detail")
 
     def draw_func_modify(self, context, p_r):
         p_options = p_r.preset_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            data_source = context.preferences.addons[PREFS_ADDONS_NAME].preferences
+            data_source = context.preferences.addons[get_addon_module_name()].preferences
         else:
             data_source = p_r
         p_collections = data_source.preset_collections
         layout = self.layout
 
         row = layout.row()
-        row.prop(p_r.preset_options, "modify_collection_function", text="")
+        row.prop(p_r.preset_options.modify_options, "collection_function", text="")
         row.operator(PYREC_OT_PresetModifyCollection.bl_idname)
 
         row = layout.row()
-        row.template_list("PYREC_UL_PresetModifyCollections", "", data_source, "preset_collections", p_options,
-                             "modify_active_collection", rows=3)
+        row.template_list("PYREC_UL_PresetModifyCollections", "", data_source, "preset_collections",
+                          p_options.modify_options, "active_collection", rows=3)
         row.operator(PYREC_OT_PresetRemoveCollection.bl_idname, text="", icon='REMOVE')
 
         layout.separator()
-        layout.prop(p_options, "modify_base_type", text="Type")
+        layout.prop(p_options.modify_options, "base_type", text="Type")
         layout.separator()
 
         row = layout.row()
-        row.prop(p_r.preset_options, "modify_preset_function", text="")
+        row.prop(p_r.preset_options.modify_options, "preset_function", text="")
         row.operator(PYREC_OT_PresetModifyPreset.bl_idname)
         layout.separator()
 
         row = layout.row()
-        if p_options.modify_active_collection < len(p_collections):
-            tp = p_collections[p_options.modify_active_collection].base_types
-            row.template_list("PYREC_UL_PresetModifyPresets", "", tp[p_options.modify_base_type], "presets",
-                              p_options, "modify_active_preset", rows=3)
+        if p_options.modify_options.active_collection < len(p_collections):
+            tp = p_collections[p_options.modify_options.active_collection].base_types
+            if p_options.modify_options.base_type in tp:
+                row.template_list("PYREC_UL_PresetModifyPresets", "", tp[p_options.modify_options.base_type],
+                                  "presets", p_options.modify_options, "active_preset", rows=3)
+            else:
+                row.box().label(text="")
         else:
             row.box().label(text="")
         row.operator(PYREC_OT_PresetRemovePreset.bl_idname, text="", icon='REMOVE')
@@ -105,9 +103,9 @@ class PresetBaseClass(Panel):
         layout.separator()
         layout.prop(p_options.clipboard_options, "list_col_size3", slider=True, text="Prop")
         row = layout.row()
-        preset_coll_index = p_options.modify_active_collection
-        preset_type_name= p_options.modify_base_type
-        preset_index = p_options.modify_active_preset
+        preset_coll_index = p_options.modify_options.active_collection
+        preset_type_name = p_options.modify_options.base_type
+        preset_index = p_options.modify_options.active_preset
         named_prop_preset = None
         if preset_coll_index < len(p_collections):
             base_types = p_collections[preset_coll_index].base_types
@@ -119,7 +117,7 @@ class PresetBaseClass(Panel):
             row.box().label(text="")
         else:
             row.template_list("PYREC_UL_PresetModifyProps", "", named_prop_preset, "prop_details",
-                              p_options, "modify_detail", rows=3)
+                              p_options.modify_options, "active_detail", rows=3)
         function_col = row.column()
         function_col.operator(PYREC_OT_PresetPropsRemoveItem.bl_idname, text="", icon='REMOVE')
 
@@ -129,7 +127,7 @@ class PresetBaseClass(Panel):
         cb_options = p_r.preset_options.clipboard_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_r.preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            data_source = context.preferences.addons[PREFS_ADDONS_NAME].preferences
+            data_source = context.preferences.addons[get_addon_module_name()].preferences
         else:
             data_source = p_r
         layout = self.layout
@@ -137,8 +135,9 @@ class PresetBaseClass(Panel):
         row = layout.row()
         row.label(text="", icon='RNA')
         row.prop(cb_options, "input_full_datapath", text="")
-        layout.separator()
+#        layout.separator()
 
+        layout.label(text="  New Preset")
         row = layout.row()
         if cb_options.create_preset_coll_name_search:
             row.prop_search(cb_options, "create_preset_coll_name", data_source, "preset_collections",
@@ -155,9 +154,9 @@ class PresetBaseClass(Panel):
         name_search = cb_options.create_preset_name_search
         if name_search  and coll_name in p_collections and bt in p_collections[coll_name].base_types:
             row.prop_search(cb_options, "create_preset_name", p_collections[coll_name].base_types[bt], "presets",
-                text="Collection", results_are_suggestions=True)
+                text="Name", results_are_suggestions=True)
         else:
-            row.prop(cb_options, "create_preset_name", text="Preset")
+            row.prop(cb_options, "create_preset_name", text="Name")
         row.prop(cb_options, "create_preset_name_search", icon='VIEWZOOM', text="", toggle=True)
 
         layout.operator(PYREC_OT_PresetClipboardCreatePreset.bl_idname)
@@ -213,6 +212,7 @@ class PresetBaseClass(Panel):
         layout.label(text="Object")
         layout.operator(PYREC_OT_PresetImportObject.bl_idname)
         layout.operator(PYREC_OT_PresetExportObject.bl_idname)
+        layout.operator(PYREC_OT_TransferObjectPresets.bl_idname)
 
     def draw(self, context):
         p_r = context.window_manager.py_rec

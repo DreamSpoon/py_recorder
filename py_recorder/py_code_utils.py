@@ -70,6 +70,20 @@ def trim_datapath(input_str):
     # which removes any trailing spaces / equals signs / etc.
     return input_str[ :attr_list[-1][1] ]
 
+# returns true if test_str starts with 'bpy.data.' (Blender data collection test) and 'test_str' can be evaluated in
+# Python (try to use exec() )
+def is_valid_full_datapath(test_str):
+    if not test_str.startswith("bpy.data."):
+        return False
+    # trim_datapath will remove '=' assignment, if needed, from 'test_str', before using exec()
+    #   - do this to prevent assigning values to properties during test for valid full data path
+    exec_str = "import bpy\n" + trim_datapath(test_str)
+    try:
+        exec(exec_str)
+        return True
+    except:
+        return False
+
 # returns dir(val) without duplicates (e.g. '__doc__' duplicates)
 def get_dir(val):
     temp_dict = {}
@@ -85,3 +99,14 @@ def get_relevant_doc(value):
         mathutils.Euler, mathutils.Matrix, mathutils.Quaternion, mathutils.Vector) ):
         return getdoc(value)
     return None
+
+# get name of class of value
+def get_value_type_name(value):
+    raw_name = str(type(value))
+    if raw_name.startswith("<class '") and raw_name.endswith("'>"):
+        return raw_name[8:-2]
+    return ""
+
+# test if value's type name begins with "bpy_types.", because this indicates that value's type is in 'bpy.types'
+def is_bpy_type_name(t_name):
+    return t_name.startswith("bpy.types.") or t_name.startswith("bpy_types.")

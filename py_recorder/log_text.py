@@ -20,10 +20,10 @@ from datetime import datetime as dt
 
 import bpy
 
-PREFS_ADDONS_NAME = "py_recorder"
+from .bl_util import get_addon_module_name
 
 def log_text_append(log_str):
-    addon_prefs_log = bpy.context.preferences.addons[PREFS_ADDONS_NAME].preferences.log
+    addon_prefs_log = bpy.context.preferences.addons[get_addon_module_name()].preferences.log
     output_text_name = addon_prefs_log.output_text_name
     # use default name if custom name is not available
     if output_text_name == "":
@@ -43,7 +43,7 @@ def log_text_append(log_str):
     return text
 
 def log_text_name():
-    addon_prefs_log = bpy.context.preferences.addons[PREFS_ADDONS_NAME].preferences.log
+    addon_prefs_log = bpy.context.preferences.addons[get_addon_module_name()].preferences.log
     output_text_name = addon_prefs_log.output_text_name
     # use default name if custom name is not available
     if output_text_name == "":
