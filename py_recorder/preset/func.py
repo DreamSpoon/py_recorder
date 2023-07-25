@@ -177,7 +177,7 @@ def update_preset_prop_value(preset, prop_name, new_value):
         preset.float_props[prop_detail.name].value = new_value
     elif prop_detail.value_type == "int" and isinstance(new_value, int):
         preset.int_props[prop_detail.name].value = new_value
-    elif prop_detail.value_type == "string" and isinstance(new_value, str):
+    elif prop_detail.value_type == "str" and isinstance(new_value, str):
         preset.string_props[prop_detail.name].value = new_value
     elif prop_detail.value_type == "VectorXYZ" and isinstance(new_value, Vector):
         preset.vector_xyz_props[prop_detail.name].value = new_value

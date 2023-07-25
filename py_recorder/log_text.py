@@ -22,12 +22,18 @@ import bpy
 
 from .bl_util import get_addon_module_name
 
-def log_text_append(log_str):
+def log_text_name():
     addon_prefs_log = bpy.context.preferences.addons[get_addon_module_name()].preferences.log
     output_text_name = addon_prefs_log.output_text_name
     # use default name if custom name is not available
     if output_text_name == "":
-        output_text_name = "py_rec_log"
+        return "py_rec_log"
+    else:
+        return output_text_name
+
+def log_text_append(log_str):
+    addon_prefs_log = bpy.context.preferences.addons[get_addon_module_name()].preferences.log
+    output_text_name = log_text_name()
     # get log Text, or create if needed
     text = bpy.data.texts.get(output_text_name)
     if text is None:
@@ -41,12 +47,3 @@ def log_text_append(log_str):
         text.write("\n%s" % date_time)
     text.write("\n%s\n" % (log_str))
     return text
-
-def log_text_name():
-    addon_prefs_log = bpy.context.preferences.addons[get_addon_module_name()].preferences.log
-    output_text_name = addon_prefs_log.output_text_name
-    # use default name if custom name is not available
-    if output_text_name == "":
-        return "py_rec_log"
-    else:
-        return output_text_name

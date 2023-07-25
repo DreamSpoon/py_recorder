@@ -63,7 +63,7 @@ class PYREC_PG_InspectPanelOptions(PropertyGroup):
         "box, to allow real-time editing of attribute value. Display value as string if try fails", default=True,
         options={'HIDDEN'})
     display_dir_attribute_type: BoolProperty(name="Type", description="Display Type column in Attribute list",
-        default=True, options={'HIDDEN'})
+        default=False, options={'HIDDEN'})
     display_dir_attribute_value: BoolProperty(name="Value", description="Display Value column in Attribute list",
         default=True, options={'HIDDEN'})
 

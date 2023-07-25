@@ -81,12 +81,12 @@ class PYREC_PG_PresetClipboard(PropertyGroup):
 
 class PYREC_PG_PresetClipboardOptions(PropertyGroup):
     # copy/paste input box
-    input_full_datapath: StringProperty(name="Data Path", set=set_input_full_datapath, get=get_input_full_datapath,
-        description="Full Data Path for preset. 'Copy Full Data Path', in right-click menu of a property, and " \
-        "paste here. e.g. right-click on Object's Location values to see menu with 'Copy Full Data Path'",
-        default="bpy.data.objects[0].location")
+    input_full_datapath: StringProperty(name="Full Data Path", set=set_input_full_datapath,
+        get=get_input_full_datapath, description="Full Data Path for preset. 'Copy Full Data Path', in right-click " \
+        "menu of a property, and paste here. e.g. right-click on Object's Location values to see menu with 'Copy " \
+        "Full Data Path'", default="bpy.data.objects[0].location")
     # list options
-    list_show_datapath: BoolProperty(name="Show Datapath", description="Show copied full datapath in Property " \
+    list_show_datapath: BoolProperty(name="Show Full Datapath", description="Show copied full datapath in Property " \
         "Clipboard list", default=False)
     # list column sizes (factors)
     list_col_size1: FloatProperty(name="List Column Size Factor 1", description="Adjust column width",

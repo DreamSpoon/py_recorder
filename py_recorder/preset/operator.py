@@ -117,6 +117,8 @@ class PYREC_OT_PresetClipboardRemoveItem(Operator):
         # remove active item from prop_details
         clipboard = context.window_manager.py_rec.preset_options.clipboard
         cb_options = context.window_manager.py_rec.preset_options.clipboard_options
+        if len(clipboard.prop_details) <= cb_options.active_prop_detail:
+            return {'CANCELLED'}
         preset_clipboard_remove_item(cb_options, clipboard)
         do_tag_redraw()
         return {'FINISHED'}
@@ -139,8 +141,14 @@ class PYREC_OT_PresetClipboardCreatePreset(Operator):
 
     def execute(self, context):
         p_r = context.window_manager.py_rec
-        preset_name = preset_clipboard_create_preset(get_source_preset_collections(context),
-            p_r.preset_options.clipboard, p_r.preset_options.clipboard_options)
+        preset_options = p_r.preset_options
+        if preset_options.lock_changes:
+            return {'CANCELLED'}
+        clipboard = preset_options.clipboard
+        cb_options = preset_options.clipboard_options
+        if len(clipboard.prop_details) == 0 or cb_options.create_base_type == " ":
+            return {'CANCELLED'}
+        preset_name = preset_clipboard_create_preset(get_source_preset_collections(context), clipboard, cb_options)
         self.report({'INFO'}, "New Preset created named: " + preset_name)
         return {'FINISHED'}
 
@@ -164,8 +172,17 @@ class PYREC_OT_PresetPropsRemoveItem(Operator):
         return preset_options.modify_options.active_detail < len(prop_details)
 
     def execute(self, context):
+        preset_options = context.window_manager.py_rec.preset_options
+        if preset_options.lock_changes:
+            return {'CANCELLED'}
         p_collections = get_source_preset_collections(context)
-        preset_remove_prop(context.window_manager.py_rec.preset_options, p_collections)
+        preset = get_modify_active_single_preset(preset_options, p_collections)
+        if preset is None:
+            return {'CANCELLED'}
+        prop_details = preset.prop_details
+        if preset_options.modify_options.active_detail >= len(prop_details):
+            return {'CANCELLED'}
+        preset_remove_prop(preset_options, p_collections)
         do_tag_redraw()
         return {'FINISHED'}
 
@@ -210,6 +227,8 @@ class PYREC_OT_PresetModifyCollection(Operator):
 
     def execute(self, context):
         preset_options = context.window_manager.py_rec.preset_options
+        if preset_options.lock_changes:
+            return {'CANCELLED'}
         f = preset_options.modify_options.collection_function
         if f == MODIFY_COLL_FUNC_MOVE:
             preset_collection_modify_move(context, preset_options, preset_options.impexp_options.dup_coll_action,
@@ -258,14 +277,16 @@ class PYREC_OT_PresetRemoveCollection(Operator):
 
     @classmethod
     def poll(cls, context):
-        p_r = context.window_manager.py_rec
-        if p_r.preset_options.lock_changes:
+        preset_options = context.window_manager.py_rec.preset_options
+        if preset_options.lock_changes:
             return False
-        return p_r.preset_options.modify_options.active_collection < len(get_source_preset_collections(context))
+        return get_modify_active_preset_collection(preset_options, get_source_preset_collections(context)) != None
 
     def execute(self, context):
-        preset_collection_remove_collection(context.window_manager.py_rec.preset_options,
-                                            get_source_preset_collections(context))
+        preset_options = context.window_manager.py_rec.preset_options
+        if preset_options.lock_changes:
+            return {'CANCELLED'}
+        preset_collection_remove_collection(preset_options, get_source_preset_collections(context))
         do_tag_redraw()
         self.report({'INFO'}, "Removed Presets Collection")
         return {'FINISHED'}
@@ -294,7 +315,11 @@ class PYREC_OT_PresetModifyPreset(Operator):
 
     def execute(self, context):
         preset_options = context.window_manager.py_rec.preset_options
+        if preset_options.lock_changes:
+            return {'CANCELLED'}
         p_collections = get_source_preset_collections(context)
+        if get_modify_active_single_preset(preset_options, p_collections) is None:
+            return {'CANCELLED'}
         f = preset_options.modify_options.preset_function
         if f == MODIFY_PRESET_FUNC_COPY_TO_CLIPBOARD:
             copy_result = copy_active_preset_to_clipboard(context, preset_options, p_collections)
@@ -376,16 +401,16 @@ class PYREC_OT_PresetRemovePreset(Operator):
         if preset_options.lock_changes:
             return False
         p_collections = get_source_preset_collections(context)
-        if preset_options.modify_options.active_collection >= len(p_collections):
-            return False
-        tp = p_collections[preset_options.modify_options.active_collection].base_types
-        if preset_options.modify_options.base_type not in tp:
-            return False
-        return preset_options.modify_options.active_preset < len(tp[preset_options.modify_options.base_type].presets)
+        return get_modify_active_single_preset(preset_options, p_collections) != None
 
     def execute(self, context):
-        preset_collection_remove_preset(context.window_manager.py_rec.preset_options,
-                                        get_source_preset_collections(context))
+        preset_options = context.window_manager.py_rec.preset_options
+        if preset_options.lock_changes:
+            return False
+        p_collections = get_source_preset_collections(context)
+        if get_modify_active_single_preset(preset_options, p_collections) is None:
+            return
+        preset_collection_remove_preset(context.window_manager.py_rec.preset_options, p_collections)
         self.report({'INFO'}, "Removed Preset")
         return {'FINISHED'}
 
@@ -459,6 +484,8 @@ class PYREC_OT_PresetImportFile(Operator, ImportHelper):
         return context.window_manager.py_rec.preset_options.lock_changes == False
 
     def execute(self, context):
+        if context.window_manager.py_rec.preset_options.lock_changes:
+            return {'CANCELLED'}
         preset_options = context.window_manager.py_rec.preset_options
         import_result = import_presets_file(get_source_preset_collections(context), self.filepath,
             preset_options.impexp_options.dup_coll_action, preset_options.impexp_options.replace_preset)
@@ -524,8 +551,7 @@ class PYREC_OT_PresetImportObject(Operator):
         return context.active_object != None and context.window_manager.py_rec.preset_options.lock_changes == False
 
     def execute(self, context):
-        if context.active_object is None:
-            self.report({'ERROR'}, "Unable to Import Presets Collections, no active Object")
+        if context.active_object is None or context.window_manager.py_rec.preset_options.lock_changes:
             return {'CANCELLED'}
         preset_options = context.window_manager.py_rec.preset_options
         import_result = import_presets_object(get_source_preset_collections(context), context.active_object,
@@ -567,8 +593,6 @@ class PYREC_OT_TransferObjectPresets(Operator):
     def execute(self, context):
         sel_ob = [ ob for ob in context.selected_objects if ob != context.active_object ]
         if context.active_object is None or len(sel_ob) < 1:
-            self.report({'ERROR'}, "Unable to Transfer Presets between Objects, no active Object or not enough " \
-                        "other selected Objects")
             return {'CANCELLED'}
         err_msg = transfer_object_presets(context.active_object, sel_ob)
         if isinstance(err_msg, str):
