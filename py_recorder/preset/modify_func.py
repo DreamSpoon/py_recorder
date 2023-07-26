@@ -99,6 +99,10 @@ def preset_remove_prop(preset_options, preset_collections):
         preset.int_props.remove(preset.int_props.find(prop_detail_name))
     elif prop_detail_type == "str":
         preset.string_props.remove(preset.string_props.find(prop_detail_name))
+    elif prop_detail_type == "VectorEuler":
+        preset.vector_euler_props.remove(preset.vector_euler_props.find(prop_detail_name))
+    elif prop_detail_type == "VectorQuaternion":
+        preset.vector_quaternion_props.remove(preset.vector_quaternion_props.find(prop_detail_name))
     elif prop_detail_type == "VectorXYZ":
         preset.vector_xyz_props.remove(preset.vector_xyz_props.find(prop_detail_name))
     # remove preset property detail
@@ -143,7 +147,12 @@ def copy_preset_to_base_type(src_preset, base_type, replace_preset):
     copy_preset_props(src_preset.float_props, new_preset.float_props, new_preset.prop_details, "float")
     copy_preset_props(src_preset.int_props, new_preset.int_props, new_preset.prop_details, "int")
     copy_preset_props(src_preset.string_props, new_preset.string_props, new_preset.prop_details, "str")
-    copy_preset_props(src_preset.vector_xyz_props, new_preset.vector_xyz_props, new_preset.prop_details, "VectorXYZ")
+    copy_preset_props(src_preset.vector_euler_props, new_preset.vector_euler_props, new_preset.prop_details,
+                      "VectorEuler")
+    copy_preset_props(src_preset.vector_quaternion_props, new_preset.vector_quaternion_props, new_preset.prop_details,
+                      "VectorQuaternion")
+    copy_preset_props(src_preset.vector_xyz_props, new_preset.vector_xyz_props, new_preset.prop_details,
+                      "VectorXYZ")
 
 def preset_collection_modify_move(context, preset_options, dup_coll_action, replace_preset):
     if preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
@@ -219,11 +228,24 @@ def update_preset(preset_options, preset_collections):
     if preset is None:
         return
     for prop_detail in preset.prop_details:
-        full_datapath = update_preset_valid_datapath[0] + "." + prop_detail.name
-        exec_str = "import bpy\ndatapath_value = " + full_datapath
+        # get base value for attribute searching
+        exec_str = "import bpy\ndatapath_value = " + update_preset_valid_datapath[0]
         locals_dict = {}
         exec(exec_str, globals(), locals_dict)
-        update_preset_prop_value(preset, prop_detail.name, locals_dict["datapath_value"])
+        if locals_dict["datapath_value"] is None:
+            continue
+        # get ordered attribute list and recurse to get property value
+        current_val = locals_dict["datapath_value"]
+        attr_name_list = prop_detail.name.split(".")
+        for attr_name in attr_name_list:
+            if current_val is None:
+                break
+            if not hasattr(current_val, attr_name):
+                current_val = None
+                break
+            current_val = getattr(current_val, attr_name)
+        if current_val != None:
+            update_preset_prop_value(preset, prop_detail.name, current_val)
 
 def preset_move_to_collection_items(self, context):
     p_r = context.window_manager.py_rec

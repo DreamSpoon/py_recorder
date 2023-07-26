@@ -16,7 +16,7 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-from mathutils import Vector
+from mathutils import Euler, Quaternion, Vector
 
 import bpy
 
@@ -116,7 +116,8 @@ def digest_full_datapath(full_datapath, all_bpy_types=False):
             prop_path = ""
             prop_value = None
         # if known property value type is found then exit for loop
-        elif isinstance(val, (bool, float, int, str)) or ( isinstance(val, Vector) and len(val) == 3 ):
+        elif isinstance(val, (bool, float, int, str, Euler, Quaternion)) \
+            or ( isinstance(val, Vector) and len(val) == 3 ):
             if prev_attr_bpy_type:
                 prop_path = prog_datapath
                 prop_value = val
@@ -159,9 +160,17 @@ def get_preset_prop_value_str(preset, prop_name):
     elif prop_detail.value_type == "str":
         prop_value = preset.string_props[prop_detail.name].value
         return ( prop_value, '"' + prop_value + '"' )
+    elif prop_detail.value_type == "VectorEuler":
+        prop_value = preset.vector_euler_props[prop_detail.name].value
+        prop_order = preset.vector_euler_props[prop_detail.name].order
+        return ( (prop_value, prop_order), "Euler((%f, %f, %f), '%s')" % (prop_value[0], prop_value[0], prop_value[2],
+                                                                          prop_order) )
+    elif prop_detail.value_type == "VectorQuaternion":
+        prop_value = preset.vector_quaternion_props[prop_detail.name].value
+        return ( prop_value, "Quaternion((%f, %f, %f, %f))" % prop_value )
     elif prop_detail.value_type == "VectorXYZ":
         prop_value = preset.vector_xyz_props[prop_detail.name].value
-        return ( prop_value, "(%f, %f, %f)" % prop_value )
+        return ( prop_value, "Vector((%f, %f, %f))" % prop_value )
     else:
         return None
 
@@ -179,7 +188,12 @@ def update_preset_prop_value(preset, prop_name, new_value):
         preset.int_props[prop_detail.name].value = new_value
     elif prop_detail.value_type == "str" and isinstance(new_value, str):
         preset.string_props[prop_detail.name].value = new_value
-    elif prop_detail.value_type == "VectorXYZ" and isinstance(new_value, Vector):
+    elif prop_detail.value_type == "VectorEuler" and isinstance(new_value, Euler):
+        preset.vector_euler_props[prop_detail.name].value = new_value
+        preset.vector_euler_props[prop_detail.name].order = new_value.order
+    elif prop_detail.value_type == "VectorQuaternion" and isinstance(new_value, Quaternion):
+        preset.vector_quaternion_props[prop_detail.name].value = new_value
+    elif prop_detail.value_type == "VectorXYZ" and isinstance(new_value, Vector) and len(new_value) == 3:
         preset.vector_xyz_props[prop_detail.name].value = new_value
     else:
         return False

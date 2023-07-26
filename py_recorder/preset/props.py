@@ -57,7 +57,24 @@ class PYREC_PG_StringProp(PropertyGroup):
 #         # 'AXISANGLE', 'XYZ', 'COLOR_GAMMA', 'LAYER'
 #         )
 #
-# TODO full implementation of Vector subtype, e.g. Rotation, Color
+# TODO full implementation of Vector subtype, e.g. Matrix, Layer
+EULER_ORDER_ITEMS = [
+    ("XYZ", "XYZ Euler", ""),
+    ("XZY", "XZY Euler", ""),
+    ("YXZ", "YXZ Euler", ""),
+    ("YZX", "YZX Euler", ""),
+    ("ZXY", "ZXY Euler", ""),
+    ("ZYX", "ZYX Euler", ""),
+    ]
+class PYREC_PG_VectorEulerProp(PropertyGroup):
+    name: StringProperty()
+    value: FloatVectorProperty(subtype='EULER')
+    order: EnumProperty(name="Mode", items=EULER_ORDER_ITEMS)
+
+class PYREC_PG_VectorQuaternionProp(PropertyGroup):
+    name: StringProperty()
+    value: FloatVectorProperty(size=4, subtype='QUATERNION', default=(0.0, 0.0, 0.0, 0.0))
+
 class PYREC_PG_VectorXYZ_Prop(PropertyGroup):
     name: StringProperty()
     value: FloatVectorProperty(subtype='XYZ')
@@ -77,6 +94,8 @@ class PYREC_PG_PresetClipboard(PropertyGroup):
     int_props: CollectionProperty(type=PYREC_PG_IntProp)
     float_props: CollectionProperty(type=PYREC_PG_FloatProp)
     string_props: CollectionProperty(type=PYREC_PG_StringProp)
+    vector_euler_props: CollectionProperty(type=PYREC_PG_VectorEulerProp)
+    vector_quaternion_props: CollectionProperty(type=PYREC_PG_VectorQuaternionProp)
     vector_xyz_props: CollectionProperty(type=PYREC_PG_VectorXYZ_Prop)
 
 class PYREC_PG_PresetClipboardOptions(PropertyGroup):
@@ -125,6 +144,8 @@ class PYREC_PG_Preset(PropertyGroup):
     int_props: CollectionProperty(type=PYREC_PG_IntProp)
     float_props: CollectionProperty(type=PYREC_PG_FloatProp)
     string_props: CollectionProperty(type=PYREC_PG_StringProp)
+    vector_euler_props: CollectionProperty(type=PYREC_PG_VectorEulerProp)
+    vector_quaternion_props: CollectionProperty(type=PYREC_PG_VectorQuaternionProp)
     vector_xyz_props: CollectionProperty(type=PYREC_PG_VectorXYZ_Prop)
 
 # a collection of presets that apply to only one base type, base type is 'name' of this item in parent collection,

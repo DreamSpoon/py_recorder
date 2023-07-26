@@ -135,7 +135,6 @@ class PresetBaseClass(Panel):
         row = layout.row()
         row.label(text="", icon='RNA')
         row.prop(cb_options, "input_full_datapath", text="")
-#        layout.separator()
 
         layout.label(text="  New Preset")
         row = layout.row()

@@ -16,7 +16,7 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-from mathutils import Vector
+from mathutils import Euler, Quaternion, Vector
 
 import bpy
 
@@ -49,6 +49,12 @@ def create_clipboard_line(clipboard, full_datapath, path_type_paths, prop_value)
     elif isinstance(prop_value, str):
         p = clipboard.string_props.add()
         prop_detail.value_type = "str"
+    elif isinstance(prop_value, Euler):
+        p = clipboard.vector_euler_props.add()
+        prop_detail.value_type = "VectorEuler"
+    elif isinstance(prop_value, Quaternion):
+        p = clipboard.vector_quaternion_props.add()
+        prop_detail.value_type = "VectorQuaternion"
     elif isinstance(prop_value, Vector) and len(prop_value) == 3:
         p = clipboard.vector_xyz_props.add()
         prop_detail.value_type = "VectorXYZ"
@@ -58,6 +64,8 @@ def create_clipboard_line(clipboard, full_datapath, path_type_paths, prop_value)
     p.name = full_datapath
     # set value of new property in Preset
     p.value = prop_value
+    if isinstance(prop_value, Euler):
+        p.order = prop_value.order
 
 def paste_full_datapath_to_clipboard(full_datapath):
     # remove leading/trailing whitespace
@@ -101,6 +109,8 @@ def preset_clipboard_clear(cb_options, clipboard):
     clipboard.int_props.clear()
     clipboard.float_props.clear()
     clipboard.string_props.clear()
+    clipboard.vector_euler_props.clear()
+    clipboard.vector_quaternion_props.clear()
     clipboard.vector_xyz_props.clear()
 
 def preset_clipboard_remove_item(cb_options, clipboard):
@@ -163,6 +173,15 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options):
                 new_preset_prop = new_preset.string_props.add()
                 new_preset_prop.name = prop_path
                 new_preset_prop.value = clipboard.string_props[prop_detail.name].value
+            elif prop_detail.value_type == "VectorEuler":
+                new_preset_prop = new_preset.vector_euler_props.add()
+                new_preset_prop.name = prop_path
+                new_preset_prop.value = clipboard.vector_euler_props[prop_detail.name].value
+                new_preset_prop.order = clipboard.vector_euler_props[prop_detail.name].order
+            elif prop_detail.value_type == "VectorQuaternion":
+                new_preset_prop = new_preset.vector_quaternion_props.add()
+                new_preset_prop.name = prop_path
+                new_preset_prop.value = clipboard.vector_quaternion_props[prop_detail.name].value
             elif prop_detail.value_type == "VectorXYZ":
                 new_preset_prop = new_preset.vector_xyz_props.add()
                 new_preset_prop.name = prop_path
@@ -186,6 +205,14 @@ def copy_active_preset_to_clipboard(context, p_options, p_collections):
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
     for prop in preset.string_props:
+        props_count += 1
+        create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
+                              prop.value)
+    for prop in preset.vector_euler_props:
+        props_count += 1
+        create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
+                              prop.value)
+    for prop in preset.vector_quaternion_props:
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)

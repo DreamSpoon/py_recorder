@@ -32,6 +32,13 @@ def draw_prop_value(layout, value_type_base, prop_base, lock_changes):
             layout.label(text=str(prop_base.int_props[value_type_base.name].value))
         elif value_type_base.value_type == "str":
             layout.label(text=str(prop_base.string_props[value_type_base.name].value))
+        elif value_type_base.value_type == "VectorEuler":
+            v = prop_base.vector_euler_props[value_type_base.name].value
+            order = prop_base.vector_euler_props[value_type_base.name].order
+            layout.label(text="((%f, %f, %f), '%s')" % (v[0], v[1], v[2], order))
+        elif value_type_base.value_type == "VectorQuaternion":
+            v = prop_base.vector_quaternion_props[value_type_base.name].value
+            layout.label(text="(%f, %f, %f, %f)" % (v[0], v[1], v[2], v[3]) )
         elif value_type_base.value_type == "VectorXYZ":
             v = prop_base.vector_xyz_props[value_type_base.name].value
             layout.label(text="(%f, %f, %f)" % (v[0], v[1], v[2]))
@@ -45,6 +52,12 @@ def draw_prop_value(layout, value_type_base, prop_base, lock_changes):
             layout.prop(prop_base.int_props[value_type_base.name], "value", text="", slider=False)
         elif value_type_base.value_type == "str":
             layout.prop(prop_base.string_props[value_type_base.name], "value", text="")
+        elif value_type_base.value_type == "VectorEuler":
+            col = layout.column(align=True)
+            col.prop(prop_base.vector_euler_props[value_type_base.name], "value", text="", slider=False)
+            col.prop(prop_base.vector_euler_props[value_type_base.name], "order", text="", slider=False)
+        elif value_type_base.value_type == "VectorQuaternion":
+            layout.prop(prop_base.vector_quaternion_props[value_type_base.name], "value", text="", slider=False)
         elif value_type_base.value_type == "VectorXYZ":
             layout.prop(prop_base.vector_xyz_props[value_type_base.name], "value", text="", slider=False)
 
