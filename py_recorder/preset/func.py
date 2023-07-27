@@ -19,6 +19,7 @@
 from mathutils import Euler, Quaternion, Vector
 
 import bpy
+from bpy.types import bpy_prop_array
 
 from ..bl_util import get_addon_module_name
 from ..py_code_utils import (enumerate_datapath_hierarchy, trim_datapath, get_value_type_name, is_bpy_type_name)
@@ -116,8 +117,8 @@ def digest_full_datapath(full_datapath, all_bpy_types=False):
             prop_path = ""
             prop_value = None
         # if known property value type is found then exit for loop
-        elif isinstance(val, (bool, float, int, str, Euler, Quaternion)) \
-            or ( isinstance(val, Vector) and len(val) == 3 ):
+        elif isinstance(val, (bool, float, int, str, Euler)) \
+            or ( isinstance(val, (bpy_prop_array, list, Quaternion, tuple, Vector)) and len(val) in [3, 4] ):
             if prev_attr_bpy_type:
                 prop_path = prog_datapath
                 prop_value = val
@@ -165,12 +166,12 @@ def get_preset_prop_value_str(preset, prop_name):
         prop_order = preset.vector_euler_props[prop_detail.name].order
         return ( (prop_value, prop_order), "Euler((%f, %f, %f), '%s')" % (prop_value[0], prop_value[0], prop_value[2],
                                                                           prop_order) )
-    elif prop_detail.value_type == "VectorQuaternion":
-        prop_value = preset.vector_quaternion_props[prop_detail.name].value
-        return ( prop_value, "Quaternion((%f, %f, %f, %f))" % prop_value )
-    elif prop_detail.value_type == "VectorXYZ":
-        prop_value = preset.vector_xyz_props[prop_detail.name].value
-        return ( prop_value, "Vector((%f, %f, %f))" % prop_value )
+    elif prop_detail.value_type == "VectorFloat3":
+        prop_value = preset.vector_float3_props[prop_detail.name].value
+        return ( prop_value, "Float3(%f, %f, %f)" % (prop_value[0], prop_value[1], prop_value[2]) )
+    elif prop_detail.value_type == "VectorFloat4":
+        prop_value = preset.vector_float4_props[prop_detail.name].value
+        return ( prop_value, "Float4(%f, %f, %f, %f)" % (prop_value[0], prop_value[1], prop_value[2], prop_value[3]) )
     else:
         return None
 
@@ -191,10 +192,13 @@ def update_preset_prop_value(preset, prop_name, new_value):
     elif prop_detail.value_type == "VectorEuler" and isinstance(new_value, Euler):
         preset.vector_euler_props[prop_detail.name].value = new_value
         preset.vector_euler_props[prop_detail.name].order = new_value.order
-    elif prop_detail.value_type == "VectorQuaternion" and isinstance(new_value, Quaternion):
-        preset.vector_quaternion_props[prop_detail.name].value = new_value
-    elif prop_detail.value_type == "VectorXYZ" and isinstance(new_value, Vector) and len(new_value) == 3:
-        preset.vector_xyz_props[prop_detail.name].value = new_value
+    elif isinstance(new_value, (bpy_prop_array, list, Quaternion, tuple, Vector)):
+        if prop_detail.value_type == "VectorFloat3" and len(new_value) == 3:
+            preset.vector_float3_props[prop_detail.name].value = new_value
+        elif prop_detail.value_type == "VectorFloat4" and len(new_value) == 4:
+            preset.vector_float4_props[prop_detail.name].value = new_value
+        else:
+            return False
     else:
         return False
     return True

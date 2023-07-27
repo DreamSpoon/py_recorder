@@ -66,7 +66,7 @@ from .preset.operator import (PYREC_OT_PresetClipboardClear, PYREC_OT_PresetClip
     PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject, PYREC_OT_TransferObjectPresets)
 from .preset.panel import (PYREC_PT_View3dPreset, PYREC_PT_TextEditorPreset)
 from .preset.props import (PYREC_PG_BoolProp, PYREC_PG_IntProp, PYREC_PG_FloatProp, PYREC_PG_VectorEulerProp,
-    PYREC_PG_VectorQuaternionProp, PYREC_PG_VectorXYZ_Prop, PYREC_PG_StringProp, PYREC_PG_PresetPropDetail,
+    PYREC_PG_VectorFloat3Prop, PYREC_PG_VectorFloat4Prop, PYREC_PG_StringProp, PYREC_PG_PresetPropDetail,
     PYREC_PG_Preset, PYREC_PG_PresetCollection, PYREC_PG_PresetTypeCollection, PYREC_PG_PresetClipboardPropDetail,
     PYREC_PG_PresetClipboard, PYREC_PG_PresetClipboardOptions, PYREC_PG_PresetApplyOptions,
     PYREC_PG_PresetModifyOptions, PYREC_PG_PresetOptions, PYREC_PG_PresetImpExpOptions)
@@ -164,8 +164,8 @@ classes = [
     PYREC_PG_IntProp,
     PYREC_PG_FloatProp,
     PYREC_PG_VectorEulerProp,
-    PYREC_PG_VectorQuaternionProp,
-    PYREC_PG_VectorXYZ_Prop,
+    PYREC_PG_VectorFloat3Prop,
+    PYREC_PG_VectorFloat4Prop,
     PYREC_PG_StringProp,
     PYREC_PG_PresetPropDetail,
     PYREC_PG_Preset,

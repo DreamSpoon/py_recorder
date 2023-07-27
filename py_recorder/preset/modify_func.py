@@ -101,23 +101,31 @@ def preset_remove_prop(preset_options, preset_collections):
         preset.string_props.remove(preset.string_props.find(prop_detail_name))
     elif prop_detail_type == "VectorEuler":
         preset.vector_euler_props.remove(preset.vector_euler_props.find(prop_detail_name))
-    elif prop_detail_type == "VectorQuaternion":
-        preset.vector_quaternion_props.remove(preset.vector_quaternion_props.find(prop_detail_name))
-    elif prop_detail_type == "VectorXYZ":
-        preset.vector_xyz_props.remove(preset.vector_xyz_props.find(prop_detail_name))
+    elif prop_detail_type == "VectorFloat3":
+        preset.vector_float3_props.remove(preset.vector_float3_props.find(prop_detail_name))
+    elif prop_detail_type == "VectorFloat4":
+        preset.vector_float4_props.remove(preset.vector_float4_props.find(prop_detail_name))
     # remove preset property detail
     preset.prop_details.remove(preset_options.modify_options.active_detail)
 
 def preset_collection_remove_collection(preset_options, preset_collections):
-    if len(preset_collections) <= preset_options.modify_options.active_collection:
+    modify_options = preset_options.modify_options
+    if len(preset_collections) <= modify_options.active_collection:
         return
-    preset_collections.remove(preset_options.modify_options.active_collection)
+    preset_collections.remove(modify_options.active_collection)
+    modify_options.active_collection -= 1
+    if modify_options.active_collection < 0:
+        modify_options.active_collection = 0
 
 def preset_collection_remove_preset(preset_options, preset_collections):
     presets = get_modify_active_presets(preset_options, preset_collections)
     if presets is None:
         return
-    presets.remove(preset_options.modify_options.active_preset)
+    modify_options = preset_options.modify_options
+    presets.remove(modify_options.active_preset)
+    modify_options.active_preset -= 1
+    if modify_options.active_preset < 0:
+        modify_options.active_preset = 0
 
 def copy_preset_props(src_props, dest_props, dest_prop_details, value_type):
     for prop in src_props:
@@ -149,10 +157,10 @@ def copy_preset_to_base_type(src_preset, base_type, replace_preset):
     copy_preset_props(src_preset.string_props, new_preset.string_props, new_preset.prop_details, "str")
     copy_preset_props(src_preset.vector_euler_props, new_preset.vector_euler_props, new_preset.prop_details,
                       "VectorEuler")
-    copy_preset_props(src_preset.vector_quaternion_props, new_preset.vector_quaternion_props, new_preset.prop_details,
-                      "VectorQuaternion")
-    copy_preset_props(src_preset.vector_xyz_props, new_preset.vector_xyz_props, new_preset.prop_details,
-                      "VectorXYZ")
+    copy_preset_props(src_preset.vector_float3_props, new_preset.vector_float3_props, new_preset.prop_details,
+                      "VectorFloat3")
+    copy_preset_props(src_preset.vector_float4_props, new_preset.vector_float4_props, new_preset.prop_details,
+                      "VectorFloat4")
 
 def preset_collection_modify_move(context, preset_options, dup_coll_action, replace_preset):
     if preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:

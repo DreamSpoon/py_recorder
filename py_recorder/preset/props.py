@@ -71,13 +71,13 @@ class PYREC_PG_VectorEulerProp(PropertyGroup):
     value: FloatVectorProperty(subtype='EULER')
     order: EnumProperty(name="Mode", items=EULER_ORDER_ITEMS)
 
-class PYREC_PG_VectorQuaternionProp(PropertyGroup):
+class PYREC_PG_VectorFloat3Prop(PropertyGroup):
     name: StringProperty()
-    value: FloatVectorProperty(size=4, subtype='QUATERNION', default=(0.0, 0.0, 0.0, 0.0))
+    value: FloatVectorProperty(size=3, default=(0.0, 0.0, 0.0))
 
-class PYREC_PG_VectorXYZ_Prop(PropertyGroup):
+class PYREC_PG_VectorFloat4Prop(PropertyGroup):
     name: StringProperty()
-    value: FloatVectorProperty(subtype='XYZ')
+    value: FloatVectorProperty(size=4, default=(0.0, 0.0, 0.0, 0.0))
 
 class PYREC_PG_PresetClipboardPropDetail(PropertyGroup):
     # name is full datapath
@@ -95,8 +95,8 @@ class PYREC_PG_PresetClipboard(PropertyGroup):
     float_props: CollectionProperty(type=PYREC_PG_FloatProp)
     string_props: CollectionProperty(type=PYREC_PG_StringProp)
     vector_euler_props: CollectionProperty(type=PYREC_PG_VectorEulerProp)
-    vector_quaternion_props: CollectionProperty(type=PYREC_PG_VectorQuaternionProp)
-    vector_xyz_props: CollectionProperty(type=PYREC_PG_VectorXYZ_Prop)
+    vector_float3_props: CollectionProperty(type=PYREC_PG_VectorFloat3Prop)
+    vector_float4_props: CollectionProperty(type=PYREC_PG_VectorFloat4Prop)
 
 class PYREC_PG_PresetClipboardOptions(PropertyGroup):
     # copy/paste input box
@@ -145,8 +145,8 @@ class PYREC_PG_Preset(PropertyGroup):
     float_props: CollectionProperty(type=PYREC_PG_FloatProp)
     string_props: CollectionProperty(type=PYREC_PG_StringProp)
     vector_euler_props: CollectionProperty(type=PYREC_PG_VectorEulerProp)
-    vector_quaternion_props: CollectionProperty(type=PYREC_PG_VectorQuaternionProp)
-    vector_xyz_props: CollectionProperty(type=PYREC_PG_VectorXYZ_Prop)
+    vector_float3_props: CollectionProperty(type=PYREC_PG_VectorFloat3Prop)
+    vector_float4_props: CollectionProperty(type=PYREC_PG_VectorFloat4Prop)
 
 # a collection of presets that apply to only one base type, base type is 'name' of this item in parent collection,
 # e.g. base type 'bpy.types.Object'

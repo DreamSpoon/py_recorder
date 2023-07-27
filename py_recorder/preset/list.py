@@ -36,12 +36,12 @@ def draw_prop_value(layout, value_type_base, prop_base, lock_changes):
             v = prop_base.vector_euler_props[value_type_base.name].value
             order = prop_base.vector_euler_props[value_type_base.name].order
             layout.label(text="((%f, %f, %f), '%s')" % (v[0], v[1], v[2], order))
-        elif value_type_base.value_type == "VectorQuaternion":
-            v = prop_base.vector_quaternion_props[value_type_base.name].value
+        elif value_type_base.value_type == "VectorFloat3":
+            v = prop_base.vector_float3_props[value_type_base.name].value
+            layout.label(text="(%f, %f, %f)" % (v[0], v[1], v[2]) )
+        elif value_type_base.value_type == "VectorFloat4":
+            v = prop_base.vector_float4_props[value_type_base.name].value
             layout.label(text="(%f, %f, %f, %f)" % (v[0], v[1], v[2], v[3]) )
-        elif value_type_base.value_type == "VectorXYZ":
-            v = prop_base.vector_xyz_props[value_type_base.name].value
-            layout.label(text="(%f, %f, %f)" % (v[0], v[1], v[2]))
     else:
         # display the property's value
         if value_type_base.value_type == "bool":
@@ -56,10 +56,10 @@ def draw_prop_value(layout, value_type_base, prop_base, lock_changes):
             col = layout.column(align=True)
             col.prop(prop_base.vector_euler_props[value_type_base.name], "value", text="", slider=False)
             col.prop(prop_base.vector_euler_props[value_type_base.name], "order", text="", slider=False)
-        elif value_type_base.value_type == "VectorQuaternion":
-            layout.prop(prop_base.vector_quaternion_props[value_type_base.name], "value", text="", slider=False)
-        elif value_type_base.value_type == "VectorXYZ":
-            layout.prop(prop_base.vector_xyz_props[value_type_base.name], "value", text="", slider=False)
+        elif value_type_base.value_type == "VectorFloat3":
+            layout.prop(prop_base.vector_float3_props[value_type_base.name], "value", text="", slider=False)
+        elif value_type_base.value_type == "VectorFloat4":
+            layout.prop(prop_base.vector_float4_props[value_type_base.name], "value", text="", slider=False)
 
 class PYREC_UL_PresetClipboardProps(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):

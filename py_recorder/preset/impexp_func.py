@@ -20,6 +20,8 @@ import ast
 from mathutils import Euler, Quaternion, Vector
 import traceback
 
+from bpy.types import bpy_prop_array
+
 from ..bl_util import get_next_name
 from ..log_text import log_text_append
 from .func import (DUP_COLL_ACTION_RENAME, DUP_COLL_ACTION_REPLACE)
@@ -39,12 +41,9 @@ def props_export_str(props):
             value_str = "'" + escape_str(p.value) + "'"
         # Euler
         elif isinstance(p.value, Euler):
-            value_str = "(%f, %f, %f, '%s')" % (p.value[0], p.value[1], p.value[2], p.value.order)
-        # Quaternion
-        elif isinstance(p.value, Quaternion):
-            value_str = "(%f, %f, %f, %f)" % (p.value[0], p.value[1], p.value[2], p.value[3])
-        # Vector parentheses
-        elif isinstance(p.value, Vector):
+            value_str = "(%f, %f, %f, '%s')" % (p.value[0], p.value[1], p.value[2], p.order)
+        # tuple/list/etc. parentheses
+        elif isinstance(p.value, (bpy_prop_array, list, Quaternion, tuple, Vector)):
             value_str = "(" + str(p.value[0])
             for i in range(1, len(p.value)):
                 value_str += ", " + str(p.value[i])
@@ -69,11 +68,11 @@ def get_export_presets_data(p_collections):
                 out_str_int_props = props_export_str(preset.int_props)
                 out_str_string_props = props_export_str(preset.string_props)
                 out_str_vector_euler_props = props_export_str(preset.vector_euler_props)
-                out_str_vector_quaternion_props = props_export_str(preset.vector_quaternion_props)
-                out_str_vector_xyz_props = props_export_str(preset.vector_xyz_props)
+                out_str_vector_float3_props = props_export_str(preset.vector_float3_props)
+                out_str_vector_float4_props = props_export_str(preset.vector_float4_props)
                 if out_str_bool_props == "" and out_str_float_props == "" and out_str_int_props == "" \
                     and out_str_string_props == "" and out_str_vector_euler_props == "" \
-                    and out_str_vector_quaternion_props == "" and out_str_vector_xyz_props == "":
+                    and out_str_vector_float3_props == "" and out_str_vector_float4_props == "":
                     continue
                 esc_p_name = escape_str(preset.name)
                 presets_str += "                    {   'name': '%s',\n" % esc_p_name
@@ -97,13 +96,13 @@ def get_export_presets_data(p_collections):
                     presets_str +=  "                        'vector_euler_props': [\n"
                     presets_str += out_str_vector_euler_props
                     presets_str +=  "                            ],\n"
-                if out_str_vector_quaternion_props != "":
-                    presets_str +=  "                        'vector_quaternion_props': [\n"
-                    presets_str += out_str_vector_quaternion_props
+                if out_str_vector_float3_props != "":
+                    presets_str +=  "                        'vector_float3_props': [\n"
+                    presets_str += out_str_vector_float3_props
                     presets_str +=  "                            ],\n"
-                if out_str_vector_xyz_props != "":
-                    presets_str +=  "                        'vector_xyz_props': [\n"
-                    presets_str += out_str_vector_xyz_props
+                if out_str_vector_float4_props != "":
+                    presets_str +=  "                        'vector_float4_props': [\n"
+                    presets_str += out_str_vector_float4_props
                     presets_str +=  "                            ],\n"
                 presets_str += "                        },\n"
             if presets_str == "":
@@ -162,10 +161,14 @@ def is_imp_euler_type(v):
         return False
     return isinstance(v[0], float) and isinstance(v[1], float) and isinstance(v[2], float) and isinstance(v[3], str)
 
-def is_imp_quaternion_type(v):
-    if not isinstance(v, tuple) or len(v) != 4:
-        return False
-    return isinstance(v[0], float) and isinstance(v[1], float) and isinstance(v[2], float) and isinstance(v[3], float)
+def is_imp_vec_float_type(v):
+    if isinstance(v, (bpy_prop_array, list, Quaternion, tuple, Vector)):
+        if len(v) == 3:
+            return isinstance(v[0], float) and isinstance(v[1], float) and isinstance(v[2], float)
+        elif len(v) == 4:
+            return isinstance(v[0], float) and isinstance(v[1], float) and isinstance(v[2], float) \
+                and isinstance(v[3], float)
+    return False
 
 def convert_import_props(raw_props, value_type):
     if not isinstance(raw_props, list):
@@ -179,7 +182,7 @@ def convert_import_props(raw_props, value_type):
         if not isinstance(p_name, str):
             continue
         if isinstance(p_val, value_type) or (value_type == Euler and is_imp_euler_type(p_val) ) \
-            or (value_type == Quaternion and is_imp_quaternion_type(p_val) ):
+            or (value_type in [ bpy_prop_array, list, Quaternion, tuple, Vector ] and is_imp_vec_float_type(p_val) ):
             new_prop_list.append( { "name": p_name, "value": p_val } )
     return new_prop_list if len(new_prop_list) > 0 else None
 
@@ -212,8 +215,8 @@ def convert_import_presets_collections(import_eval):
                 int_props = convert_import_props(imp_preset.get("int_props"), int)
                 string_props = convert_import_props(imp_preset.get("string_props"), str)
                 vector_euler_props = convert_import_props(imp_preset.get("vector_euler_props"), Euler)
-                vector_quaternion_props = convert_import_props(imp_preset.get("vector_quaternion_props"), Quaternion)
-                vector_xyz_props = convert_import_props(imp_preset.get("vector_xyz_props"), Vector)
+                vector_float3_props = convert_import_props(imp_preset.get("vector_float3_props"), Quaternion)
+                vector_float4_props = convert_import_props(imp_preset.get("vector_float4_props"), Quaternion)
                 temp_preset = {}
                 if bool_props != None:
                     temp_preset["bool_props"] = bool_props
@@ -225,10 +228,10 @@ def convert_import_presets_collections(import_eval):
                     temp_preset["string_props"] = string_props
                 if vector_euler_props != None:
                     temp_preset["vector_euler_props"] = vector_euler_props
-                if vector_quaternion_props != None:
-                    temp_preset["vector_quaternion_props"] = vector_quaternion_props
-                if vector_xyz_props != None:
-                    temp_preset["vector_xyz_props"] = vector_xyz_props
+                if vector_float3_props != None:
+                    temp_preset["vector_float3_props"] = vector_float3_props
+                if vector_float4_props != None:
+                    temp_preset["vector_float4_props"] = vector_float4_props
                 if len(temp_preset) > 0:
                     temp_preset["name"] = preset_name
                     new_presets.append(temp_preset)
@@ -245,9 +248,6 @@ def add_conv_props_to_preset(src_props, dest_props, dest_prop_details, value_typ
             temp_val = (imp_prop["value"][0], imp_prop["value"][1], imp_prop["value"][2])
             new_prop.value = Euler(temp_val, imp_prop["value"][3])
             new_prop.order = imp_prop["value"][3]
-        elif value_type == "VectorQuaternion":
-            new_prop.value = Quaternion( (imp_prop["value"][0], imp_prop["value"][1], imp_prop["value"][2],
-                                          imp_prop["value"][3]) )
         else:
             new_prop.value = imp_prop["value"]
         new_detail = dest_prop_details.add()
@@ -311,14 +311,14 @@ def import_presets_collections_eval(p_collections, pc_eval, dup_coll_action, rep
                 if vector_euler_props != None:
                     add_conv_props_to_preset(vector_euler_props, new_preset.vector_euler_props,
                                              new_preset.prop_details, "VectorEuler")
-                vector_quaternion_props = imp_preset.get("vector_quaternion_props")
-                if vector_quaternion_props != None:
-                    add_conv_props_to_preset(vector_quaternion_props, new_preset.vector_quaternion_props,
-                                             new_preset.prop_details, "VectorQuaternion")
-                vector_xyz_props = imp_preset.get("vector_xyz_props")
-                if vector_xyz_props != None:
-                    add_conv_props_to_preset(vector_xyz_props, new_preset.vector_xyz_props, new_preset.prop_details,
-                                             "VectorXYZ")
+                vector_float3_props = imp_preset.get("vector_float3_props")
+                if vector_float3_props != None:
+                    add_conv_props_to_preset(vector_float3_props, new_preset.vector_float3_props,
+                                             new_preset.prop_details, "VectorFloat3")
+                vector_float4_props = imp_preset.get("vector_float4_props")
+                if vector_float4_props != None:
+                    add_conv_props_to_preset(vector_float4_props, new_preset.vector_float4_props,
+                                             new_preset.prop_details, "VectorFloat4")
     return len(imp_presets_collections), presets_count
 
 def import_presets_file(p_collections, filepath, dup_coll_action, replace_preset):

@@ -19,6 +19,7 @@
 from mathutils import Euler, Quaternion, Vector
 
 import bpy
+from bpy.types import bpy_prop_array
 
 from ..py_code_utils import is_valid_full_datapath
 from ..bl_util import get_next_name
@@ -52,12 +53,13 @@ def create_clipboard_line(clipboard, full_datapath, path_type_paths, prop_value)
     elif isinstance(prop_value, Euler):
         p = clipboard.vector_euler_props.add()
         prop_detail.value_type = "VectorEuler"
-    elif isinstance(prop_value, Quaternion):
-        p = clipboard.vector_quaternion_props.add()
-        prop_detail.value_type = "VectorQuaternion"
-    elif isinstance(prop_value, Vector) and len(prop_value) == 3:
-        p = clipboard.vector_xyz_props.add()
-        prop_detail.value_type = "VectorXYZ"
+    elif isinstance(prop_value, (bpy_prop_array, list, Quaternion, tuple, Vector)):
+        if len(prop_value) == 3:
+            p = clipboard.vector_float3_props.add()
+            prop_detail.value_type = "VectorFloat3"
+        elif len(prop_value) == 4:
+            p = clipboard.vector_float4_props.add()
+            prop_detail.value_type = "VectorFloat4"
     else:
         return
     # link type-specific property to prop_detail with 'full_datapath'
@@ -110,11 +112,14 @@ def preset_clipboard_clear(cb_options, clipboard):
     clipboard.float_props.clear()
     clipboard.string_props.clear()
     clipboard.vector_euler_props.clear()
-    clipboard.vector_quaternion_props.clear()
-    clipboard.vector_xyz_props.clear()
+    clipboard.vector_float3_props.clear()
+    clipboard.vector_float4_props.clear()
 
 def preset_clipboard_remove_item(cb_options, clipboard):
     clipboard.prop_details.remove(cb_options.active_prop_detail)
+    cb_options.active_prop_detail -= 1
+    if cb_options.active_prop_detail < 0:
+        cb_options.active_prop_detail = 0
 
 def preset_clipboard_create_preset(p_collections, clipboard, cb_options):
     base_type_name = cb_options.create_base_type
@@ -178,14 +183,14 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options):
                 new_preset_prop.name = prop_path
                 new_preset_prop.value = clipboard.vector_euler_props[prop_detail.name].value
                 new_preset_prop.order = clipboard.vector_euler_props[prop_detail.name].order
-            elif prop_detail.value_type == "VectorQuaternion":
-                new_preset_prop = new_preset.vector_quaternion_props.add()
+            elif prop_detail.value_type == "VectorFloat3":
+                new_preset_prop = new_preset.vector_float3_props.add()
                 new_preset_prop.name = prop_path
-                new_preset_prop.value = clipboard.vector_quaternion_props[prop_detail.name].value
-            elif prop_detail.value_type == "VectorXYZ":
-                new_preset_prop = new_preset.vector_xyz_props.add()
+                new_preset_prop.value = clipboard.vector_float3_props[prop_detail.name].value
+            elif prop_detail.value_type == "VectorFloat4":
+                new_preset_prop = new_preset.vector_float4_props.add()
                 new_preset_prop.name = prop_path
-                new_preset_prop.value = clipboard.vector_xyz_props[prop_detail.name].value
+                new_preset_prop.value = clipboard.vector_float4_props[prop_detail.name].value
     return new_preset.name
 
 def copy_active_preset_to_clipboard(context, p_options, p_collections):
@@ -212,11 +217,11 @@ def copy_active_preset_to_clipboard(context, p_options, p_collections):
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
-    for prop in preset.vector_quaternion_props:
+    for prop in preset.vector_float3_props:
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
-    for prop in preset.vector_xyz_props:
+    for prop in preset.vector_float4_props:
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
