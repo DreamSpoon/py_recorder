@@ -93,18 +93,20 @@ def preset_remove_prop(preset_options, preset_collections):
     # check value type to remove preset property value from correct collection
     if prop_detail_type == "bool":
         preset.bool_props.remove(preset.bool_props.find(prop_detail_name))
+    elif prop_detail_type == "Euler":
+        preset.euler_props.remove(preset.euler_props.find(prop_detail_name))
     elif prop_detail_type == "float":
         preset.float_props.remove(preset.float_props.find(prop_detail_name))
     elif prop_detail_type == "int":
         preset.int_props.remove(preset.int_props.find(prop_detail_name))
     elif prop_detail_type == "str":
         preset.string_props.remove(preset.string_props.find(prop_detail_name))
-    elif prop_detail_type == "VectorEuler":
-        preset.vector_euler_props.remove(preset.vector_euler_props.find(prop_detail_name))
-    elif prop_detail_type == "VectorFloat3":
-        preset.vector_float3_props.remove(preset.vector_float3_props.find(prop_detail_name))
-    elif prop_detail_type == "VectorFloat4":
-        preset.vector_float4_props.remove(preset.vector_float4_props.find(prop_detail_name))
+    elif prop_detail_type == "FloatVector3":
+        preset.float_vector3_props.remove(preset.float_vector3_props.find(prop_detail_name))
+    elif prop_detail_type == "FloatVector4":
+        preset.float_vector4_props.remove(preset.float_vector4_props.find(prop_detail_name))
+    elif prop_detail_type == "Layer32":
+        preset.layer32_props.remove(preset.layer32_props.find(prop_detail_name))
     # remove preset property detail
     preset.prop_details.remove(preset_options.modify_options.active_detail)
 
@@ -152,15 +154,15 @@ def copy_preset_to_base_type(src_preset, base_type, replace_preset):
             new_preset = base_type.presets.add()
             new_preset.name = next_name
     copy_preset_props(src_preset.bool_props, new_preset.bool_props, new_preset.prop_details, "bool")
+    copy_preset_props(src_preset.euler_props, new_preset.euler_props, new_preset.prop_details, "Euler")
     copy_preset_props(src_preset.float_props, new_preset.float_props, new_preset.prop_details, "float")
     copy_preset_props(src_preset.int_props, new_preset.int_props, new_preset.prop_details, "int")
     copy_preset_props(src_preset.string_props, new_preset.string_props, new_preset.prop_details, "str")
-    copy_preset_props(src_preset.vector_euler_props, new_preset.vector_euler_props, new_preset.prop_details,
-                      "VectorEuler")
-    copy_preset_props(src_preset.vector_float3_props, new_preset.vector_float3_props, new_preset.prop_details,
-                      "VectorFloat3")
-    copy_preset_props(src_preset.vector_float4_props, new_preset.vector_float4_props, new_preset.prop_details,
-                      "VectorFloat4")
+    copy_preset_props(src_preset.float_vector3_props, new_preset.float_vector3_props, new_preset.prop_details,
+                      "FloatVector3")
+    copy_preset_props(src_preset.float_vector4_props, new_preset.float_vector4_props, new_preset.prop_details,
+                      "FloatVector4")
+    copy_preset_props(src_preset.layer32_props, new_preset.layer32_props, new_preset.prop_details, "Layer32")
 
 def preset_collection_modify_move(context, preset_options, dup_coll_action, replace_preset):
     if preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:

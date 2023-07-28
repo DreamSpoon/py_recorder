@@ -55,19 +55,20 @@ DATABLOCK_DUAL_TYPES = (
     (bpy.types.Text, "texts"),
     (bpy.types.Texture, "textures"),
     (bpy.types.Volume, "volumes"),
+    (bpy.types.WindowManager, "window_managers"),
     (bpy.types.WorkSpace, "workspaces"),
     (bpy.types.World, "worlds"),
 )
 if bpy.app.version >= (3,10,0):
-    DATABLOCK_DUAL_TYPES = DATABLOCK_DUAL_TYPES + (bpy.types.PointCloud, "pointclouds"),
+    DATABLOCK_DUAL_TYPES += [ (bpy.types.PointCloud, "pointclouds") ]
 if bpy.app.version >= (3,30,0):
-    DATABLOCK_DUAL_TYPES = DATABLOCK_DUAL_TYPES + (bpy.types.Curves, "hair_curves"),
+    DATABLOCK_DUAL_TYPES += [ (bpy.types.Curves, "hair_curves") ]
 
 def get_datablock_for_type(data):
-    for dd in DATABLOCK_DUAL_TYPES:
-        if isinstance(data, dd[0]):
-            return dd[1]
-    return None
+    try:
+        return [ dd for dd in DATABLOCK_DUAL_TYPES if isinstance(data, dd[0]) ][1]
+    except:
+        return None
 
 class PYREC_OT_OBJ_ModifyInit(Operator):
     bl_description = "Modify active Object's custom property '"+CPROP_NAME_INIT_PY+""
@@ -146,8 +147,11 @@ class PYREC_PT_OBJ_AdjustCustomProp(Panel):
         if act_ob.get(CPROP_NAME_INIT_PY) is None:
             box.label(text=CPROP_NAME_INIT_PY+":  None")
         else:
-            box.prop_search(act_ob, '["'+CPROP_NAME_INIT_PY+'"]', bpy.data,
-                            get_datablock_for_type(act_ob[CPROP_NAME_INIT_PY]))
+            datablock = get_datablock_for_type(act_ob[CPROP_NAME_INIT_PY])
+            if datablock != None:
+                box.prop_search(act_ob, '["'+CPROP_NAME_INIT_PY+'"]', bpy.data, datablock)
+            else:
+                box.prop(act_ob, '["'+CPROP_NAME_INIT_PY+'"]')
         box.operator(PYREC_OT_OBJ_ModifyInit.bl_idname)
 
         layout.label(text="New Property")

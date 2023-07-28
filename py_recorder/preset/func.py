@@ -118,7 +118,7 @@ def digest_full_datapath(full_datapath, all_bpy_types=False):
             prop_value = None
         # if known property value type is found then exit for loop
         elif isinstance(val, (bool, float, int, str, Euler)) \
-            or ( isinstance(val, (bpy_prop_array, list, Quaternion, tuple, Vector)) and len(val) in [3, 4] ):
+            or ( isinstance(val, (bpy_prop_array, list, Quaternion, tuple, Vector)) and len(val) in [3, 4, 32] ):
             if prev_attr_bpy_type:
                 prop_path = prog_datapath
                 prop_value = val
@@ -152,6 +152,11 @@ def get_preset_prop_value_str(preset, prop_name):
     if prop_detail.value_type == "bool":
         prop_value = preset.bool_props[prop_detail.name].value
         return ( prop_value, str(prop_value) )
+    elif prop_detail.value_type == "Euler":
+        prop_value = preset.euler_props[prop_detail.name].value
+        prop_order = preset.euler_props[prop_detail.name].order
+        return ( (prop_value, prop_order), "Euler((%f, %f, %f), '%s')" % (prop_value[0], prop_value[0], prop_value[2],
+                                                                          prop_order) )
     elif prop_detail.value_type == "float":
         prop_value = preset.float_props[prop_detail.name].value
         return ( prop_value, str(prop_value) )
@@ -161,17 +166,16 @@ def get_preset_prop_value_str(preset, prop_name):
     elif prop_detail.value_type == "str":
         prop_value = preset.string_props[prop_detail.name].value
         return ( prop_value, '"' + prop_value + '"' )
-    elif prop_detail.value_type == "VectorEuler":
-        prop_value = preset.vector_euler_props[prop_detail.name].value
-        prop_order = preset.vector_euler_props[prop_detail.name].order
-        return ( (prop_value, prop_order), "Euler((%f, %f, %f), '%s')" % (prop_value[0], prop_value[0], prop_value[2],
-                                                                          prop_order) )
-    elif prop_detail.value_type == "VectorFloat3":
-        prop_value = preset.vector_float3_props[prop_detail.name].value
-        return ( prop_value, "Float3(%f, %f, %f)" % (prop_value[0], prop_value[1], prop_value[2]) )
-    elif prop_detail.value_type == "VectorFloat4":
-        prop_value = preset.vector_float4_props[prop_detail.name].value
-        return ( prop_value, "Float4(%f, %f, %f, %f)" % (prop_value[0], prop_value[1], prop_value[2], prop_value[3]) )
+    elif prop_detail.value_type == "FloatVector3":
+        prop_value = preset.float_vector3_props[prop_detail.name].value
+        return ( prop_value, "FloatVector3(%f, %f, %f)" % (prop_value[0], prop_value[1], prop_value[2]) )
+    elif prop_detail.value_type == "FloatVector4":
+        prop_value = preset.float_vector4_props[prop_detail.name].value
+        return ( prop_value, "FloatVector4(%f, %f, %f, %f)" % (prop_value[0], prop_value[1], prop_value[2],
+                                                               prop_value[3]) )
+    elif prop_detail.value_type == "Layer32":
+        prop_value = preset.layer32_props[prop_detail.name].value
+        return ( prop_value, "Layer32(%s)" % str(prop_value) )
     else:
         return None
 
@@ -183,25 +187,35 @@ def update_preset_prop_value(preset, prop_name, new_value):
         return False
     if prop_detail.value_type == "bool" and isinstance(new_value, bool):
         preset.bool_props[prop_detail.name].value = new_value
+        return True
+    elif prop_detail.value_type == "Euler" and isinstance(new_value, Euler):
+        preset.euler_props[prop_detail.name].value = new_value
+        preset.euler_props[prop_detail.name].order = new_value.order
+        return True
     elif prop_detail.value_type == "float" and isinstance(new_value, float):
         preset.float_props[prop_detail.name].value = new_value
+        return True
     elif prop_detail.value_type == "int" and isinstance(new_value, int):
         preset.int_props[prop_detail.name].value = new_value
+        return True
     elif prop_detail.value_type == "str" and isinstance(new_value, str):
         preset.string_props[prop_detail.name].value = new_value
-    elif prop_detail.value_type == "VectorEuler" and isinstance(new_value, Euler):
-        preset.vector_euler_props[prop_detail.name].value = new_value
-        preset.vector_euler_props[prop_detail.name].order = new_value.order
+        return True
     elif isinstance(new_value, (bpy_prop_array, list, Quaternion, tuple, Vector)):
-        if prop_detail.value_type == "VectorFloat3" and len(new_value) == 3:
-            preset.vector_float3_props[prop_detail.name].value = new_value
-        elif prop_detail.value_type == "VectorFloat4" and len(new_value) == 4:
-            preset.vector_float4_props[prop_detail.name].value = new_value
-        else:
-            return False
-    else:
-        return False
-    return True
+        # all float values?
+        if len(new_value) == len( [ d for d in new_value if isinstance(d, float) ] ):
+            if prop_detail.value_type == "FloatVector3" and len(new_value) == 3:
+                preset.float_vector3_props[prop_detail.name].value = new_value
+                return True
+            elif prop_detail.value_type == "FloatVector4" and len(new_value) == 4:
+                preset.float_vector4_props[prop_detail.name].value = new_value
+                return True
+        # all bool values?
+        elif len(new_value) == len( [ d for d in new_value if isinstance(d, bool) ] ):
+            if prop_detail.value_type == "Layer32" and len(new_value) == 32:
+                preset.layer32_props[prop_detail.name].value = new_value
+                return True
+    return False
 
 def get_source_preset_collections(context):
     p_r = context.window_manager.py_rec

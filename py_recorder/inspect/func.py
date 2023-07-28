@@ -499,16 +499,16 @@ def attribute_list_draw_item(self, context, layout, data, item, icon, active_dat
                 context_name = "VIEW_3D"
             exec_state = data.inspect_exec_state.get(context_name + data.name)
             result_value = exec_state.get("exec_value")
-            try:
-                if result_value != None and hasattr(result_value, item.name):
-                    attr_val = getattr(result_value, item.name)
-                    # do not display if attribute value is None or if it is a zero-length list/tuple
-                    if attr_val != None and not ( isinstance(attr_val, (list, tuple)) and len(attr_val) == 0) and \
-                        not callable(attr_val):
-                            row.prop(result_value, item.name, text="")
-                            return
-            except:
-                pass
+            if result_value != None and hasattr(result_value, item.name):
+                attr_val = getattr(result_value, item.name)
+                # do not display if attribute value is None or if it is a zero-length list/tuple
+                if attr_val != None and not ( isinstance(attr_val, (list, tuple)) and len(attr_val) == 0) and \
+                    not callable(attr_val):
+                    try:
+                        row.prop(result_value, item.name, text="")
+                        return
+                    except:
+                        pass
         # show value str if value selector not available
         row.label(text=item.value_str)
 

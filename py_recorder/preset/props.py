@@ -16,8 +16,8 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProperty, FloatVectorProperty,
-    IntProperty, PointerProperty, StringProperty)
+from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, BoolVectorProperty, FloatProperty,
+    FloatVectorProperty, IntProperty, PointerProperty, StringProperty)
 from bpy.types import PropertyGroup
 
 from .func import (PRESET_SOURCE_TYPES, PRESET_VIEW_TYPES, DUP_COLL_ACTION_ITEMS)
@@ -66,18 +66,22 @@ EULER_ORDER_ITEMS = [
     ("ZXY", "ZXY Euler", ""),
     ("ZYX", "ZYX Euler", ""),
     ]
-class PYREC_PG_VectorEulerProp(PropertyGroup):
+class PYREC_PG_EulerProp(PropertyGroup):
     name: StringProperty()
     value: FloatVectorProperty(subtype='EULER')
     order: EnumProperty(name="Mode", items=EULER_ORDER_ITEMS)
 
-class PYREC_PG_VectorFloat3Prop(PropertyGroup):
+class PYREC_PG_FloatVector3Prop(PropertyGroup):
     name: StringProperty()
     value: FloatVectorProperty(size=3, default=(0.0, 0.0, 0.0))
 
-class PYREC_PG_VectorFloat4Prop(PropertyGroup):
+class PYREC_PG_FloatVector4Prop(PropertyGroup):
     name: StringProperty()
     value: FloatVectorProperty(size=4, default=(0.0, 0.0, 0.0, 0.0))
+
+class PYREC_PG_Layer32Prop(PropertyGroup):
+    name: StringProperty()
+    value: BoolVectorProperty(size=32, subtype='LAYER', default=[ False for _ in range(32)])
 
 class PYREC_PG_PresetClipboardPropDetail(PropertyGroup):
     # name is full datapath
@@ -94,9 +98,10 @@ class PYREC_PG_PresetClipboard(PropertyGroup):
     int_props: CollectionProperty(type=PYREC_PG_IntProp)
     float_props: CollectionProperty(type=PYREC_PG_FloatProp)
     string_props: CollectionProperty(type=PYREC_PG_StringProp)
-    vector_euler_props: CollectionProperty(type=PYREC_PG_VectorEulerProp)
-    vector_float3_props: CollectionProperty(type=PYREC_PG_VectorFloat3Prop)
-    vector_float4_props: CollectionProperty(type=PYREC_PG_VectorFloat4Prop)
+    euler_props: CollectionProperty(type=PYREC_PG_EulerProp)
+    float_vector3_props: CollectionProperty(type=PYREC_PG_FloatVector3Prop)
+    float_vector4_props: CollectionProperty(type=PYREC_PG_FloatVector4Prop)
+    layer32_props: CollectionProperty(type=PYREC_PG_Layer32Prop)
 
 class PYREC_PG_PresetClipboardOptions(PropertyGroup):
     # copy/paste input box
@@ -138,15 +143,15 @@ class PYREC_PG_PresetPropDetail(PropertyGroup):
 # both can be included in a single preset, because prop names can include '.' symbol to use Python sub-attributes
 class PYREC_PG_Preset(PropertyGroup):
     prop_details: CollectionProperty(type=PYREC_PG_PresetPropDetail)
-
     # 'name' of each item in collection is Python attribute name, so preset value can be linked with 'name' lookup
     bool_props: CollectionProperty(type=PYREC_PG_BoolProp)
     int_props: CollectionProperty(type=PYREC_PG_IntProp)
     float_props: CollectionProperty(type=PYREC_PG_FloatProp)
     string_props: CollectionProperty(type=PYREC_PG_StringProp)
-    vector_euler_props: CollectionProperty(type=PYREC_PG_VectorEulerProp)
-    vector_float3_props: CollectionProperty(type=PYREC_PG_VectorFloat3Prop)
-    vector_float4_props: CollectionProperty(type=PYREC_PG_VectorFloat4Prop)
+    euler_props: CollectionProperty(type=PYREC_PG_EulerProp)
+    float_vector3_props: CollectionProperty(type=PYREC_PG_FloatVector3Prop)
+    float_vector4_props: CollectionProperty(type=PYREC_PG_FloatVector4Prop)
+    layer32_props: CollectionProperty(type=PYREC_PG_Layer32Prop)
 
 # a collection of presets that apply to only one base type, base type is 'name' of this item in parent collection,
 # e.g. base type 'bpy.types.Object'

@@ -24,7 +24,6 @@ import bpy
 # ]
 ANIMDATA_SOURCES = [
     # TODO: add bpy.data.images? or add comment explaining absence of bpy.data.images
-    # TODO: sort alphabetically?
     ( "Armature", ["armatures"] ),
     ( "Cache File", ["cache_files"] ),
     ( "Camera", ["cameras"] ),
@@ -55,63 +54,56 @@ ANIMDATA_SOURCES = [
     ( "World Material Nodes", ["worlds", "node_tree"] ),
 ]
 if bpy.app.version >= (3,10,0):
-    ANIMDATA_SOURCES.append( ( "Point Cloud", ["pointclouds"] ) )
+    ANIMDATA_SOURCES += [ ( "Point Cloud", ["pointclouds"] ) ]
 if bpy.app.version >= (3,30,0):
-    ANIMDATA_SOURCES.append( ( "Hair Curve", ["hair_curves"] ) )
-
-# sort tuples alphabetically by first value in each tuple
-def sort_tup(tup):
-    return(sorted(tup, key = lambda x: x[0]))
-
+    ANIMDATA_SOURCES += [ ( "Hair Curve", ["hair_curves"] ) ]
 # sort alphabetically by first value in each tuple
-ANIMDATA_SOURCES = sort_tup(ANIMDATA_SOURCES)
+ANIMDATA_SOURCES = sorted(ANIMDATA_SOURCES, key = lambda x: x[0])
 
-def get_animdata_bool_names():
-    names = []
-    for dst in ANIMDATA_SOURCES:
-        names.append(dst[0])
-    return names
-
-ANIMDATA_BOOL_NAMES = get_animdata_bool_names()
+# get names to show with 'enable data source' boolean values
+ANIMDATA_BOOL_NAMES = [ dst[0] for dst in ANIMDATA_SOURCES ]
 
 BPY_DATA_TYPE_ITEMS = [
-    ('actions', "Action", "", 1),
-    ('armatures', "Armature", "", 2),
-    ('brushes', "Brush", "", 3),
-    ('cache_files', "Cache File", "", 4),
-    ('cameras', "Camera", "", 5),
-    ('collections', "Collection", "", 6),
-    ('curves', "Curve", "", 7),
-    ('fonts', "Font", "", 8),
-    ('grease_pencils', "Grease Pencil", "", 9),
-    ('images', "Image", "", 10),
-    ('lattices', "Lattice", "", 11),
-    ('libraries', "Library", "", 12),
-    ('lights', "Light", "", 13),
-    ('lightprobes', "Light Probe", "", 14),
-    ('linestyles', "Line Style", "", 15),
-    ('masks', "Mask", "", 16),
-    ('materials', "Material", "", 17),
-    ('meshes', "Mesh", "", 18),
-    ('metaballs', "Meta Ball", "", 19),
-    ('movieclips', "Movie Clip", "", 20),
-    ('node_groups', "Node Group", "", 21),
-    ('objects', "Object", "", 22),
-    ('paint_curves', "Paint Curve", "", 23),
-    ('palettes', "Palette", "", 24),
-    ('particles', "Particle Settings", "", 25),
-    ('shape_keys', "Shape Key", "", 26),
-    ('scenes', "Scene", "", 27),
-    ('screens', "Screen", "", 28),
-    ('sounds', "Sound", "", 29),
-    ('speakers', "Speaker", "", 30),
-    ('textures', "Texture", "", 31),
-    ('texts', "Text", "", 32),
-    ('volumes', "Volume", "", 33),
-    ('workspaces', "Work Space", "", 34),
-    ('worlds', "World", "", 35),
-]
+    ('actions', "Action", ""),
+    ('armatures', "Armature", ""),
+    ('brushes', "Brush", ""),
+    ('cache_files', "Cache File", ""),
+    ('cameras', "Camera", ""),
+    ('collections', "Collection", ""),
+    ('curves', "Curve", ""),
+    ('fonts', "Font", ""),
+    ('grease_pencils', "Grease Pencil", ""),
+    ('images', "Image", ""),
+    ('lattices', "Lattice", ""),
+    ('libraries', "Library", ""),
+    ('lights', "Light", ""),
+    ('lightprobes', "Light Probe", ""),
+    ('linestyles', "Line Style", ""),
+    ('masks', "Mask", ""),
+    ('materials', "Material", ""),
+    ('meshes', "Mesh", ""),
+    ('metaballs', "Meta Ball", ""),
+    ('movieclips', "Movie Clip", ""),
+    ('node_groups', "Node Group", ""),
+    ('objects', "Object", ""),
+    ('paint_curves', "Paint Curve", ""),
+    ('palettes', "Palette", ""),
+    ('particles', "Particle Settings", ""),
+    ('scenes', "Scene", ""),
+    ('screens', "Screen", ""),
+    ('shape_keys', "Shape Key", ""),
+    ('sounds', "Sound", ""),
+    ('speakers', "Speaker", ""),
+    ('texts', "Text", ""),
+    ('textures', "Texture", ""),
+    ('volumes', "Volume", ""),
+    ('window_managers', "Window Manager", ""),
+    ('workspaces', "Work Space", ""),
+    ('worlds', "World", ""),
+    ]
 if bpy.app.version >= (3,10,0):
-    BPY_DATA_TYPE_ITEMS = BPY_DATA_TYPE_ITEMS + ('pointclouds', "Point Cloud", "", len(BPY_DATA_TYPE_ITEMS)+1)
+    BPY_DATA_TYPE_ITEMS += [ ('pointclouds', "Point Cloud", "") ]
 if bpy.app.version >= (3,30,0):
-    BPY_DATA_TYPE_ITEMS = BPY_DATA_TYPE_ITEMS + ('hair_curves', "Hair Curve", "", len(BPY_DATA_TYPE_ITEMS)+1)
+    BPY_DATA_TYPE_ITEMS += [  ('hair_curves', "Hair Curve", "") ]
+# sort alphabetically by first value in each tuple
+BPY_DATA_TYPE_ITEMS = sorted(BPY_DATA_TYPE_ITEMS,  key=lambda x: x[0] )

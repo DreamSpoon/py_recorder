@@ -138,6 +138,8 @@ def bpy_value_to_string(value):
             return "bpy.data.fonts.get(\"%s\")" % value.name
         elif isinstance(value, bpy.types.Volume):
             return "bpy.data.volumes.get(\"%s\")" % value.name
+        elif isinstance(value, bpy.types.WindowManager):
+            return "bpy.data.window_managers.get(\"%s\")" % value.name
         elif isinstance(value, bpy.types.WorkSpace):
             return "bpy.data.workspaces.get(\"%s\")" % value.name
         elif isinstance(value, bpy.types.World):

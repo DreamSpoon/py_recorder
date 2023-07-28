@@ -41,6 +41,9 @@ def create_clipboard_line(clipboard, full_datapath, path_type_paths, prop_value)
     if isinstance(prop_value, bool):
         p = clipboard.bool_props.add()
         prop_detail.value_type = "bool"
+    elif isinstance(prop_value, Euler):
+        p = clipboard.euler_props.add()
+        prop_detail.value_type = "Euler"
     elif isinstance(prop_value, float):
         p = clipboard.float_props.add()
         prop_detail.value_type = "float"
@@ -50,17 +53,22 @@ def create_clipboard_line(clipboard, full_datapath, path_type_paths, prop_value)
     elif isinstance(prop_value, str):
         p = clipboard.string_props.add()
         prop_detail.value_type = "str"
-    elif isinstance(prop_value, Euler):
-        p = clipboard.vector_euler_props.add()
-        prop_detail.value_type = "VectorEuler"
     elif isinstance(prop_value, (bpy_prop_array, list, Quaternion, tuple, Vector)):
-        if len(prop_value) == 3:
-            p = clipboard.vector_float3_props.add()
-            prop_detail.value_type = "VectorFloat3"
-        elif len(prop_value) == 4:
-            p = clipboard.vector_float4_props.add()
-            prop_detail.value_type = "VectorFloat4"
-    else:
+        num_elements = len(prop_value)
+        # all floats?
+        if len([ d for d in prop_value if isinstance(d, float) ]) == num_elements:
+            if num_elements == 3:
+                p = clipboard.float_vector3_props.add()
+                prop_detail.value_type = "FloatVector3"
+            elif num_elements == 4:
+                p = clipboard.float_vector4_props.add()
+                prop_detail.value_type = "FloatVector4"
+        # all bools?
+        elif len([ d for d in prop_value if isinstance(d, bool) ]) == num_elements:
+            if num_elements == 32:
+                p = clipboard.layer32_props.add()
+                prop_detail.value_type = "Layer32"
+    if p is None:
         return
     # link type-specific property to prop_detail with 'full_datapath'
     p.name = full_datapath
@@ -109,11 +117,12 @@ def preset_clipboard_clear(cb_options, clipboard):
     clipboard.prop_details.clear()
     clipboard.bool_props.clear()
     clipboard.int_props.clear()
+    clipboard.euler_props.clear()
     clipboard.float_props.clear()
     clipboard.string_props.clear()
-    clipboard.vector_euler_props.clear()
-    clipboard.vector_float3_props.clear()
-    clipboard.vector_float4_props.clear()
+    clipboard.float_vector3_props.clear()
+    clipboard.float_vector4_props.clear()
+    clipboard.layer32_props.clear()
 
 def preset_clipboard_remove_item(cb_options, clipboard):
     clipboard.prop_details.remove(cb_options.active_prop_detail)
@@ -166,6 +175,11 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options):
                 new_preset_prop = new_preset.bool_props.add()
                 new_preset_prop.name = prop_path
                 new_preset_prop.value = clipboard.bool_props[prop_detail.name].value
+            elif prop_detail.value_type == "Euler":
+                new_preset_prop = new_preset.euler_props.add()
+                new_preset_prop.name = prop_path
+                new_preset_prop.value = clipboard.euler_props[prop_detail.name].value
+                new_preset_prop.order = clipboard.euler_props[prop_detail.name].order
             elif prop_detail.value_type == "float":
                 new_preset_prop = new_preset.float_props.add()
                 new_preset_prop.name = prop_path
@@ -178,19 +192,18 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options):
                 new_preset_prop = new_preset.string_props.add()
                 new_preset_prop.name = prop_path
                 new_preset_prop.value = clipboard.string_props[prop_detail.name].value
-            elif prop_detail.value_type == "VectorEuler":
-                new_preset_prop = new_preset.vector_euler_props.add()
+            elif prop_detail.value_type == "FloatVector3":
+                new_preset_prop = new_preset.float_vector3_props.add()
                 new_preset_prop.name = prop_path
-                new_preset_prop.value = clipboard.vector_euler_props[prop_detail.name].value
-                new_preset_prop.order = clipboard.vector_euler_props[prop_detail.name].order
-            elif prop_detail.value_type == "VectorFloat3":
-                new_preset_prop = new_preset.vector_float3_props.add()
+                new_preset_prop.value = clipboard.float_vector3_props[prop_detail.name].value
+            elif prop_detail.value_type == "FloatVector4":
+                new_preset_prop = new_preset.float_vector4_props.add()
                 new_preset_prop.name = prop_path
-                new_preset_prop.value = clipboard.vector_float3_props[prop_detail.name].value
-            elif prop_detail.value_type == "VectorFloat4":
-                new_preset_prop = new_preset.vector_float4_props.add()
+                new_preset_prop.value = clipboard.float_vector4_props[prop_detail.name].value
+            elif prop_detail.value_type == "Layer32":
+                new_preset_prop = new_preset.layer32_props.add()
                 new_preset_prop.name = prop_path
-                new_preset_prop.value = clipboard.vector_float4_props[prop_detail.name].value
+                new_preset_prop.value = clipboard.layer32_props[prop_detail.name].value
     return new_preset.name
 
 def copy_active_preset_to_clipboard(context, p_options, p_collections):
@@ -198,6 +211,10 @@ def copy_active_preset_to_clipboard(context, p_options, p_collections):
     clipboard = context.window_manager.py_rec.preset_options.clipboard
     props_count = 0
     for prop in preset.bool_props:
+        props_count += 1
+        create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
+                              prop.value)
+    for prop in preset.euler_props:
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
@@ -213,15 +230,15 @@ def copy_active_preset_to_clipboard(context, p_options, p_collections):
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
-    for prop in preset.vector_euler_props:
+    for prop in preset.float_vector3_props:
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
-    for prop in preset.vector_float3_props:
+    for prop in preset.float_vector4_props:
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
-    for prop in preset.vector_float4_props:
+    for prop in preset.layer32_props:
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)

@@ -26,40 +26,45 @@ def draw_prop_value(layout, value_type_base, prop_base, lock_changes):
         # display the property's value
         if value_type_base.value_type == "bool":
             layout.label(text=str(prop_base.bool_props[value_type_base.name].value))
+        elif value_type_base.value_type == "Euler":
+            v = prop_base.euler_props[value_type_base.name].value
+            order = prop_base.euler_props[value_type_base.name].order
+            layout.label(text="((%f, %f, %f), '%s')" % (v[0], v[1], v[2], order))
         elif value_type_base.value_type == "float":
             layout.label(text=str(prop_base.float_props[value_type_base.name].value))
         elif value_type_base.value_type == "int":
             layout.label(text=str(prop_base.int_props[value_type_base.name].value))
         elif value_type_base.value_type == "str":
             layout.label(text=str(prop_base.string_props[value_type_base.name].value))
-        elif value_type_base.value_type == "VectorEuler":
-            v = prop_base.vector_euler_props[value_type_base.name].value
-            order = prop_base.vector_euler_props[value_type_base.name].order
-            layout.label(text="((%f, %f, %f), '%s')" % (v[0], v[1], v[2], order))
-        elif value_type_base.value_type == "VectorFloat3":
-            v = prop_base.vector_float3_props[value_type_base.name].value
+        elif value_type_base.value_type == "FloatVector3":
+            v = prop_base.float_vector3_props[value_type_base.name].value
             layout.label(text="(%f, %f, %f)" % (v[0], v[1], v[2]) )
-        elif value_type_base.value_type == "VectorFloat4":
-            v = prop_base.vector_float4_props[value_type_base.name].value
+        elif value_type_base.value_type == "FloatVector4":
+            v = prop_base.float_vector4_props[value_type_base.name].value
             layout.label(text="(%f, %f, %f, %f)" % (v[0], v[1], v[2], v[3]) )
+        elif value_type_base.value_type == "Layer32":
+            v = prop_base.layer32_props[value_type_base.name].value
+            layout.label(text="(%s)" % str(v) )
     else:
         # display the property's value
         if value_type_base.value_type == "bool":
             layout.prop(prop_base.bool_props[value_type_base.name], "value", text="")
+        elif value_type_base.value_type == "Euler":
+            col = layout.column(align=True)
+            col.prop(prop_base.euler_props[value_type_base.name], "value", text="", slider=False)
+            col.prop(prop_base.euler_props[value_type_base.name], "order", text="", slider=False)
         elif value_type_base.value_type == "float":
             layout.prop(prop_base.float_props[value_type_base.name], "value", text="", slider=False)
         elif value_type_base.value_type == "int":
             layout.prop(prop_base.int_props[value_type_base.name], "value", text="", slider=False)
         elif value_type_base.value_type == "str":
             layout.prop(prop_base.string_props[value_type_base.name], "value", text="")
-        elif value_type_base.value_type == "VectorEuler":
-            col = layout.column(align=True)
-            col.prop(prop_base.vector_euler_props[value_type_base.name], "value", text="", slider=False)
-            col.prop(prop_base.vector_euler_props[value_type_base.name], "order", text="", slider=False)
-        elif value_type_base.value_type == "VectorFloat3":
-            layout.prop(prop_base.vector_float3_props[value_type_base.name], "value", text="", slider=False)
-        elif value_type_base.value_type == "VectorFloat4":
-            layout.prop(prop_base.vector_float4_props[value_type_base.name], "value", text="", slider=False)
+        elif value_type_base.value_type == "FloatVector3":
+            layout.prop(prop_base.float_vector3_props[value_type_base.name], "value", text="", slider=False)
+        elif value_type_base.value_type == "FloatVector4":
+            layout.prop(prop_base.float_vector4_props[value_type_base.name], "value", text="", slider=False)
+        elif value_type_base.value_type == "Layer32":
+            layout.prop(prop_base.layer32_props[value_type_base.name], "value", text="")
 
 class PYREC_UL_PresetClipboardProps(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):

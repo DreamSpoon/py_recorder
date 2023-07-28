@@ -106,13 +106,13 @@ def apply_preset_to_base_value(base_val, preset):
         pvs_result = get_preset_prop_value_str(preset, p_d.name)
         if pvs_result is None:
             continue
-        if p_d.value_type == "VectorEuler":
+        if p_d.value_type == "Euler":
             try:
                 sub_val = getattr(apply_base_val, attr_name)
-                sub_val.order = pvs_result[0][1]
                 sub_val[0]= pvs_result[0][0][0]
                 sub_val[1]= pvs_result[0][0][1]
                 sub_val[2]= pvs_result[0][0][2]
+                sub_val.order = pvs_result[0][1]
             except:
                 # add error message with base value type, attribute name, and attribute value
                 combined_err_msg += "Cannot apply Preset to type %s with property %s and value %s\n" % \

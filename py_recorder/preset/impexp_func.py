@@ -64,21 +64,27 @@ def get_export_presets_data(p_collections):
             for preset in bt.presets:
                 presets_count += 1
                 out_str_bool_props = props_export_str(preset.bool_props)
+                out_str_euler_props = props_export_str(preset.euler_props)
                 out_str_float_props = props_export_str(preset.float_props)
                 out_str_int_props = props_export_str(preset.int_props)
                 out_str_string_props = props_export_str(preset.string_props)
-                out_str_vector_euler_props = props_export_str(preset.vector_euler_props)
-                out_str_vector_float3_props = props_export_str(preset.vector_float3_props)
-                out_str_vector_float4_props = props_export_str(preset.vector_float4_props)
-                if out_str_bool_props == "" and out_str_float_props == "" and out_str_int_props == "" \
-                    and out_str_string_props == "" and out_str_vector_euler_props == "" \
-                    and out_str_vector_float3_props == "" and out_str_vector_float4_props == "":
+                out_str_float_vector3_props = props_export_str(preset.float_vector3_props)
+                out_str_float_vector4_props = props_export_str(preset.float_vector4_props)
+                out_str_layer32_props = props_export_str(preset.layer32_props)
+                if out_str_bool_props == ""  and out_str_euler_props == "" and out_str_float_props == "" \
+                    and out_str_int_props == "" and out_str_string_props == "" \
+                    and out_str_float_vector3_props == "" and out_str_float_vector4_props == "" \
+                    and out_str_layer32_props == "":
                     continue
                 esc_p_name = escape_str(preset.name)
                 presets_str += "                    {   'name': '%s',\n" % esc_p_name
                 if out_str_bool_props != "":
                     presets_str +=  "                        'bool_props': [\n"
                     presets_str += out_str_bool_props
+                    presets_str +=  "                            ],\n"
+                if out_str_euler_props != "":
+                    presets_str +=  "                        'euler_props': [\n"
+                    presets_str += out_str_euler_props
                     presets_str +=  "                            ],\n"
                 if out_str_float_props != "":
                     presets_str +=  "                        'float_props': [\n"
@@ -92,17 +98,17 @@ def get_export_presets_data(p_collections):
                     presets_str +=  "                        'string_props': [\n"
                     presets_str += out_str_string_props
                     presets_str +=  "                            ],\n"
-                if out_str_vector_euler_props != "":
-                    presets_str +=  "                        'vector_euler_props': [\n"
-                    presets_str += out_str_vector_euler_props
+                if out_str_float_vector3_props != "":
+                    presets_str +=  "                        'float_vector3_props': [\n"
+                    presets_str += out_str_float_vector3_props
                     presets_str +=  "                            ],\n"
-                if out_str_vector_float3_props != "":
-                    presets_str +=  "                        'vector_float3_props': [\n"
-                    presets_str += out_str_vector_float3_props
+                if out_str_float_vector4_props != "":
+                    presets_str +=  "                        'float_vector4_props': [\n"
+                    presets_str += out_str_float_vector4_props
                     presets_str +=  "                            ],\n"
-                if out_str_vector_float4_props != "":
-                    presets_str +=  "                        'vector_float4_props': [\n"
-                    presets_str += out_str_vector_float4_props
+                if out_str_layer32_props != "":
+                    presets_str +=  "                        'layer32_props': [\n"
+                    presets_str += out_str_layer32_props
                     presets_str +=  "                            ],\n"
                 presets_str += "                        },\n"
             if presets_str == "":
@@ -211,27 +217,30 @@ def convert_import_presets_collections(import_eval):
                 if preset_name is None:
                     continue
                 bool_props = convert_import_props(imp_preset.get("bool_props"), bool)
+                euler_props = convert_import_props(imp_preset.get("euler_props"), Euler)
                 float_props = convert_import_props(imp_preset.get("float_props"), float)
                 int_props = convert_import_props(imp_preset.get("int_props"), int)
                 string_props = convert_import_props(imp_preset.get("string_props"), str)
-                vector_euler_props = convert_import_props(imp_preset.get("vector_euler_props"), Euler)
-                vector_float3_props = convert_import_props(imp_preset.get("vector_float3_props"), Quaternion)
-                vector_float4_props = convert_import_props(imp_preset.get("vector_float4_props"), Quaternion)
+                float_vector3_props = convert_import_props(imp_preset.get("float_vector3_props"), tuple)
+                float_vector4_props = convert_import_props(imp_preset.get("float_vector4_props"), tuple)
+                layer32_props = convert_import_props(imp_preset.get("layer32_props"), tuple)
                 temp_preset = {}
                 if bool_props != None:
                     temp_preset["bool_props"] = bool_props
+                if euler_props != None:
+                    temp_preset["euler_props"] = euler_props
                 if float_props != None:
                     temp_preset["float_props"] = float_props
                 if int_props != None:
                     temp_preset["int_props"] = int_props
                 if string_props != None:
                     temp_preset["string_props"] = string_props
-                if vector_euler_props != None:
-                    temp_preset["vector_euler_props"] = vector_euler_props
-                if vector_float3_props != None:
-                    temp_preset["vector_float3_props"] = vector_float3_props
-                if vector_float4_props != None:
-                    temp_preset["vector_float4_props"] = vector_float4_props
+                if float_vector3_props != None:
+                    temp_preset["float_vector3_props"] = float_vector3_props
+                if float_vector4_props != None:
+                    temp_preset["float_vector4_props"] = float_vector4_props
+                if layer32_props != None:
+                    temp_preset["layer32_props"] = layer32_props
                 if len(temp_preset) > 0:
                     temp_preset["name"] = preset_name
                     new_presets.append(temp_preset)
@@ -244,7 +253,7 @@ def add_conv_props_to_preset(src_props, dest_props, dest_prop_details, value_typ
     for imp_prop in src_props:
         new_prop = dest_props.add()
         new_prop.name = imp_prop["name"]
-        if value_type == "VectorEuler":
+        if value_type == "Euler":
             temp_val = (imp_prop["value"][0], imp_prop["value"][1], imp_prop["value"][2])
             new_prop.value = Euler(temp_val, imp_prop["value"][3])
             new_prop.order = imp_prop["value"][3]
@@ -307,18 +316,22 @@ def import_presets_collections_eval(p_collections, pc_eval, dup_coll_action, rep
                 string_props = imp_preset.get("string_props")
                 if string_props != None:
                     add_conv_props_to_preset(string_props, new_preset.string_props, new_preset.prop_details, "str")
-                vector_euler_props = imp_preset.get("vector_euler_props")
-                if vector_euler_props != None:
-                    add_conv_props_to_preset(vector_euler_props, new_preset.vector_euler_props,
-                                             new_preset.prop_details, "VectorEuler")
-                vector_float3_props = imp_preset.get("vector_float3_props")
-                if vector_float3_props != None:
-                    add_conv_props_to_preset(vector_float3_props, new_preset.vector_float3_props,
-                                             new_preset.prop_details, "VectorFloat3")
-                vector_float4_props = imp_preset.get("vector_float4_props")
-                if vector_float4_props != None:
-                    add_conv_props_to_preset(vector_float4_props, new_preset.vector_float4_props,
-                                             new_preset.prop_details, "VectorFloat4")
+                euler_props = imp_preset.get("euler_props")
+                if euler_props != None:
+                    add_conv_props_to_preset(euler_props, new_preset.euler_props,
+                                             new_preset.prop_details, "Euler")
+                float_vector3_props = imp_preset.get("float_vector3_props")
+                if float_vector3_props != None:
+                    add_conv_props_to_preset(float_vector3_props, new_preset.float_vector3_props,
+                                             new_preset.prop_details, "FloatVector3")
+                float_vector4_props = imp_preset.get("float_vector4_props")
+                if float_vector4_props != None:
+                    add_conv_props_to_preset(float_vector4_props, new_preset.float_vector4_props,
+                                             new_preset.prop_details, "FloatVector4")
+                layer32_props = imp_preset.get("layer32_props")
+                if layer32_props != None:
+                    add_conv_props_to_preset(layer32_props, new_preset.layer32_props,
+                                             new_preset.prop_details, "Layer32")
     return len(imp_presets_collections), presets_count
 
 def import_presets_file(p_collections, filepath, dup_coll_action, replace_preset):
