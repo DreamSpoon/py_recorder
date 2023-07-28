@@ -243,3 +243,11 @@ def copy_active_preset_to_clipboard(context, p_options, p_collections):
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
     return props_count
+
+def text_to_preset_clipboard(text):
+    for line in text.lines:
+        body = line.body
+        print("text line body =", body)
+        print("  body len =", len(body))
+        if body != "":
+            paste_full_datapath_to_clipboard(body)

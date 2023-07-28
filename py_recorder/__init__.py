@@ -63,7 +63,8 @@ from .preset.operator import (PYREC_OT_PresetClipboardClear, PYREC_OT_PresetClip
     PYREC_OT_PresetClipboardCreatePreset, PYREC_OT_PresetPropsRemoveItem, PYREC_OT_PresetApply,
     PYREC_OT_PresetModifyCollection, PYREC_OT_PresetRemoveCollection, PYREC_OT_PresetModifyPreset,
     PYREC_OT_PresetRemovePreset, PYREC_OT_QuicksavePreferences, PYREC_OT_PresetExportFile, PYREC_OT_PresetImportFile,
-    PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject, PYREC_OT_TransferObjectPresets)
+    PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject, PYREC_OT_TransferObjectPresets,
+    PYREC_OT_TextToPresetClipboard)
 from .preset.panel import (PYREC_PT_View3dPreset, PYREC_PT_TextEditorPreset)
 from .preset.props import (PYREC_PG_BoolProp, PYREC_PG_EulerProp, PYREC_PG_IntProp, PYREC_PG_FloatProp,
     PYREC_PG_FloatVector3Prop, PYREC_PG_FloatVector4Prop, PYREC_PG_Layer32Prop, PYREC_PG_StringProp,
@@ -157,6 +158,7 @@ classes = [
     PYREC_OT_PresetExportObject,
     PYREC_OT_PresetImportObject,
     PYREC_OT_TransferObjectPresets,
+    PYREC_OT_TextToPresetClipboard,
     PYREC_PT_View3dPreset,
     PYREC_PT_TextEditorPreset,
 

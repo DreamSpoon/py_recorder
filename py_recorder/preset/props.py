@@ -114,11 +114,11 @@ class PYREC_PG_PresetClipboardOptions(PropertyGroup):
         "Clipboard list", default=False)
     # list column sizes (factors)
     list_col_size1: FloatProperty(name="List Column Size Factor 1", description="Adjust column width",
-        default=0.2, min=0.1, max=0.9)
+        default=0.5, min=0.1, max=0.9)
     list_col_size2: FloatProperty(name="List Column Size Factor 2", description="Adjust column width",
-        default=0.4, min=0.1, max=0.9)
+        default=0.5, min=0.1, max=0.9)
     list_col_size3: FloatProperty(name="List Column Size Factor 3", description="Adjust column width",
-        default=0.4, min=0.1, max=0.9)
+        default=0.5, min=0.1, max=0.9)
     active_prop_detail: IntProperty()
     # selected base_type for creating new preset
     create_base_type: EnumProperty(name="Base Type", description="Base Type for new Preset, when 'Create Preset' " \

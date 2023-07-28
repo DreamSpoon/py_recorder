@@ -26,7 +26,7 @@ from .operator import (PYREC_OT_PresetClipboardCreatePreset, PYREC_OT_PresetClip
     PYREC_OT_PresetRemovePreset, PYREC_OT_PresetRemoveCollection, PYREC_OT_PresetModifyPreset,
     PYREC_OT_PresetPropsRemoveItem, PYREC_OT_QuicksavePreferences, PYREC_OT_PresetImportFile,
     PYREC_OT_PresetExportFile, PYREC_OT_PresetExportObject, PYREC_OT_PresetImportObject,
-    PYREC_OT_TransferObjectPresets)
+    PYREC_OT_TransferObjectPresets, PYREC_OT_TextToPresetClipboard)
 
 class PresetBaseClass(Panel):
     def draw_func_apply(self, context, p_r):
@@ -135,6 +135,8 @@ class PresetBaseClass(Panel):
         row = layout.row()
         row.label(text="", icon='RNA')
         row.prop(cb_options, "input_full_datapath", text="")
+        if context.space_data.type == 'TEXT_EDITOR':
+            layout.operator(PYREC_OT_TextToPresetClipboard.bl_idname)
 
         layout.label(text="  New Preset")
         row = layout.row()

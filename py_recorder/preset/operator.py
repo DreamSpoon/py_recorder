@@ -66,7 +66,7 @@ from ..bl_util import (get_addon_module_name, do_tag_redraw)
 from .func import (PRESET_SOURCE_ADDON_PREFS, get_source_preset_collections)
 from .apply_func import preset_apply_preset
 from .clipboard_func import (preset_clipboard_clear, preset_clipboard_remove_item, preset_clipboard_create_preset,
-    copy_active_preset_to_clipboard)
+    copy_active_preset_to_clipboard, text_to_preset_clipboard)
 from .impexp_func import (export_presets_file, import_presets_file, export_presets_object, import_presets_object,
     transfer_object_presets)
 from .modify_func import (MODIFY_COLL_FUNC_MOVE, MODIFY_COLL_FUNC_RENAME, MODIFY_PRESET_FUNC_MOVE,
@@ -598,4 +598,20 @@ class PYREC_OT_TransferObjectPresets(Operator):
         if isinstance(err_msg, str):
             self.report({'ERROR'}, "Unable to Transfer Presets between Objects, " + err_msg)
             return {'CANCELLED'}
+        return {'FINISHED'}
+
+class PYREC_OT_TextToPresetClipboard(Operator):
+    bl_idname = "py_rec.text_to_preset_clipboard"
+    bl_label = "Text to Clipboard"
+    bl_description = "Read current Text (in Text-Editor) and try to add each line to Presets Clipboard"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.space_data.text != None
+
+    def execute(self, context):
+        if context.space_data.text is None:
+            return {'CANCELLED'}
+        text_to_preset_clipboard(context.space_data.text)
         return {'FINISHED'}

@@ -260,7 +260,7 @@ class PYREC_OT_InspectRecordAttribute(Operator):
         # get single inspect value Python attribute
         if attr_record_options.copy_from == "single_attribute":
             attr_name = ic_panel.dir_attributes[ic_panel.dir_attributes_index].name
-            finished, out_str = get_attribute_python_str(context, ic_panel, ic_panel.dir_inspect_exec_str, attr_name,
+            finished, out_str = get_attribute_python_str(ic_panel, ic_panel.dir_inspect_exec_str, attr_name,
                                                          attr_record_options)
             if finished == 'CANCELLED':
                 self.report({'ERROR'}, out_str)
@@ -270,7 +270,7 @@ class PYREC_OT_InspectRecordAttribute(Operator):
             for attr_item in ic_panel.dir_attributes:
                 if attr_item.name == ".":
                     continue
-                finished, temp_str = get_attribute_python_str(context, ic_panel, ic_panel.dir_inspect_exec_str,
+                finished, temp_str = get_attribute_python_str(ic_panel, ic_panel.dir_inspect_exec_str,
                                                               attr_item.name, attr_record_options)
                 if finished == 'CANCELLED':
                     continue

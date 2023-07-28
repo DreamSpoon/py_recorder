@@ -444,9 +444,6 @@ def get_active_thing_inspect_str(context, active_type):
             return "bpy.context.space_data"
     return ""
 
-#### inspect_exec.py ####
-
-# region_type = 'UI'
 inspect_panel_classes = {}
 INSPECT_PANEL_REGISTER = "class PYREC_PT_%s_Inspect%i(bpy.types.Panel):\n" \
     "    bl_space_type = '%s'\n" \
@@ -729,7 +726,7 @@ def apply_inspect_options(context, panel_num, ic_panel, panel_options, context_n
     inspect_exec_refresh(context, panel_num)
     return 'FINISHED', ""
 
-def get_attribute_python_str(context, ic_panel, inspect_str, attr_name, attr_record_options):
+def get_attribute_python_str(ic_panel, inspect_str, attr_name, attr_record_options):
     out_first_str = ""
     out_last_str = inspect_str if attr_name == "." else inspect_str + "." + attr_name
     pre_exec_str = get_pre_exec_str(ic_panel)
@@ -748,7 +745,7 @@ def get_attribute_python_str(context, ic_panel, inspect_str, attr_name, attr_rec
     # append attribute value to output, if needed
     if attr_record_options.include_value:
         if attr_value is None:
-            out_last_str += " = None\n"
+            out_last_str += " # = None\n"
         elif callable(attr_value):
             out_last_str += " # = %s\n" % str(attr_value)
         else:
@@ -756,7 +753,7 @@ def get_attribute_python_str(context, ic_panel, inspect_str, attr_name, attr_rec
             if py_val_str is None:
                 out_last_str += "  # = %s\n" % str(attr_value)
             else:
-                out_last_str += " = %s\n" % py_val_str
+                out_last_str += " # = %s\n" % py_val_str
     if attr_record_options.comment_type:
         out_first_str += "# Type: " + type(attr_value).__name__ + "\n"
     if attr_record_options.comment_doc:

@@ -111,9 +111,9 @@ class PYREC_PG_InspectPanel(PropertyGroup):
     dir_attributes_index: IntProperty(update=update_dir_attributes)
 
     dir_col_size1: FloatProperty(name="List Column Size Factor 1", description="Adjust column width",
-        default=0.333333, min=0.1, max=0.9)
+        default=0.5, min=0.1, max=0.9)
     dir_col_size2: FloatProperty(name="List Column Size Factor 2", description="Adjust column width",
-        default=0.666667, min=0.1, max=0.9)
+        default=0.5, min=0.1, max=0.9)
 
     dir_item_doc_lines: CollectionProperty(type=PropertyGroup)
     dir_item_doc_lines_index: IntProperty()
