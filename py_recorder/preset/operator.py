@@ -60,13 +60,15 @@
 
 import bpy
 from bpy_extras.io_utils import ImportHelper
+from bpy.props import EnumProperty
 from bpy.types import Operator
 
 from ..bl_util import (get_addon_module_name, do_tag_redraw)
 from .func import (PRESET_SOURCE_ADDON_PREFS, get_source_preset_collections)
 from .apply_func import preset_apply_preset
-from .clipboard_func import (preset_clipboard_clear, preset_clipboard_remove_item, preset_clipboard_create_preset,
-    copy_active_preset_to_clipboard, text_to_preset_clipboard)
+from .clipboard_func import (CB_DUP_NAME_ACTION_ITEMS, preset_clipboard_clear, preset_clipboard_remove_item,
+    preset_clipboard_create_preset, copy_active_preset_to_clipboard, text_to_preset_clipboard,
+    is_clipboard_preset_name_used)
 from .impexp_func import (export_presets_file, import_presets_file, export_presets_object, import_presets_object,
     transfer_object_presets)
 from .modify_func import (MODIFY_COLL_FUNC_MOVE, MODIFY_COLL_FUNC_RENAME, MODIFY_PRESET_FUNC_MOVE,
@@ -130,6 +132,10 @@ class PYREC_OT_PresetClipboardCreatePreset(Operator):
         "match selected base type"
     bl_options = {'REGISTER'}
 
+    preset_dup_name_action: EnumProperty(name="Create Preset Duplicate Name Action",
+        description="Choose action to resolve duplicate Preset name, because Preset with same name is already in " \
+        "this Preset Collection", items=CB_DUP_NAME_ACTION_ITEMS)
+
     @classmethod
     def poll(cls, context):
         preset_options = context.window_manager.py_rec.preset_options
@@ -148,9 +154,25 @@ class PYREC_OT_PresetClipboardCreatePreset(Operator):
         cb_options = preset_options.clipboard_options
         if len(clipboard.prop_details) == 0 or cb_options.create_base_type == " ":
             return {'CANCELLED'}
-        preset_name = preset_clipboard_create_preset(get_source_preset_collections(context), clipboard, cb_options)
+        preset_name = preset_clipboard_create_preset(get_source_preset_collections(context), clipboard, cb_options,
+                                                     self.preset_dup_name_action)
         self.report({'INFO'}, "New Preset created named: " + preset_name)
         return {'FINISHED'}
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Preset name already used, choose action")
+        layout.prop(self, "preset_dup_name_action")
+
+    def invoke(self, context, event):
+        p_collections = get_source_preset_collections(context)
+        cb_options = context.window_manager.py_rec.preset_options.clipboard_options
+        # check if Preset name is already used, and if it is, show window for user to choose action
+        if is_clipboard_preset_name_used(cb_options, p_collections):
+            wm = context.window_manager
+            return wm.invoke_props_dialog(self)
+        else:
+            return self.execute(context)
 
 class PYREC_OT_PresetPropsRemoveItem(Operator):
     bl_idname = "py_rec.preset_props_remove_item"

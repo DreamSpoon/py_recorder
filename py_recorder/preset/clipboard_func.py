@@ -25,6 +25,14 @@ from ..py_code_utils import is_valid_full_datapath
 from ..bl_util import get_next_name
 from .func import (digest_full_datapath, get_modify_active_single_preset)
 
+CDNA_RENAME_NEW = "Rename New"
+CDNA_REPLACE_OLD = "Replace Existing"
+CB_DUP_NAME_ACTION_ITEMS = [
+    (CDNA_RENAME_NEW, "Rename New", "Auto-rename New Preset by appending a number sequence, e.g. '.001'"),
+    (CDNA_REPLACE_OLD, "Replace Existing", "Replace Existing Preset with New Preset. All old Preset values are " \
+     "deleted, and new Preset values added")
+    ]
+
 def create_clipboard_line(clipboard, full_datapath, path_type_paths, prop_value):
     # create new detail
     prop_detail = clipboard.prop_details.add()
@@ -134,7 +142,21 @@ def preset_clipboard_remove_item(cb_options, clipboard):
     if cb_options.active_prop_detail < 0:
         cb_options.active_prop_detail = 0
 
-def preset_clipboard_create_preset(p_collections, clipboard, cb_options):
+def is_clipboard_preset_name_used(cb_options, p_collections):
+    coll_name = cb_options.create_preset_coll_name
+    base_type_name = cb_options.create_base_type
+    preset_name = cb_options.create_preset_name
+    if coll_name in p_collections:
+        preset_coll = p_collections[coll_name]
+    else:
+        return False
+    if base_type_name in preset_coll.base_types:
+        preset_type = preset_coll.base_types[base_type_name]
+    else:
+        return False
+    return preset_name in preset_type.presets
+
+def preset_clipboard_create_preset(p_collections, clipboard, cb_options, dup_name_action):
     base_type_name = cb_options.create_base_type
     preset_name = cb_options.create_preset_name
     # if Preset name is empty then use default name
@@ -159,8 +181,14 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options):
         preset_type = preset_coll.base_types.add()
         preset_type.name = base_type_name
     # create Preset from data in Property Clipboard
-    # check if Preset name is used, and append '.001', etc. if name is already used
+    # check if Preset name is used, and append '.001', etc. if name is already used - depending upon 'dup_name_action'
     next_preset_name = get_next_name(preset_name, preset_type.presets)
+    if next_preset_name != preset_name:
+        if dup_name_action == CDNA_REPLACE_OLD:
+            # delete old Preset
+            preset_type.presets.remove(preset_type.presets.find(preset_name))
+            # use original preset name
+            next_preset_name = preset_name
     new_preset = preset_type.presets.add()
     new_preset.name = next_preset_name
     for prop_detail in clipboard.prop_details:
@@ -259,7 +287,5 @@ def copy_active_preset_to_clipboard(context, p_options, p_collections):
 def text_to_preset_clipboard(text):
     for line in text.lines:
         body = line.body
-        print("text line body =", body)
-        print("  body len =", len(body))
         if body != "":
             paste_full_datapath_to_clipboard(body)
