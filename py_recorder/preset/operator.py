@@ -216,7 +216,7 @@ class PYREC_OT_PresetApply(Operator):
 class PYREC_OT_PresetModifyCollection(Operator):
     bl_idname = "py_rec.preset_modify_collection"
     bl_label = "Modify"
-    bl_description = "Apply Modify Function to Preset Collection"
+    bl_description = "Apply Modify Function to Preset Collection. Undo not available, modification is permanent"
     bl_options = {'REGISTER'}
 
     @classmethod
@@ -303,7 +303,7 @@ class PYREC_OT_PresetRemoveCollection(Operator):
 class PYREC_OT_PresetModifyPreset(Operator):
     bl_idname = "py_rec.preset_modify_preset"
     bl_label = "Modify"
-    bl_description = "Apply Modify Function to Preset"
+    bl_description = "Apply Modify Function to Preset. Undo not available, modification is permanent"
     bl_options = {'REGISTER'}
 
     @classmethod

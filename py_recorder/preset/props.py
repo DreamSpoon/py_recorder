@@ -79,6 +79,12 @@ class PYREC_PG_FloatVector4Prop(PropertyGroup):
     name: StringProperty()
     value: FloatVectorProperty(size=4, default=(0.0, 0.0, 0.0, 0.0))
 
+# e.g. bpy.data.objects["Cube"].rigid_body.collision_collections
+class PYREC_PG_Layer20Prop(PropertyGroup):
+    name: StringProperty()
+    value: BoolVectorProperty(size=20, subtype='LAYER', default=[ False for _ in range(20)])
+
+# e.g. bpy.data.armatures["Armature"].layers
 class PYREC_PG_Layer32Prop(PropertyGroup):
     name: StringProperty()
     value: BoolVectorProperty(size=32, subtype='LAYER', default=[ False for _ in range(32)])
@@ -101,6 +107,7 @@ class PYREC_PG_PresetClipboard(PropertyGroup):
     euler_props: CollectionProperty(type=PYREC_PG_EulerProp)
     float_vector3_props: CollectionProperty(type=PYREC_PG_FloatVector3Prop)
     float_vector4_props: CollectionProperty(type=PYREC_PG_FloatVector4Prop)
+    layer20_props: CollectionProperty(type=PYREC_PG_Layer20Prop)
     layer32_props: CollectionProperty(type=PYREC_PG_Layer32Prop)
 
 class PYREC_PG_PresetClipboardOptions(PropertyGroup):
@@ -151,6 +158,7 @@ class PYREC_PG_Preset(PropertyGroup):
     euler_props: CollectionProperty(type=PYREC_PG_EulerProp)
     float_vector3_props: CollectionProperty(type=PYREC_PG_FloatVector3Prop)
     float_vector4_props: CollectionProperty(type=PYREC_PG_FloatVector4Prop)
+    layer20_props: CollectionProperty(type=PYREC_PG_Layer20Prop)
     layer32_props: CollectionProperty(type=PYREC_PG_Layer32Prop)
 
 # a collection of presets that apply to only one base type, base type is 'name' of this item in parent collection,

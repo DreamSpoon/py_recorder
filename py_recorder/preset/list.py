@@ -42,6 +42,9 @@ def draw_prop_value(layout, value_type_base, prop_base, lock_changes):
         elif value_type_base.value_type == "FloatVector4":
             v = prop_base.float_vector4_props[value_type_base.name].value
             layout.label(text="(%f, %f, %f, %f)" % (v[0], v[1], v[2], v[3]) )
+        elif value_type_base.value_type == "Layer20":
+            v = prop_base.layer20_props[value_type_base.name].value
+            layout.label(text="(%s)" % str(v) )
         elif value_type_base.value_type == "Layer32":
             v = prop_base.layer32_props[value_type_base.name].value
             layout.label(text="(%s)" % str(v) )
@@ -63,6 +66,8 @@ def draw_prop_value(layout, value_type_base, prop_base, lock_changes):
             layout.prop(prop_base.float_vector3_props[value_type_base.name], "value", text="", slider=False)
         elif value_type_base.value_type == "FloatVector4":
             layout.prop(prop_base.float_vector4_props[value_type_base.name], "value", text="", slider=False)
+        elif value_type_base.value_type == "Layer20":
+            layout.prop(prop_base.layer20_props[value_type_base.name], "value", text="")
         elif value_type_base.value_type == "Layer32":
             layout.prop(prop_base.layer32_props[value_type_base.name], "value", text="")
 

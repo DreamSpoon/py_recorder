@@ -67,10 +67,11 @@ from .preset.operator import (PYREC_OT_PresetClipboardClear, PYREC_OT_PresetClip
     PYREC_OT_TextToPresetClipboard)
 from .preset.panel import (PYREC_PT_View3dPreset, PYREC_PT_TextEditorPreset)
 from .preset.props import (PYREC_PG_BoolProp, PYREC_PG_EulerProp, PYREC_PG_IntProp, PYREC_PG_FloatProp,
-    PYREC_PG_FloatVector3Prop, PYREC_PG_FloatVector4Prop, PYREC_PG_Layer32Prop, PYREC_PG_StringProp,
-    PYREC_PG_PresetPropDetail, PYREC_PG_Preset, PYREC_PG_PresetCollection, PYREC_PG_PresetTypeCollection,
-    PYREC_PG_PresetClipboardPropDetail, PYREC_PG_PresetClipboard, PYREC_PG_PresetClipboardOptions,
-    PYREC_PG_PresetApplyOptions, PYREC_PG_PresetModifyOptions, PYREC_PG_PresetOptions, PYREC_PG_PresetImpExpOptions)
+    PYREC_PG_FloatVector3Prop, PYREC_PG_FloatVector4Prop, PYREC_PG_Layer20Prop, PYREC_PG_Layer32Prop,
+    PYREC_PG_StringProp, PYREC_PG_PresetPropDetail, PYREC_PG_Preset, PYREC_PG_PresetCollection,
+    PYREC_PG_PresetTypeCollection, PYREC_PG_PresetClipboardPropDetail, PYREC_PG_PresetClipboard,
+    PYREC_PG_PresetClipboardOptions, PYREC_PG_PresetApplyOptions, PYREC_PG_PresetModifyOptions,
+    PYREC_PG_PresetOptions, PYREC_PG_PresetImpExpOptions)
 from .record.driver.operator import (PYREC_OT_DriversToPython, PYREC_OT_SelectAnimdataSrcAll,
     PYREC_OT_SelectAnimdataSrcNone)
 from .record.driver.panel import PYREC_PT_RecordDriver
@@ -168,6 +169,7 @@ classes = [
     PYREC_PG_FloatProp,
     PYREC_PG_FloatVector3Prop,
     PYREC_PG_FloatVector4Prop,
+    PYREC_PG_Layer20Prop,
     PYREC_PG_Layer32Prop,
     PYREC_PG_StringProp,
     PYREC_PG_PresetPropDetail,

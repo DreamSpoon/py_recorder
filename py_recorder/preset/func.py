@@ -118,7 +118,7 @@ def digest_full_datapath(full_datapath, all_bpy_types=False):
             prop_value = None
         # if known property value type is found then exit for loop
         elif isinstance(val, (bool, float, int, str, Euler)) \
-            or ( isinstance(val, (bpy_prop_array, list, Quaternion, tuple, Vector)) and len(val) in [3, 4, 32] ):
+            or ( isinstance(val, (bpy_prop_array, list, Quaternion, tuple, Vector)) and len(val) in [3, 4, 20, 32] ):
             if prev_attr_bpy_type:
                 prop_path = prog_datapath
                 prop_value = val
@@ -173,6 +173,9 @@ def get_preset_prop_value_str(preset, prop_name):
         prop_value = preset.float_vector4_props[prop_detail.name].value
         return ( prop_value, "FloatVector4(%f, %f, %f, %f)" % (prop_value[0], prop_value[1], prop_value[2],
                                                                prop_value[3]) )
+    elif prop_detail.value_type == "Layer20":
+        prop_value = preset.layer20_props[prop_detail.name].value
+        return ( prop_value, "Layer32(%s)" % str(prop_value) )
     elif prop_detail.value_type == "Layer32":
         prop_value = preset.layer32_props[prop_detail.name].value
         return ( prop_value, "Layer32(%s)" % str(prop_value) )
@@ -212,7 +215,10 @@ def update_preset_prop_value(preset, prop_name, new_value):
                 return True
         # all bool values?
         elif len(new_value) == len( [ d for d in new_value if isinstance(d, bool) ] ):
-            if prop_detail.value_type == "Layer32" and len(new_value) == 32:
+            if prop_detail.value_type == "Layer20" and len(new_value) == 20:
+                preset.layer32_props[prop_detail.name].value = new_value
+                return True
+            elif prop_detail.value_type == "Layer32" and len(new_value) == 32:
                 preset.layer32_props[prop_detail.name].value = new_value
                 return True
     return False

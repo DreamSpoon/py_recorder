@@ -70,11 +70,12 @@ def get_export_presets_data(p_collections):
                 out_str_string_props = props_export_str(preset.string_props)
                 out_str_float_vector3_props = props_export_str(preset.float_vector3_props)
                 out_str_float_vector4_props = props_export_str(preset.float_vector4_props)
+                out_str_layer20_props = props_export_str(preset.layer20_props)
                 out_str_layer32_props = props_export_str(preset.layer32_props)
                 if out_str_bool_props == ""  and out_str_euler_props == "" and out_str_float_props == "" \
                     and out_str_int_props == "" and out_str_string_props == "" \
                     and out_str_float_vector3_props == "" and out_str_float_vector4_props == "" \
-                    and out_str_layer32_props == "":
+                    and out_str_layer20_props == "" and out_str_layer32_props == "":
                     continue
                 esc_p_name = escape_str(preset.name)
                 presets_str += "                    {   'name': '%s',\n" % esc_p_name
@@ -105,6 +106,10 @@ def get_export_presets_data(p_collections):
                 if out_str_float_vector4_props != "":
                     presets_str +=  "                        'float_vector4_props': [\n"
                     presets_str += out_str_float_vector4_props
+                    presets_str +=  "                            ],\n"
+                if out_str_layer20_props != "":
+                    presets_str +=  "                        'layer20_props': [\n"
+                    presets_str += out_str_layer20_props
                     presets_str +=  "                            ],\n"
                 if out_str_layer32_props != "":
                     presets_str +=  "                        'layer32_props': [\n"
@@ -223,6 +228,7 @@ def convert_import_presets_collections(import_eval):
                 string_props = convert_import_props(imp_preset.get("string_props"), str)
                 float_vector3_props = convert_import_props(imp_preset.get("float_vector3_props"), tuple)
                 float_vector4_props = convert_import_props(imp_preset.get("float_vector4_props"), tuple)
+                layer20_props = convert_import_props(imp_preset.get("layer20_props"), tuple)
                 layer32_props = convert_import_props(imp_preset.get("layer32_props"), tuple)
                 temp_preset = {}
                 if bool_props != None:
@@ -239,6 +245,8 @@ def convert_import_presets_collections(import_eval):
                     temp_preset["float_vector3_props"] = float_vector3_props
                 if float_vector4_props != None:
                     temp_preset["float_vector4_props"] = float_vector4_props
+                if layer20_props != None:
+                    temp_preset["layer20_props"] = layer20_props
                 if layer32_props != None:
                     temp_preset["layer32_props"] = layer32_props
                 if len(temp_preset) > 0:
@@ -328,6 +336,10 @@ def import_presets_collections_eval(p_collections, pc_eval, dup_coll_action, rep
                 if float_vector4_props != None:
                     add_conv_props_to_preset(float_vector4_props, new_preset.float_vector4_props,
                                              new_preset.prop_details, "FloatVector4")
+                layer20_props = imp_preset.get("layer20_props")
+                if layer20_props != None:
+                    add_conv_props_to_preset(layer20_props, new_preset.layer20_props,
+                                             new_preset.prop_details, "Layer20")
                 layer32_props = imp_preset.get("layer32_props")
                 if layer32_props != None:
                     add_conv_props_to_preset(layer32_props, new_preset.layer32_props,

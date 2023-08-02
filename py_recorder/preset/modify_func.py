@@ -105,6 +105,8 @@ def preset_remove_prop(preset_options, preset_collections):
         preset.float_vector3_props.remove(preset.float_vector3_props.find(prop_detail_name))
     elif prop_detail_type == "FloatVector4":
         preset.float_vector4_props.remove(preset.float_vector4_props.find(prop_detail_name))
+    elif prop_detail_type == "Layer20":
+        preset.layer20_props.remove(preset.layer20_props.find(prop_detail_name))
     elif prop_detail_type == "Layer32":
         preset.layer32_props.remove(preset.layer32_props.find(prop_detail_name))
     # remove preset property detail
@@ -162,6 +164,7 @@ def copy_preset_to_base_type(src_preset, base_type, replace_preset):
                       "FloatVector3")
     copy_preset_props(src_preset.float_vector4_props, new_preset.float_vector4_props, new_preset.prop_details,
                       "FloatVector4")
+    copy_preset_props(src_preset.layer20_props, new_preset.layer20_props, new_preset.prop_details, "Layer20")
     copy_preset_props(src_preset.layer32_props, new_preset.layer32_props, new_preset.prop_details, "Layer32")
 
 def preset_collection_modify_move(context, preset_options, dup_coll_action, replace_preset):

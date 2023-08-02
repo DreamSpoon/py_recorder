@@ -65,7 +65,10 @@ def create_clipboard_line(clipboard, full_datapath, path_type_paths, prop_value)
                 prop_detail.value_type = "FloatVector4"
         # all bools?
         elif len([ d for d in prop_value if isinstance(d, bool) ]) == num_elements:
-            if num_elements == 32:
+            if num_elements == 20:
+                p = clipboard.layer20_props.add()
+                prop_detail.value_type = "Layer20"
+            elif num_elements == 32:
                 p = clipboard.layer32_props.add()
                 prop_detail.value_type = "Layer32"
     if p is None:
@@ -122,6 +125,7 @@ def preset_clipboard_clear(cb_options, clipboard):
     clipboard.string_props.clear()
     clipboard.float_vector3_props.clear()
     clipboard.float_vector4_props.clear()
+    clipboard.layer20_props.clear()
     clipboard.layer32_props.clear()
 
 def preset_clipboard_remove_item(cb_options, clipboard):
@@ -200,6 +204,10 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options):
                 new_preset_prop = new_preset.float_vector4_props.add()
                 new_preset_prop.name = prop_path
                 new_preset_prop.value = clipboard.float_vector4_props[prop_detail.name].value
+            elif prop_detail.value_type == "Layer20":
+                new_preset_prop = new_preset.layer20_props.add()
+                new_preset_prop.name = prop_path
+                new_preset_prop.value = clipboard.layer20_props[prop_detail.name].value
             elif prop_detail.value_type == "Layer32":
                 new_preset_prop = new_preset.layer32_props.add()
                 new_preset_prop.name = prop_path
@@ -235,6 +243,10 @@ def copy_active_preset_to_clipboard(context, p_options, p_collections):
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
     for prop in preset.float_vector4_props:
+        props_count += 1
+        create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
+                              prop.value)
+    for prop in preset.layer20_props:
         props_count += 1
         create_clipboard_line(clipboard, prop.name, [ ("", p_options.modify_options.base_type, prop.name) ],
                               prop.value)
