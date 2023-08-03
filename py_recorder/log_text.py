@@ -20,10 +20,9 @@ from datetime import datetime as dt
 
 import bpy
 
-from .bl_util import get_addon_module_name
-
 def log_text_name():
-    addon_prefs_log = bpy.context.preferences.addons[get_addon_module_name()].preferences.log
+    base_pkg_name = __package__ if __package__.find(".") == -1 else __package__[:__package__.find(".")]
+    addon_prefs_log = bpy.context.preferences.addons[base_pkg_name].preferences.log
     output_text_name = addon_prefs_log.output_text_name
     # use default name if custom name is not available
     if output_text_name == "":
@@ -32,7 +31,8 @@ def log_text_name():
         return output_text_name
 
 def log_text_append(log_str):
-    addon_prefs_log = bpy.context.preferences.addons[get_addon_module_name()].preferences.log
+    base_pkg_name = __package__ if __package__.find(".") == -1 else __package__[:__package__.find(".")]
+    addon_prefs_log = bpy.context.preferences.addons[base_pkg_name].preferences.log
     output_text_name = log_text_name()
     # get log Text, or create if needed
     text = bpy.data.texts.get(output_text_name)

@@ -21,7 +21,6 @@ from mathutils import Euler, Quaternion, Vector
 import bpy
 from bpy.types import bpy_prop_array
 
-from ..bl_util import get_addon_module_name
 from ..py_code_utils import (enumerate_datapath_hierarchy, trim_datapath, get_value_type_name, is_bpy_type_name)
 
 # Data related to Presets and Preset Collections can be stored in one of two places:
@@ -226,7 +225,8 @@ def update_preset_prop_value(preset, prop_name, new_value):
 def get_source_preset_collections(context):
     p_r = context.window_manager.py_rec
     if p_r.preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-        return context.preferences.addons[get_addon_module_name()].preferences.preset_collections
+        base_pkg_name = __package__ if __package__.find(".") == -1 else __package__[:__package__.find(".")]
+        return context.preferences.addons[base_pkg_name].preferences.preset_collections
     else:
         return p_r.preset_collections
 

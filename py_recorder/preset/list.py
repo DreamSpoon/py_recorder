@@ -18,7 +18,6 @@
 
 from bpy.types import UIList
 
-from ..bl_util import get_addon_module_name
 from .func import (get_source_preset_collections, get_modify_active_single_preset)
 
 def draw_prop_value(layout, value_type_base, prop_base, lock_changes):

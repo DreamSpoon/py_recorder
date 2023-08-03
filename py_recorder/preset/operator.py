@@ -60,11 +60,11 @@
 
 import bpy
 from bpy_extras.io_utils import ImportHelper
-from bpy.props import EnumProperty
+from bpy.props import (EnumProperty, StringProperty)
 from bpy.types import Operator
 
-from ..bl_util import (get_addon_module_name, do_tag_redraw)
-from .func import (PRESET_SOURCE_ADDON_PREFS, get_source_preset_collections)
+from ..bl_util import do_tag_redraw
+from .func import (PRESET_SOURCE_TYPES, PRESET_SOURCE_ADDON_PREFS, get_source_preset_collections)
 from .apply_func import preset_apply_preset
 from .clipboard_func import (CB_DUP_NAME_ACTION_ITEMS, preset_clipboard_clear, preset_clipboard_remove_item,
     preset_clipboard_create_preset, copy_active_preset_to_clipboard, text_to_preset_clipboard,
@@ -75,13 +75,14 @@ from .modify_func import (MODIFY_COLL_FUNC_MOVE, MODIFY_COLL_FUNC_RENAME, MODIFY
     MODIFY_PRESET_FUNC_RENAME, MODIFY_PRESET_FUNC_UPDATE, MODIFY_PRESET_FUNC_COPY_TO_CLIPBOARD, preset_remove_prop,
     preset_collection_modify_rename, preset_collection_remove_collection, preset_modify_rename,
     preset_collection_remove_preset, preset_collection_modify_move, update_preset, is_valid_update_datapath,
-    get_modify_active_preset_collection, get_modify_active_single_preset, move_active_preset)
+    get_modify_active_preset_collection, get_modify_active_single_preset, move_active_preset,
+    preset_move_to_collection_items)
 
 class PYREC_OT_PresetClipboardClear(Operator):
     bl_idname = "py_rec.preset_clipboard_clear"
     bl_label = "Clear Clipboard"
     bl_description = "Delete all items in Property Clipboard. Using this function will affect only this file"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -107,7 +108,7 @@ class PYREC_OT_PresetClipboardRemoveItem(Operator):
     bl_idname = "py_rec.preset_clipboard_remove_item"
     bl_label = "Remove Item"
     bl_description = "Remove active item from Preset Clipboard"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -130,7 +131,7 @@ class PYREC_OT_PresetClipboardCreatePreset(Operator):
     bl_label = "Create Preset"
     bl_description = "Create new Preset from items in Property Clipboard, using only items with base types that " \
         "match selected base type"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     preset_dup_name_action: EnumProperty(name="Create Preset Duplicate Name Action",
         description="Choose action to resolve duplicate Preset name, because Preset with same name is already in " \
@@ -178,7 +179,7 @@ class PYREC_OT_PresetPropsRemoveItem(Operator):
     bl_idname = "py_rec.preset_props_remove_item"
     bl_label = "Remove Property"
     bl_description = "Remove Property from list of Preset Properties"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -221,7 +222,7 @@ class PYREC_OT_PresetApply(Operator):
     bl_idname = "py_rec.preset_apply"
     bl_label = "Apply Preset"
     bl_description = "Apply Preset to base type"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -239,7 +240,9 @@ class PYREC_OT_PresetModifyCollection(Operator):
     bl_idname = "py_rec.preset_modify_collection"
     bl_label = "Modify"
     bl_description = "Apply Modify Function to Preset Collection. Undo not available, modification is permanent"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
+
+    collection_rename: StringProperty()
 
     @classmethod
     def poll(cls, context):
@@ -257,7 +260,8 @@ class PYREC_OT_PresetModifyCollection(Operator):
                                           preset_options.impexp_options.replace_preset)
             self.report({'INFO'}, "Moved Presets Collection from one Data Source to another")
         elif f == MODIFY_COLL_FUNC_RENAME:
-            preset_collection_modify_rename(preset_options, get_source_preset_collections(context))
+            preset_collection_modify_rename(preset_options, get_source_preset_collections(context),
+                                            self.collection_rename)
             do_tag_redraw()
             self.report({'INFO'}, "Renamed Presets Collection")
         return {'FINISHED'}
@@ -280,7 +284,7 @@ class PYREC_OT_PresetModifyCollection(Operator):
             active_coll = get_modify_active_preset_collection(preset_options, get_source_preset_collections(context))
             label_text = "" if active_coll is None else active_coll.name
             layout.label(text="Rename Preset Collection: " + label_text)
-            layout.prop(preset_options.modify_options, "collection_rename", text="")
+            layout.prop(self, "collection_rename", text="")
 
     def invoke(self, context, event):
         preset_options = context.window_manager.py_rec.preset_options
@@ -288,14 +292,14 @@ class PYREC_OT_PresetModifyCollection(Operator):
         if f == MODIFY_COLL_FUNC_RENAME:
             # set initial rename string to original name string, if available
             p_coll = get_modify_active_preset_collection(preset_options, get_source_preset_collections(context))
-            preset_options.modify_options.collection_rename = "" if p_coll is None else p_coll.name
+            self.collection_rename = "" if p_coll is None else p_coll.name
         return context.window_manager.invoke_props_dialog(self)
 
 class PYREC_OT_PresetRemoveCollection(Operator):
     bl_idname = "py_rec.preset_remove_collection"
     bl_label = "Remove Collection"
     bl_description = "Permanently delete active Collection"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -326,7 +330,13 @@ class PYREC_OT_PresetModifyPreset(Operator):
     bl_idname = "py_rec.preset_modify_preset"
     bl_label = "Modify"
     bl_description = "Apply Modify Function to Preset. Undo not available, modification is permanent"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
+
+    preset_rename: StringProperty()
+    move_to_data_source: EnumProperty(description="Preset will be moved to Presets Collection from this Data Source",
+        items=PRESET_SOURCE_TYPES)
+    move_to_collection:  EnumProperty(description="Preset will be moved to this Presets Collection",
+        items=preset_move_to_collection_items)
 
     @classmethod
     def poll(cls, context):
@@ -350,14 +360,18 @@ class PYREC_OT_PresetModifyPreset(Operator):
                 return {'CANCELLED'}
             self.report({'INFO'}, "Copied %d properties from Preset to Preset Clipboard" % copy_result)
         elif f == MODIFY_PRESET_FUNC_MOVE:
+            if self.move_to_collection == " ":
+                self.report({'ERROR'}, "Unable to move active Preset to another Collection")
+                return {'CANCELLED'}
             move_result = move_active_preset(context, preset_options, p_collections,
-                                             preset_options.impexp_options.replace_preset)
+                                             preset_options.impexp_options.replace_preset, self.move_to_data_source,
+                                             self.move_to_collection)
             if move_result == False:
                 self.report({'ERROR'}, "Unable to move active Preset to another Collection")
                 return {'CANCELLED'}
             self.report({'INFO'}, "Moved Preset")
         elif f == MODIFY_PRESET_FUNC_RENAME:
-            preset_modify_rename(preset_options, p_collections)
+            preset_modify_rename(preset_options, p_collections, self.preset_rename)
             do_tag_redraw()
             self.report({'INFO'}, "Renamed Preset")
         elif f == MODIFY_PRESET_FUNC_UPDATE:
@@ -372,15 +386,15 @@ class PYREC_OT_PresetModifyPreset(Operator):
         f = preset_options.modify_options.preset_function
         if f == MODIFY_PRESET_FUNC_MOVE:
             layout.label(text="Data Source")
-            layout.prop(preset_options.modify_options, "move_to_data_source", text="")
+            layout.prop(self, "move_to_data_source", text="")
             layout.label(text="Move to Collection")
-            layout.prop(preset_options.modify_options, "move_to_collection", text="")
+            layout.prop(self, "move_to_collection", text="")
             layout.prop(preset_options.impexp_options, "replace_preset", text="Replace Existing")
         elif f == MODIFY_PRESET_FUNC_RENAME:
             preset = get_modify_active_single_preset(preset_options, p_collections)
             label_text = "" if preset is None else preset.name
             layout.label(text="Rename Preset: " + label_text)
-            layout.prop(preset_options.modify_options, "preset_rename", text="")
+            layout.prop(self, "preset_rename", text="")
         elif f == MODIFY_PRESET_FUNC_UPDATE:
             layout.label(text="Update from Copy Full Datapath")
             layout.prop(preset_options.modify_options, "update_full_datapath", text="")
@@ -389,6 +403,7 @@ class PYREC_OT_PresetModifyPreset(Operator):
                 layout.label(text="Datapath validated")
             else:
                 layout.label(text="Enter valid Datapath")
+
     def invoke(self, context, event):
         wm = context.window_manager
         preset_options = wm.py_rec.preset_options
@@ -405,7 +420,7 @@ class PYREC_OT_PresetModifyPreset(Operator):
                     presets = active_coll.base_types[preset_options.modify_options.base_type].presets
                     if len(presets) > preset_options.modify_options.active_preset:
                         temp_name = presets[preset_options.modify_options.active_preset].name
-            preset_options.modify_options.preset_rename = temp_name
+            self.preset_rename = temp_name
             return wm.invoke_props_dialog(self)
         elif f == MODIFY_PRESET_FUNC_UPDATE:
             return wm.invoke_props_dialog(self)
@@ -415,7 +430,7 @@ class PYREC_OT_PresetRemovePreset(Operator):
     bl_idname = "py_rec.preset_remove_preset"
     bl_label = "Remove Preset"
     bl_description = "Permanently delete active Preset"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -450,7 +465,7 @@ class PYREC_OT_QuicksavePreferences(Operator):
     bl_description = "Save Presets in Blender Preferences by saving Blender Preferences. This will save any " \
         "changes to Presets / Preset Collections - only applies to Preset / Preset Colleciton data in " \
         "Blender Preferences"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         bpy.ops.wm.save_userpref()
@@ -469,7 +484,7 @@ class PYREC_OT_PresetExportFile(Operator, ImportHelper):
     bl_label = "Export File"
     bl_description = "Create a .py file copy of Presets Collections from current Presets source. This .py file " \
         "can be imported into Blender with Py Preset -> Import File function"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     filter_glob: bpy.props.StringProperty(default="*.py", options={'HIDDEN'})
 
@@ -497,7 +512,7 @@ class PYREC_OT_PresetImportFile(Operator, ImportHelper):
     bl_label = "Import File"
     bl_description = "Open a .py file with Presets Collections and copy to current Presets source. This .py file " \
         "can be created with Py Preset -> Export File function"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     filter_glob: bpy.props.StringProperty(default="*.py", options={'HIDDEN'})
 
@@ -541,7 +556,7 @@ class PYREC_OT_PresetExportObject(Operator):
     bl_description = "Attach a .py string to active Object, with copy of Presets Collections from current Presets " \
         "source. This .py string attached to active Object can be imported into Blender with Py Preset -> " \
         "Import Object function"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -566,7 +581,7 @@ class PYREC_OT_PresetImportObject(Operator):
     bl_description = "Read a .py string attached to active Object, to create Presets Collections and add to " \
         "current Presets Collections Data Source. Current Presets Collections data can be attached to any " \
         "Object with Py Preset -> Export Object function"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -605,7 +620,7 @@ class PYREC_OT_TransferObjectPresets(Operator):
     bl_idname = "py_rec.transfer_object_presets"
     bl_label = "Transfer Presets"
     bl_description = "Copy Presets Collections data from active Object to all other selected Objects"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -626,7 +641,7 @@ class PYREC_OT_TextToPresetClipboard(Operator):
     bl_idname = "py_rec.text_to_preset_clipboard"
     bl_label = "Text to Clipboard"
     bl_description = "Read current Text (in Text-Editor) and try to add each line to Presets Clipboard"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):

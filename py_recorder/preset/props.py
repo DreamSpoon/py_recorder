@@ -25,7 +25,7 @@ from .apply_func import (set_apply_full_datapath, get_apply_full_datapath, apply
     apply_collection_items, apply_preset_items)
 from .clipboard_func import (set_input_full_datapath, get_input_full_datapath, create_base_type_items)
 from .modify_func import (MODIFY_COLL_FUNC, MODIFY_PRESET_FUNC, modify_base_type_items,
-    get_update_full_datapath, set_update_full_datapath, preset_move_to_collection_items)
+    get_update_full_datapath, set_update_full_datapath)
 
 class PYREC_PG_BoolProp(PropertyGroup):
     name: StringProperty()
@@ -197,15 +197,10 @@ class PYREC_PG_PresetModifyOptions(PropertyGroup):
     active_preset: IntProperty()
     active_detail: IntProperty()
     collection_function: EnumProperty(items=MODIFY_COLL_FUNC)
-    collection_rename: StringProperty()
     preset_function: EnumProperty(items=MODIFY_PRESET_FUNC)
-    preset_rename: StringProperty()
     update_full_datapath: StringProperty(description="Paste here after using 'Copy Full Data Path' function " \
         "(right-click context menu)", get=get_update_full_datapath, set=set_update_full_datapath)
-    move_to_data_source: EnumProperty(description="Preset will be moved to Presets Collection from this Data Source",
-        items=PRESET_SOURCE_TYPES)
-    move_to_collection:  EnumProperty(description="Preset will be moved to this Presets Collection",
-        items=preset_move_to_collection_items)
+    update_valid_full_datapath: StringProperty()
 
 class PYREC_PG_PresetOptions(PropertyGroup):
     data_source: EnumProperty(name="Data Source", description="Presets and Preset Collections Data will be saved " \

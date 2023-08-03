@@ -21,6 +21,7 @@ from bpy.types import (Operator, Panel)
 
 CPROP_NAME_INIT_PY = "__init__.py"
 
+# TODO: move this tuple to version_bpy_data.py
 DATABLOCK_DUAL_TYPES = (
     (bpy.types.Action, "actions"),
     (bpy.types.Armature, "armatures"),

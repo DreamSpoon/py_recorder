@@ -18,7 +18,6 @@
 
 import bpy
 
-from ..bl_util import get_addon_module_name
 from ..py_code_utils import (trim_datapath, is_valid_full_datapath)
 from .func import (digest_full_datapath, get_preset_prop_value_str, get_source_preset_collections)
 

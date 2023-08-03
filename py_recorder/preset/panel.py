@@ -18,7 +18,6 @@
 
 from bpy.types import Panel
 
-from ..bl_util import get_addon_module_name
 from .func import (PRESET_SOURCE_ADDON_PREFS, PRESET_VIEW_APPLY, PRESET_VIEW_MODIFY,
     PRESET_VIEW_CLIPBOARD, PRESET_VIEW_IMPORT_EXPORT, get_source_preset_collections)
 from .operator import (PYREC_OT_PresetClipboardCreatePreset, PYREC_OT_PresetClipboardRemoveItem,
@@ -64,7 +63,8 @@ class PresetBaseClass(Panel):
         p_options = p_r.preset_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            data_source = context.preferences.addons[get_addon_module_name()].preferences
+            base_pkg_name = __package__ if __package__.find(".") == -1 else __package__[:__package__.find(".")]
+            data_source = context.preferences.addons[base_pkg_name].preferences
         else:
             data_source = p_r
         p_collections = data_source.preset_collections
@@ -127,7 +127,8 @@ class PresetBaseClass(Panel):
         cb_options = p_r.preset_options.clipboard_options
         # use Blender Addon Preferences or .blend file as Preset save data source
         if p_r.preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-            data_source = context.preferences.addons[get_addon_module_name()].preferences
+            base_pkg_name = __package__ if __package__.find(".") == -1 else __package__[:__package__.find(".")]
+            data_source = context.preferences.addons[base_pkg_name].preferences
         else:
             data_source = p_r
         layout = self.layout

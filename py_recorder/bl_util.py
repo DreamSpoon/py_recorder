@@ -18,15 +18,6 @@
 
 import bpy
 
-addons_module_name = []
-
-def set_addon_module_name(name):
-    addons_module_name.clear()
-    addons_module_name.append(name)
-
-def get_addon_module_name():
-    return addons_module_name[0]
-
 def get_next_name(name, collection):
     if name not in collection:
         return name

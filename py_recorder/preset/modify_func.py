@@ -18,7 +18,7 @@
 
 import bpy
 
-from ..bl_util import (get_addon_module_name, get_next_name)
+from ..bl_util import get_next_name
 from ..py_code_utils import is_valid_full_datapath
 from .func import (PRESET_SOURCE_ADDON_PREFS, DUP_COLL_ACTION_RENAME, DUP_COLL_ACTION_REPLACE, digest_full_datapath,
     update_preset_prop_value, get_modify_active_preset_collection, get_modify_active_presets,
@@ -46,7 +46,8 @@ MODIFY_PRESET_FUNC = [
 def modify_base_type_items(self, context):
     preset_collections = get_source_preset_collections(context)
     try:
-        tps = preset_collections[context.window_manager.py_rec.preset_options.modify_options.active_collection].base_types
+        active_coll = context.window_manager.py_rec.preset_options.modify_options.active_collection
+        tps = preset_collections[active_coll].base_types
         # get list of type names ('bpy.types.' name)
         items = [ (t.name, t.name, "") for t in tps ]
         if len(items) > 0:
@@ -55,8 +56,7 @@ def modify_base_type_items(self, context):
         pass
     return [ (" ", "", "") ]
 
-def preset_collection_modify_rename(preset_options, preset_collections):
-    new_name = preset_options.modify_options.collection_rename
+def preset_collection_modify_rename(preset_options, preset_collections, new_name):
     # quit if new_name is blank
     if new_name == "":
         return
@@ -69,8 +69,7 @@ def preset_collection_modify_rename(preset_options, preset_collections):
         p_coll = preset_collections[preset_options.modify_options.active_collection]
         p_coll.name = new_name
 
-def preset_modify_rename(preset_options, preset_collections):
-    new_name = preset_options.modify_options.preset_rename
+def preset_modify_rename(preset_options, preset_collections, new_name):
     # quit if new_name is blank
     if new_name == "":
         return
@@ -147,7 +146,7 @@ def copy_preset_to_base_type(src_preset, base_type, replace_preset):
         new_preset.name = src_preset.name
     else:
         if replace_preset:
-            base_type.presets.remove(src_preset.name)
+            base_type.presets.remove(base_type.presets.find(src_preset.name))
             new_preset = base_type.presets.add()
             new_preset.name = src_preset.name
         # rename Preset, e.g. add .001
@@ -168,12 +167,13 @@ def copy_preset_to_base_type(src_preset, base_type, replace_preset):
     copy_preset_props(src_preset.layer32_props, new_preset.layer32_props, new_preset.prop_details, "Layer32")
 
 def preset_collection_modify_move(context, preset_options, dup_coll_action, replace_preset):
+    base_pkg_name = __package__ if __package__.find(".") == -1 else __package__[:__package__.find(".")]
     if preset_options.data_source == PRESET_SOURCE_ADDON_PREFS:
-        preset_collections = context.preferences.addons[get_addon_module_name()].preferences.preset_collections
+        preset_collections = context.preferences.addons[base_pkg_name].preferences.preset_collections
         other_p_collections = context.window_manager.py_rec.preset_collections
     else:
         preset_collections = context.window_manager.py_rec.preset_collections
-        other_p_collections = context.preferences.addons[get_addon_module_name()].preferences.preset_collections
+        other_p_collections = context.preferences.addons[base_pkg_name].preferences.preset_collections
     move_coll = get_modify_active_preset_collection(preset_options, preset_collections)
     if move_coll is None:
         return
@@ -203,10 +203,9 @@ def preset_collection_modify_move(context, preset_options, dup_coll_action, repl
     # remove original Presets Collection
     preset_collections.remove(preset_collections.find(move_coll.name))
 
-update_preset_valid_datapath = []
-
-def paste_full_datapath_to_update_preset(full_datapath, expected_type):
-    update_preset_valid_datapath.clear()
+def paste_full_datapath_to_update_preset(full_datapath, mod_options):
+    expected_type = mod_options.base_type
+    mod_options.update_valid_full_datapath = ""
     # remove leading/trailing whitespace
     full_datapath = full_datapath.strip()
     if not is_valid_full_datapath(full_datapath):
@@ -218,7 +217,7 @@ def paste_full_datapath_to_update_preset(full_datapath, expected_type):
     # get first available value that matches type and add to global result variable
     for base_path, type_name, _ in path_type_paths:
         if type_name == expected_type:
-            update_preset_valid_datapath.append(base_path)
+            mod_options.update_valid_full_datapath = base_path
             return
 
 def set_update_full_datapath(self, value):
@@ -226,23 +225,26 @@ def set_update_full_datapath(self, value):
         self["update_full_datapath"] = value
         return
     self["update_full_datapath"] = value
-    paste_full_datapath_to_update_preset(value, bpy.context.window_manager.py_rec.preset_options.modify_options.base_type)
+    mod_options = bpy.context.window_manager.py_rec.preset_options.modify_options
+    paste_full_datapath_to_update_preset(value, mod_options)
 
 def get_update_full_datapath(self):
     return self.get("update_full_datapath", "")
 
 def is_valid_update_datapath():
-    return len(update_preset_valid_datapath) > 0
+    mod_options = bpy.context.window_manager.py_rec.preset_options.modify_options
+    return mod_options.update_valid_full_datapath != ""
 
 def update_preset(preset_options, preset_collections):
-    if len(update_preset_valid_datapath) != 1:
+    mod_options = bpy.context.window_manager.py_rec.preset_options.modify_options
+    if mod_options.update_valid_full_datapath == "":
         return
     preset = get_modify_active_single_preset(preset_options, preset_collections)
     if preset is None:
         return
     for prop_detail in preset.prop_details:
         # get base value for attribute searching
-        exec_str = "import bpy\ndatapath_value = " + update_preset_valid_datapath[0]
+        exec_str = "import bpy\ndatapath_value = " + mod_options.update_valid_full_datapath
         locals_dict = {}
         exec(exec_str, globals(), locals_dict)
         if locals_dict["datapath_value"] is None:
@@ -262,22 +264,29 @@ def update_preset(preset_options, preset_collections):
 
 def preset_move_to_collection_items(self, context):
     p_r = context.window_manager.py_rec
-    if p_r.preset_options.modify_options.move_to_data_source == PRESET_SOURCE_ADDON_PREFS:
-        source_collections = context.preferences.addons[get_addon_module_name()].preferences.preset_collections
+    if self.move_to_data_source == PRESET_SOURCE_ADDON_PREFS:
+        base_pkg_name = __package__ if __package__.find(".") == -1 else __package__[:__package__.find(".")]
+        source_collections = context.preferences.addons[base_pkg_name].preferences.preset_collections
     else:
         source_collections = p_r.preset_collections
     item_list = [ (p_coll.name, p_coll.name, "") for p_coll in source_collections ]
     return item_list if len(item_list) > 0 else [ (" ", "", "") ]
 
-def move_active_preset(context, preset_options, preset_collections, replace_preset):
+def move_active_preset(context, preset_options, preset_collections, replace_preset, move_to_data_source,
+                       to_collection):
     move_preset = get_modify_active_single_preset(preset_options, preset_collections)
-    if preset_options.modify_options.move_to_data_source == PRESET_SOURCE_ADDON_PREFS:
-        move_to_collections = context.preferences.addons[get_addon_module_name()].preferences.preset_collections
+    if move_to_data_source == PRESET_SOURCE_ADDON_PREFS:
+        base_pkg_name = __package__ if __package__.find(".") == -1 else __package__[:__package__.find(".")]
+        move_to_collections = context.preferences.addons[base_pkg_name].preferences.preset_collections
     else:
         move_to_collections = context.window_manager.py_rec.preset_collections
-    if not preset_options.modify_options.move_to_collection in move_to_collections:
+    if not to_collection in move_to_collections:
         return
-    move_to_coll = move_to_collections[preset_options.modify_options.move_to_collection]
+    move_to_coll = move_to_collections[to_collection]
+    active_coll = get_modify_active_preset_collection(preset_options, preset_collections)
+    # if move to same collection then no work needed, so exit
+    if active_coll == move_to_coll:
+        return
     move_base_type_name = preset_options.modify_options.base_type
     # get or create base type as needed
     if move_base_type_name in move_to_coll.base_types:
@@ -290,6 +299,5 @@ def move_active_preset(context, preset_options, preset_collections, replace_pres
     active_presets = get_modify_active_presets(preset_options, preset_collections)
     active_presets.remove(active_presets.find(move_preset.name))
     # remove empty base_types, i.e. when last Preset is removed from base_type
-    active_coll = get_modify_active_preset_collection(preset_options, preset_collections)
     if len(active_coll.base_types[move_base_type_name].presets) == 0:
         active_coll.base_types.remove(active_coll.base_types.find(move_base_type_name))

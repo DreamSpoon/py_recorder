@@ -38,7 +38,6 @@ from bpy.props import (BoolProperty, CollectionProperty, PointerProperty, String
 from bpy.utils import (register_class, unregister_class)
 
 from .addon_prefs import (PYREC_PG_LogAddonPrefs, PYREC_PG_InterfaceAddonPrefs, PYREC_AddonPreferences)
-from .bl_util import set_addon_module_name
 from .object_custom_prop import (PYREC_OT_OBJ_AddCP_Data, PYREC_OT_OBJ_ModifyInit, PYREC_PT_OBJ_AdjustCustomProp)
 from .context_exec.panel import (append_exec_context_panel_all, remove_exec_context_panel_all)
 from .context_exec.operator import PYREC_OT_ContextExec
@@ -245,7 +244,6 @@ def timed_reg_exec():
         append_exec_context_panel_all()
 
 def register():
-    set_addon_module_name(__name__)
     register_inspect_panel_draw_func(draw_inspect_panel)
     for cls in classes:
         register_class(cls)
