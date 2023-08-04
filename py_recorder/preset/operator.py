@@ -135,7 +135,7 @@ class PYREC_OT_PresetClipboardCreatePreset(Operator):
 
     preset_dup_name_action: EnumProperty(name="Create Preset Duplicate Name Action",
         description="Choose action to resolve duplicate Preset name, because Preset with same name is already in " \
-        "this Preset Collection", items=CB_DUP_NAME_ACTION_ITEMS)
+        "this Preset Collection", items=CB_DUP_NAME_ACTION_ITEMS, options={'HIDDEN'})
 
     @classmethod
     def poll(cls, context):
@@ -155,10 +155,14 @@ class PYREC_OT_PresetClipboardCreatePreset(Operator):
         cb_options = preset_options.clipboard_options
         if len(clipboard.prop_details) == 0 or cb_options.create_base_type == " ":
             return {'CANCELLED'}
-        preset_name = preset_clipboard_create_preset(get_source_preset_collections(context), clipboard, cb_options,
+        status, preset_name = preset_clipboard_create_preset(get_source_preset_collections(context), clipboard, cb_options,
                                                      self.preset_dup_name_action)
-        self.report({'INFO'}, "New Preset created named: " + preset_name)
-        return {'FINISHED'}
+        if status == {'FINISHED'}:
+            self.report({'INFO'}, "New Preset created named: " + preset_name)
+            return {'FINISHED'}
+        else:
+            self.report({'ERROR'}, preset_name)
+            return {'CANCELLED'}
 
     def draw(self, context):
         layout = self.layout
@@ -242,7 +246,7 @@ class PYREC_OT_PresetModifyCollection(Operator):
     bl_description = "Apply Modify Function to Preset Collection. Undo not available, modification is permanent"
     bl_options = {'REGISTER', 'UNDO'}
 
-    collection_rename: StringProperty()
+    collection_rename: StringProperty(options={'HIDDEN'})
 
     @classmethod
     def poll(cls, context):
@@ -332,11 +336,11 @@ class PYREC_OT_PresetModifyPreset(Operator):
     bl_description = "Apply Modify Function to Preset. Undo not available, modification is permanent"
     bl_options = {'REGISTER', 'UNDO'}
 
-    preset_rename: StringProperty()
+    preset_rename: StringProperty(options={'HIDDEN'})
     move_to_data_source: EnumProperty(description="Preset will be moved to Presets Collection from this Data Source",
-        items=PRESET_SOURCE_TYPES)
+        items=PRESET_SOURCE_TYPES, options={'HIDDEN'})
     move_to_collection:  EnumProperty(description="Preset will be moved to this Presets Collection",
-        items=preset_move_to_collection_items)
+        items=preset_move_to_collection_items, options={'HIDDEN'})
 
     @classmethod
     def poll(cls, context):

@@ -185,6 +185,22 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options, dup_nam
     else:
         preset_type = preset_coll.base_types.add()
         preset_type.name = base_type_name
+    # create list of valid details
+    new_preset_details = {}
+    for prop_detail in clipboard.prop_details:
+        if prop_detail.base_type != base_type_name:
+            continue
+        try:
+            prop_path = prop_detail.available_base_types[prop_detail.base_type].value
+        except:
+            continue
+        # do not add duplicate 'prop_path', if found
+        if prop_path in new_preset_details:
+            continue
+        new_preset_details[prop_path] = prop_detail
+    # if zero valid details then Preset cannot be created
+    if len(new_preset_details) == 0:
+        return {'ERROR'}, "No Preset Clipboard details match type " + base_type_name
     # create Preset from data in Property Clipboard
     # check if Preset name is used, and append '.001', etc. if name is already used - depending upon 'dup_name_action'
     next_preset_name = get_next_name(preset_name, preset_type.presets)
@@ -196,15 +212,7 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options, dup_nam
             next_preset_name = preset_name
     new_preset = preset_type.presets.add()
     new_preset.name = next_preset_name
-    for prop_detail in clipboard.prop_details:
-        if prop_detail.base_type == base_type_name:
-            try:
-                prop_path = prop_detail.available_base_types[prop_detail.base_type].value
-            except:
-                continue
-            # do not add duplicate 'prop_path', if found
-            if prop_path in new_preset.prop_details:
-                continue
+    for prop_path, prop_detail in new_preset_details.items():
             preset_prop_detail = new_preset.prop_details.add()
             preset_prop_detail.name = prop_path
             preset_prop_detail.value_type = prop_detail.value_type
@@ -245,7 +253,7 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options, dup_nam
                 new_preset_prop = new_preset.layer32_props.add()
                 new_preset_prop.name = prop_path
                 new_preset_prop.value = clipboard.layer32_props[prop_detail.name].value
-    return new_preset.name
+    return {'FINISHED'}, new_preset.name
 
 def copy_active_preset_to_clipboard(context, p_options, p_collections):
     preset = get_modify_active_single_preset(p_options, p_collections)
