@@ -45,6 +45,7 @@ def create_clipboard_line(clipboard, full_datapath, path_type_paths, prop_value)
         abt.name = bt_name
         abt.value = prop_path
     prop_detail.base_type = first_bt_name
+    p = None
     # create new property in type-specific property collection
     if isinstance(prop_value, bool):
         p = clipboard.bool_props.add()
@@ -100,6 +101,10 @@ def paste_full_datapath_to_clipboard(full_datapath):
     path_type_paths, prop_value = digest_full_datapath(full_datapath)
     # exit if no data for next steps
     if path_type_paths is None:
+        return
+    last_name = path_type_paths[-1][2]
+    # exit if builtin attribute
+    if last_name.startswith("__") and last_name.endswith("__"):
         return
     create_clipboard_line(clipboard, full_datapath, path_type_paths, prop_value)
 

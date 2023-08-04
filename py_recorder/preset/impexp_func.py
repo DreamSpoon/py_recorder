@@ -24,6 +24,7 @@ from bpy.types import bpy_prop_array
 
 from ..bl_util import get_next_name
 from ..log_text import log_text_append
+from ..py_code_utils import strip_line_comment
 from .func import (DUP_COLL_ACTION_RENAME, DUP_COLL_ACTION_REPLACE)
 
 PRESETS_COLLECTIONS_CUSTOM_PROP_NAME = "py_presets_collections"
@@ -157,10 +158,9 @@ def ast_literal_eval_lines(f):
     full_str = ""
     for line in f:
         # remove comments without modifying file line structure
-        find_comment = line.find("#")
-        if find_comment != -1:
-            line = line[:find_comment] + "\n"
-        full_str += line
+        full_str += strip_line_comment(line)
+    if full_str == "":
+        return {}
     try:
         eval_result = ast.literal_eval(full_str)
     except:

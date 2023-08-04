@@ -19,57 +19,9 @@
 import bpy
 from bpy.types import (Operator, Panel)
 
+from .version_bpy_data import DATABLOCK_DUAL_TYPES
+
 CPROP_NAME_INIT_PY = "__init__.py"
-
-# TODO: move this tuple to version_bpy_data.py
-DATABLOCK_DUAL_TYPES = (
-    (bpy.types.Action, "actions"),
-    (bpy.types.Armature, "armatures"),
-    (bpy.types.Brush, "brushes"),
-    (bpy.types.CacheFile, "cache_files"),
-    (bpy.types.Camera, "cameras"),
-    (bpy.types.Collection, "collections"),
-    (bpy.types.Curve, "curves"),
-    (bpy.types.VectorFont, "fonts"),
-    (bpy.types.GreasePencil, "grease_pencils"),
-    (bpy.types.Image, "images"),
-    (bpy.types.Lattice, "lattices"),
-    (bpy.types.Library, "libraries"),
-    (bpy.types.Light, "lights"),
-    (bpy.types.LightProbe, "lightprobes"),
-    (bpy.types.FreestyleLineStyle, "linestyles"),
-    (bpy.types.Mask, "masks"),
-    (bpy.types.Material, "materials"),
-    (bpy.types.Mesh, "meshes"),
-    (bpy.types.MetaBall, "metaballs"),
-    (bpy.types.MovieClip, "movieclips"),
-    (bpy.types.NodeGroup, "node_groups"),
-    (bpy.types.Object, "objects"),
-    (bpy.types.PaintCurve, "paint_curves"),
-    (bpy.types.Palette, "palettes"),
-    (bpy.types.ParticleSettings, "particles"),
-    (bpy.types.ShapeKey, "shape_keys"),
-    (bpy.types.Scene, "scenes"),
-    (bpy.types.Screen, "screens"),
-    (bpy.types.Sound, "sounds"),
-    (bpy.types.Speaker, "speakers"),
-    (bpy.types.Text, "texts"),
-    (bpy.types.Texture, "textures"),
-    (bpy.types.Volume, "volumes"),
-    (bpy.types.WindowManager, "window_managers"),
-    (bpy.types.WorkSpace, "workspaces"),
-    (bpy.types.World, "worlds"),
-)
-if bpy.app.version >= (3,10,0):
-    DATABLOCK_DUAL_TYPES += [ (bpy.types.PointCloud, "pointclouds") ]
-if bpy.app.version >= (3,30,0):
-    DATABLOCK_DUAL_TYPES += [ (bpy.types.Curves, "hair_curves") ]
-
-def get_datablock_for_type(data):
-    try:
-        return [ dd for dd in DATABLOCK_DUAL_TYPES if isinstance(data, dd[0]) ][1]
-    except:
-        return None
 
 class PYREC_OT_OBJ_ModifyInit(Operator):
     bl_description = "Modify active Object's custom property '"+CPROP_NAME_INIT_PY+""
@@ -148,10 +100,10 @@ class PYREC_PT_OBJ_AdjustCustomProp(Panel):
         if act_ob.get(CPROP_NAME_INIT_PY) is None:
             box.label(text=CPROP_NAME_INIT_PY+":  None")
         else:
-            datablock = get_datablock_for_type(act_ob[CPROP_NAME_INIT_PY])
-            if datablock != None:
+            try:
+                datablock = [ dd for dd in DATABLOCK_DUAL_TYPES if isinstance(act_ob[CPROP_NAME_INIT_PY], dd[0]) ][1]
                 box.prop_search(act_ob, '["'+CPROP_NAME_INIT_PY+'"]', bpy.data, datablock)
-            else:
+            except:
                 box.prop(act_ob, '["'+CPROP_NAME_INIT_PY+'"]')
         box.operator(PYREC_OT_OBJ_ModifyInit.bl_idname)
 

@@ -18,7 +18,7 @@
 
 bl_info = {
     "name": "Python Recorder",
-    "version": (0, 6, 1),
+    "version": (0, 6, 2),
     "author": "Dave",
     "blender": (2, 80, 0),
     "description": "Create and apply Presets. Inspect Python value attributes. Record Blender data to Python code",
@@ -26,7 +26,7 @@ bl_info = {
         "Add Inspect Panel. Context -> Tool -> Py Inspect",
     "doc_url": "https://github.com/DreamSpoon/py_recorder#readme",
     "category": "Presets, Python",
-}
+    }
 
 import numpy
 import types
@@ -190,7 +190,7 @@ classes = [
     PYREC_PG_LogAddonPrefs,
     PYREC_PG_InterfaceAddonPrefs,
     PYREC_AddonPreferences,
-]
+    ]
 
 def duplicate_prop(to_prop, from_prop):
     if isinstance(from_prop, PropertyGroup):

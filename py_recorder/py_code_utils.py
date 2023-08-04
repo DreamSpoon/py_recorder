@@ -22,6 +22,48 @@ import mathutils
 from .bpy_value_string import bpy_value_to_string
 from .lex_py_attributes import lex_py_attributes
 
+def strip_line_comment(src_line):
+    dest_line = ""
+    state_vars = { "backslash": False, "quote": False, "double_quote": False }
+    for c in src_line:
+        if c == "#":
+            # ignore '#' symbols in quotes
+            if state_vars["quote"]:
+                pass
+            # comment found
+            else:
+                dest_line += "\n"
+                break
+        elif c == "'":
+            if state_vars["backslash"]:
+                if state_vars["quote"]:
+                    state_vars["backslash"] = False
+                else:
+                    if not state_vars["double_quote"]:
+                        state_vars["quote"] = True
+            else:
+                if not state_vars["double_quote"]:
+                    state_vars["quote"] = not state_vars["quote"]
+        elif c == '"':
+            if state_vars["backslash"]:
+                if state_vars["double_quote"]:
+                    state_vars["backslash"] = False
+                else:
+                    if not state_vars["quote"]:
+                        state_vars["double_quote"] = True
+            else:
+                if not state_vars["quote"]:
+                    state_vars["double_quote"] = not state_vars["double_quote"]
+        elif c == "\\":
+            state_vars["backslash"] = not state_vars["backslash"]
+        elif c == "\n":
+            dest_line += c
+            break
+        else:
+            state_vars["backslash"] = False
+        dest_line += c
+    return dest_line
+
 def get_commented_splitlines(input_str):
     if input_str is None or input_str == "":
         return ""

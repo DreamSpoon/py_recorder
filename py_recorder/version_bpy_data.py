@@ -107,3 +107,46 @@ if bpy.app.version >= (3,30,0):
     BPY_DATA_TYPE_ITEMS += [  ('hair_curves', "Hair Curve", "") ]
 # sort alphabetically by first value in each tuple
 BPY_DATA_TYPE_ITEMS = sorted(BPY_DATA_TYPE_ITEMS,  key=lambda x: x[0] )
+
+DATABLOCK_DUAL_TYPES = (
+    (bpy.types.Action, "actions"),
+    (bpy.types.Armature, "armatures"),
+    (bpy.types.Brush, "brushes"),
+    (bpy.types.CacheFile, "cache_files"),
+    (bpy.types.Camera, "cameras"),
+    (bpy.types.Collection, "collections"),
+    (bpy.types.Curve, "curves"),
+    (bpy.types.VectorFont, "fonts"),
+    (bpy.types.GreasePencil, "grease_pencils"),
+    (bpy.types.Image, "images"),
+    (bpy.types.Lattice, "lattices"),
+    (bpy.types.Library, "libraries"),
+    (bpy.types.Light, "lights"),
+    (bpy.types.LightProbe, "lightprobes"),
+    (bpy.types.FreestyleLineStyle, "linestyles"),
+    (bpy.types.Mask, "masks"),
+    (bpy.types.Material, "materials"),
+    (bpy.types.Mesh, "meshes"),
+    (bpy.types.MetaBall, "metaballs"),
+    (bpy.types.MovieClip, "movieclips"),
+    (bpy.types.NodeGroup, "node_groups"),
+    (bpy.types.Object, "objects"),
+    (bpy.types.PaintCurve, "paint_curves"),
+    (bpy.types.Palette, "palettes"),
+    (bpy.types.ParticleSettings, "particles"),
+    (bpy.types.ShapeKey, "shape_keys"),
+    (bpy.types.Scene, "scenes"),
+    (bpy.types.Screen, "screens"),
+    (bpy.types.Sound, "sounds"),
+    (bpy.types.Speaker, "speakers"),
+    (bpy.types.Text, "texts"),
+    (bpy.types.Texture, "textures"),
+    (bpy.types.Volume, "volumes"),
+    (bpy.types.WindowManager, "window_managers"),
+    (bpy.types.WorkSpace, "workspaces"),
+    (bpy.types.World, "worlds"),
+)
+if bpy.app.version >= (3,10,0):
+    DATABLOCK_DUAL_TYPES += [ (bpy.types.PointCloud, "pointclouds") ]
+if bpy.app.version >= (3,30,0):
+    DATABLOCK_DUAL_TYPES += [ (bpy.types.Curves, "hair_curves") ]

@@ -64,7 +64,7 @@ def apply_preset_items(self, context):
     apply_base_type = preset_options.apply_options.base_type
     # exit if base type is blank
     if apply_base_type == " ":
-        return [ (" ", "", "") ]
+        return [ (" ", "", "", 0) ]
     # remove ': datapath' from end of base type name, to get base type only
     apply_base_type = apply_base_type[:apply_base_type.find(":")]
     if apply_collection in preset_collections:
@@ -75,7 +75,7 @@ def apply_preset_items(self, context):
             items = [ (p.name, p.name, "") for p in presets ]
             if len(items) > 0:
                 return items
-    return [ (" ", "", "") ]
+    return [ (" ", "", "", 0) ]
 
 # recurse through datapath hierarchy, starting at base_val and using getattr(), to get to value prior to property
 # being preset
