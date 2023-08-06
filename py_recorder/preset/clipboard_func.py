@@ -125,6 +125,8 @@ def create_base_type_items(self, context):
         for abt in p_detail.available_base_types:
             available_base_types[abt.name] = True
     items = [ (bt_name, bt_name, "") for bt_name in available_base_types.keys() ]
+    # sort items alphabetically, by 'display name', and return sorted array
+    items.sort(key = lambda x: x[1])
     return items if len(items) > 0 else [ (" ", "", "") ]
 
 def preset_clipboard_clear(cb_options, clipboard):
@@ -161,8 +163,35 @@ def is_clipboard_preset_name_used(cb_options, p_collections):
         return False
     return preset_name in preset_type.presets
 
+def is_clipboard_preset_create_allowed(clipboard, cb_options):
+    base_type_name = cb_options.create_base_type
+    # create list of valid details
+    detail_count = 0
+    for prop_detail in clipboard.prop_details:
+        if prop_detail.base_type != base_type_name:
+            continue
+        detail_count += 1
+    # if zero valid details then Preset cannot be created
+    return False if detail_count == 0 else True
+
 def preset_clipboard_create_preset(p_collections, clipboard, cb_options, dup_name_action):
     base_type_name = cb_options.create_base_type
+    # create list of valid details
+    new_preset_details = {}
+    for prop_detail in clipboard.prop_details:
+        if prop_detail.base_type != base_type_name:
+            continue
+        try:
+            prop_path = prop_detail.available_base_types[prop_detail.base_type].value
+        except:
+            continue
+        # do not add duplicate 'prop_path', if found
+        if prop_path in new_preset_details:
+            continue
+        new_preset_details[prop_path] = prop_detail
+    # if zero valid details then Preset cannot be created
+    if len(new_preset_details) == 0:
+        return {'ERROR'}, "No Preset Clipboard details match type " + base_type_name
     preset_name = cb_options.create_preset_name
     # if Preset name is empty then use default name
     if preset_name == "":
@@ -185,22 +214,6 @@ def preset_clipboard_create_preset(p_collections, clipboard, cb_options, dup_nam
     else:
         preset_type = preset_coll.base_types.add()
         preset_type.name = base_type_name
-    # create list of valid details
-    new_preset_details = {}
-    for prop_detail in clipboard.prop_details:
-        if prop_detail.base_type != base_type_name:
-            continue
-        try:
-            prop_path = prop_detail.available_base_types[prop_detail.base_type].value
-        except:
-            continue
-        # do not add duplicate 'prop_path', if found
-        if prop_path in new_preset_details:
-            continue
-        new_preset_details[prop_path] = prop_detail
-    # if zero valid details then Preset cannot be created
-    if len(new_preset_details) == 0:
-        return {'ERROR'}, "No Preset Clipboard details match type " + base_type_name
     # create Preset from data in Property Clipboard
     # check if Preset name is used, and append '.001', etc. if name is already used - depending upon 'dup_name_action'
     next_preset_name = get_next_name(preset_name, preset_type.presets)

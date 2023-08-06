@@ -68,7 +68,7 @@ from .func import (PRESET_SOURCE_TYPES, PRESET_SOURCE_ADDON_PREFS, get_source_pr
 from .apply_func import preset_apply_preset
 from .clipboard_func import (CB_DUP_NAME_ACTION_ITEMS, preset_clipboard_clear, preset_clipboard_remove_item,
     preset_clipboard_create_preset, copy_active_preset_to_clipboard, text_to_preset_clipboard,
-    is_clipboard_preset_name_used)
+    is_clipboard_preset_name_used, is_clipboard_preset_create_allowed)
 from .impexp_func import (export_presets_file, import_presets_file, export_presets_object, import_presets_object,
     transfer_object_presets)
 from .modify_func import (MODIFY_COLL_FUNC_MOVE, MODIFY_COLL_FUNC_RENAME, MODIFY_PRESET_FUNC_MOVE,
@@ -170,10 +170,13 @@ class PYREC_OT_PresetClipboardCreatePreset(Operator):
         layout.prop(self, "preset_dup_name_action")
 
     def invoke(self, context, event):
-        p_collections = get_source_preset_collections(context)
-        cb_options = context.window_manager.py_rec.preset_options.clipboard_options
+        preset_options = context.window_manager.py_rec.preset_options
+        cb_options = preset_options.clipboard_options
+        if not is_clipboard_preset_create_allowed(preset_options.clipboard, cb_options):
+            self.report({'ERROR'}, "No Preset Clipboard details match type " + cb_options.create_base_type)
+            return {'CANCELLED'}
         # check if Preset name is already used, and if it is, show window for user to choose action
-        if is_clipboard_preset_name_used(cb_options, p_collections):
+        elif is_clipboard_preset_name_used(preset_options.clipboard_options, get_source_preset_collections(context)):
             wm = context.window_manager
             return wm.invoke_props_dialog(self)
         else:

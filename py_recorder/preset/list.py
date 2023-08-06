@@ -75,7 +75,6 @@ class PYREC_UL_PresetClipboardProps(UIList):
         p_r = context.window_manager.py_rec
         clipboard = p_r.preset_options.clipboard
         cb_options = p_r.preset_options.clipboard_options
-        # item type is PYREC_PG_PresetClipboardPropDetail
         ob = item
         sp = layout
         if cb_options.list_show_datapath:
@@ -96,7 +95,6 @@ class PYREC_UL_PresetClipboardProps(UIList):
 
 class PYREC_UL_PresetApplyProps(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
-        # item type is PYREC_PG_PresetPropDetail
         p_options = context.window_manager.py_rec.preset_options
         p_collections = get_source_preset_collections(context)
         base_types = p_collections[p_options.apply_options.collection].base_types
@@ -112,7 +110,6 @@ class PYREC_UL_PresetApplyProps(UIList):
 
 class PYREC_UL_PresetModifyCollections(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
-        # item type is PYREC_PG_BaseTypePropPresetsCollection
         layout.label(text=item.name)
 
 class PYREC_UL_PresetModifyPresets(UIList):
@@ -121,7 +118,6 @@ class PYREC_UL_PresetModifyPresets(UIList):
 
 class PYREC_UL_PresetModifyProps(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
-        # item type is PYREC_PG_PresetPropDetail
         preset_options = context.window_manager.py_rec.preset_options
         sp = layout.split(factor=preset_options.clipboard_options.list_col_size3)
         sp.label(text=item.name)

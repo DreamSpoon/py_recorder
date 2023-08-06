@@ -43,6 +43,8 @@ def populate_index_strings(self, context):
         output = []
         for index_str in self.array_key_set:
             output.append( (index_str.name, index_str.name, "") )
+        # sort items alphabetically, by 'display name', and return sorted array
+        output.sort(key = lambda x: x[1])
         return output
     # return empty
     return [ (" ", "", "") ]
@@ -302,12 +304,9 @@ def get_inspect_active_type_items(self, context):
     elif context.space_data.type == "SEQUENCE_EDITOR":
         if context.active_sequence_strip != None:
             active_items.append( ("ACTIVE_SEQUENCE_STRIP", "Sequence Strip", "") )
-    # if active_items is empty then return empty list (list needs at least one item or exception will occur)
-    if len(active_items) < 1:
-        return [ (" ", "", "") ]
     # sort items alphabetically, by 'display name', and return sorted array
     active_items.sort(key = lambda x: x[1])
-    return active_items
+    return active_items if len(active_items) > 0 else [ (" ", "", "") ]
 
 def get_active_thing_inspect_str(context, active_type):
     # check for empty (single space is checked because enum is used for active_type, and enum needs at least one item)

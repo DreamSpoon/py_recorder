@@ -51,6 +51,8 @@ def modify_base_type_items(self, context):
         # get list of type names ('bpy.types.' name)
         items = [ (t.name, t.name, "") for t in tps ]
         if len(items) > 0:
+            # sort items alphabetically, by 'display name', and return sorted array
+            items.sort(key = lambda x: x[1])
             return items
     except:
         pass
@@ -270,6 +272,8 @@ def preset_move_to_collection_items(self, context):
     else:
         source_collections = p_r.preset_collections
     item_list = [ (p_coll.name, p_coll.name, "") for p_coll in source_collections ]
+    # sort items alphabetically, by 'display name', and return sorted array
+    item_list.sort(key = lambda x: x[1])
     return item_list if len(item_list) > 0 else [ (" ", "", "") ]
 
 def move_active_preset(context, preset_options, preset_collections, replace_preset, move_to_data_source,

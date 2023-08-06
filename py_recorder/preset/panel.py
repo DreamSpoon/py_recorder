@@ -70,6 +70,7 @@ class PresetBaseClass(Panel):
         p_collections = data_source.preset_collections
         layout = self.layout
 
+        layout.label(text="  Collection")
         row = layout.row()
         row.prop(p_r.preset_options.modify_options, "collection_function", text="")
         row.operator(PYREC_OT_PresetModifyCollection.bl_idname)
@@ -79,10 +80,9 @@ class PresetBaseClass(Panel):
                           p_options.modify_options, "active_collection", rows=3)
         row.operator(PYREC_OT_PresetRemoveCollection.bl_idname, text="", icon='REMOVE')
 
-        layout.separator()
         layout.prop(p_options.modify_options, "base_type", text="Type")
-        layout.separator()
 
+        layout.label(text="  Preset")
         row = layout.row()
         row.prop(p_r.preset_options.modify_options, "preset_function", text="")
         row.operator(PYREC_OT_PresetModifyPreset.bl_idname)
@@ -132,7 +132,7 @@ class PresetBaseClass(Panel):
         else:
             data_source = p_r
         layout = self.layout
-
+        layout.label(text="  Paste Full Data Path here")
         row = layout.row()
         row.label(text="", icon='RNA')
         row.prop(cb_options, "input_full_datapath", text="")
@@ -208,10 +208,10 @@ class PresetBaseClass(Panel):
 
     def draw_func_import_export(self):
         layout = self.layout
-        layout.label(text="File")
+        layout.label(text="  File")
         layout.operator(PYREC_OT_PresetImportFile.bl_idname)
         layout.operator(PYREC_OT_PresetExportFile.bl_idname)
-        layout.label(text="Object")
+        layout.label(text="  Object")
         layout.operator(PYREC_OT_PresetImportObject.bl_idname)
         layout.operator(PYREC_OT_PresetExportObject.bl_idname)
         layout.operator(PYREC_OT_TransferObjectPresets.bl_idname)

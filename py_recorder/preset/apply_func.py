@@ -50,11 +50,15 @@ def get_apply_full_datapath(self):
 def apply_base_type_items(self, context):
     preset_options = context.window_manager.py_rec.preset_options
     items = [ (t.name, t.name, "") for t in preset_options.apply_options.available_types ]
+    # sort items alphabetically, by 'display name', and return sorted array
+    items.sort(key = lambda x: x[1])
     return items if len(items) > 0 else [ (" ", "", "") ]
 
 def apply_collection_items(self, context):
     # include all preset collections in list
     items = [ (pc.name, pc.name, "") for pc in get_source_preset_collections(context) ]
+    # sort items alphabetically, by 'display name', and return sorted array
+    items.sort(key = lambda x: x[1])
     return items if len(items) > 0 else [ (" ", "", "") ]
 
 def apply_preset_items(self, context):
@@ -74,6 +78,8 @@ def apply_preset_items(self, context):
             # include all presets in list, because base type of all presets match given base type
             items = [ (p.name, p.name, "") for p in presets ]
             if len(items) > 0:
+                # sort items alphabetically, by 'display name', and return sorted array
+                items.sort(key = lambda x: x[1])
                 return items
     return [ (" ", "", "", 0) ]
 
