@@ -86,22 +86,6 @@ class PYREC_OT_InspectOptions(Operator):
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
-class PYREC_OT_AddInspectPanel(Operator):
-    bl_idname = "py_rec.add_py_inspect_panel"
-    bl_label = "Add Py Inspect Panel"
-    bl_description = "Add Py Inspect panel to active context Tools menu. e.g. If View 3D context, then " \
-        "Py Inspect panel is in Tools -> Tool menu"
-    bl_options = {'REGISTER'}
-
-    panel_num: IntProperty(default=-1, options={'HIDDEN'})
-
-    def execute(self, context):
-        if not create_context_inspect_panel(context, context.space_data.type,
-                                            context.window_manager.py_rec.inspect_context_collections):
-            self.report({'ERROR'}, "Unable to add Py Inspect panel to context type '%s'" % context.space_data.type)
-            return {'CANCELLED'}
-        return {'FINISHED'}
-
 class PYREC_OT_RemoveInspectPanel(Operator):
     bl_idname = "py_rec.remove_inspect_panel"
     bl_label = "Remove Inspect panel?"

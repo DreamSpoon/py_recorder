@@ -21,11 +21,11 @@ import re
 import bpy
 from bpy.types import Menu
 
-from .operator import (PYREC_OT_AddInspectPanel, PYREC_OT_PyInspectActiveObject)
+from .operator import PYREC_OT_PyInspectActiveObject
 from .func import get_inspect_active_type_items
 
 class PYREC_MT_InspectActive(Menu):
-    bl_label = "Py Inspect Active"
+    bl_label = "Py Inspect"
     bl_idname = "PYREC_MT_InspectActive"
 
     def draw(self, context):
@@ -33,11 +33,6 @@ class PYREC_MT_InspectActive(Menu):
         layout.label(text=str(context.space_data.type)+" context")
         for type_name, nice_name, _ in get_inspect_active_type_items(None, context):
             layout.operator(PYREC_OT_PyInspectActiveObject.bl_idname, text=nice_name).inspect_type = type_name
-
-def draw_inspect_context_menu(self, context):
-    layout = self.layout
-    layout.separator()
-    layout.operator(PYREC_OT_AddInspectPanel.bl_idname)
 
 def draw_inspect_active_context_menu(self, context):
     layout = self.layout
@@ -61,13 +56,6 @@ def remove_context_menu_all(draw_func, menu_list):
     for d in menu_list:
         d.remove(draw_func)
     menu_list.clear()
-
-inspect_context_menu_removes = []
-def append_inspect_context_menu_all():
-    append_context_menu_all(draw_inspect_context_menu, inspect_context_menu_removes)
-
-def remove_inspect_context_menu_all():
-    remove_context_menu_all(draw_inspect_context_menu, inspect_context_menu_removes)
 
 inspect_active_context_menu_removes = []
 def append_inspect_active_context_menu_all():

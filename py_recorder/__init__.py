@@ -18,7 +18,7 @@
 
 bl_info = {
     "name": "Python Recorder",
-    "version": (0, 6, 2),
+    "version": (0, 6, 3),
     "author": "Dave",
     "blender": (2, 80, 0),
     "description": "Create and apply Presets. Inspect Python value attributes. Record Blender data to Python code",
@@ -43,9 +43,9 @@ from .context_exec.panel import (append_exec_context_panel_all, remove_exec_cont
 from .context_exec.operator import PYREC_OT_ContextExec
 from .context_exec.props import PYREC_PG_ContextExecOptions
 from .inspect.func import (register_inspect_panel_draw_func, unregister_all_inspect_panel_classes)
-from .inspect.menu import (PYREC_MT_InspectActive, append_inspect_context_menu_all,
-    remove_inspect_context_menu_all, append_inspect_active_context_menu_all, remove_inspect_active_context_menu_all)
-from .inspect.operator import (PYREC_OT_InspectOptions, PYREC_OT_AddInspectPanel, PYREC_OT_RemoveInspectPanel,
+from .inspect.menu import (PYREC_MT_InspectActive, append_inspect_active_context_menu_all,
+    remove_inspect_active_context_menu_all)
+from .inspect.operator import (PYREC_OT_InspectOptions, PYREC_OT_RemoveInspectPanel,
     PYREC_OT_InspectPanelAttrZoomIn, PYREC_OT_InspectPanelAttrZoomOut, PYREC_OT_InspectPanelArrayIndexZoomIn,
     PYREC_OT_InspectPanelArrayKeyZoomIn, PYREC_OT_RestoreInspectContextPanels, PYREC_OT_InspectRecordAttribute,
     PYREC_OT_InspectCopyAttribute, PYREC_OT_InspectPasteAttribute, PYREC_OT_InspectChoosePy,
@@ -111,7 +111,6 @@ classes = [
     PYREC_OT_BatchExecObject,
     PYREC_OT_ExecObject,
     PYREC_PT_VIEW3D_ExecObject,
-    PYREC_OT_AddInspectPanel,
     PYREC_MT_InspectActive,
     PYREC_OT_PyInspectActiveObject,
     PYREC_OT_RemoveInspectPanel,
@@ -259,8 +258,7 @@ def register():
         bpy.app.handlers.load_post.append(load_post_handler_func)
     if not save_pre_handler_func in bpy.app.handlers.save_pre:
         bpy.app.handlers.save_pre.append(save_pre_handler_func)
-    # append 'Add Inspect Panel' button to all Context menus (all Context types)
-    append_inspect_context_menu_all()
+    # append 'Py Inspect' button to all Context menus (all Context types), which leads to list of active things
     append_inspect_active_context_menu_all()
     # set a timer, so bpy.context can be accessed, to register 'context exec' panels, because 'context exec' panels
     # can be disabled in AddonPreferences, and AddonPreferences is only accessible from a valid context
@@ -268,9 +266,8 @@ def register():
 
 def unregister():
     remove_exec_context_panel_all()
+    # remove 'Py Inspect' button from all Context menus (all Context types)
     remove_inspect_active_context_menu_all()
-    # remove 'Add Inspect Panel' button from all Context menus (all Context types)
-    remove_inspect_context_menu_all()
     # unregister Py Inspect panel UI classes
     unregister_all_inspect_panel_classes()
     if save_pre_handler_func in bpy.app.handlers.save_pre:
