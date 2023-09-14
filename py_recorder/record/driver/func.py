@@ -41,7 +41,10 @@ def write_py_from_thing(textblock, line_prefix, data_rlookup_table, thing, path_
         drv = d.driver
 
         # check if the thing has length, and if so then include array index when adding driver
-        path_resolved_thing = thing.path_resolve(d.data_path)
+        try:
+            path_resolved_thing = thing.path_resolve(d.data_path)
+        except:
+            path_resolved_thing = None
         if path_resolved_thing != None and hasattr(path_resolved_thing, "__len__"):
             textblock.write(line_prefix + "new_drv = drv_data_item.driver_add(\"" +
                            add_quotes_and_backslashes(d.data_path) + "\", " +
