@@ -108,7 +108,7 @@ if bpy.app.version >= (3,30,0):
 # sort alphabetically by first value in each tuple
 BPY_DATA_TYPE_ITEMS = sorted(BPY_DATA_TYPE_ITEMS,  key=lambda x: x[0] )
 
-DATABLOCK_DUAL_TYPES = (
+DATABLOCK_DUAL_TYPES = [
     (bpy.types.Action, "actions"),
     (bpy.types.Armature, "armatures"),
     (bpy.types.Brush, "brushes"),
@@ -145,7 +145,7 @@ DATABLOCK_DUAL_TYPES = (
     (bpy.types.WindowManager, "window_managers"),
     (bpy.types.WorkSpace, "workspaces"),
     (bpy.types.World, "worlds"),
-)
+]
 if bpy.app.version >= (3,10,0):
     DATABLOCK_DUAL_TYPES += [ (bpy.types.PointCloud, "pointclouds") ]
 if bpy.app.version >= (3,30,0):
