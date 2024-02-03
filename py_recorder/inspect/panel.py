@@ -49,7 +49,7 @@ def draw_inspect_panel(self, context):
     exec_state = ic_panel.inspect_exec_state.get(context_name + str(self.panel_num))
     show_attr_list = True
     # check for empty state / inspect error
-    if len(exec_state) == 0 or inspect_error != None:
+    if exec_state is None or len(exec_state) == 0 or inspect_error != None:
         show_attr_list = False
     # check for same value as converted to string - to avoid invalid reference errors
     elif str(inspect_value) != exec_state.get("exec_value_str"):
@@ -69,7 +69,7 @@ def draw_inspect_panel(self, context):
             show_attr_list = False
     # if unable to display list, then clear dictionary to prevent invalid references,
     # i.e. exec_state["exec_value"]
-    if not show_attr_list:
+    if not show_attr_list and exec_state != None:
         exec_state.clear()
     # top row of Py Inspect panel buttons, always visible
     row = layout.row()

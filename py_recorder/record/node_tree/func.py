@@ -216,12 +216,24 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
         out_text.write("%snew_node_group = bpy.data.node_groups.new(name=node_group_name, type='%s')\n" %
                        (line_prefix, mat.edit_tree.bl_idname))
         out_text.write(line_prefix + "# remove old group inputs and outputs\n")
-        out_text.write(line_prefix + "new_node_group.inputs.clear()\n")
-        out_text.write(line_prefix + "new_node_group.outputs.clear()\n")
-        if len(node_group.inputs) > 0 or len(node_group.outputs) > 0:
+        out_text.write(line_prefix + "if bpy.app.version >= (4, 0, 0):\n")
+        out_text.write(line_prefix + "    for item in new_node_group.interface.items_tree:\n")
+        out_text.write(line_prefix + "        if item.item_type == 'SOCKET':\n")
+        out_text.write(line_prefix + "            new_node_group.interface.remove(item)\n")
+        out_text.write(line_prefix + "else:\n")
+        out_text.write(line_prefix + "    new_node_group.inputs.clear()\n")
+        out_text.write(line_prefix + "    new_node_group.outputs.clear()\n")
+ 
+        if bpy.app.version >= (4, 0, 0):
+            node_grp_inputs = [ s for s in node_group.interface.items_tree if s.item_type == 'SOCKET' and s.in_out == 'INPUT' ]
+            node_grp_outputs = [ s for s in node_group.interface.items_tree if s.item_type == 'SOCKET' and s.in_out == 'OUTPUT' ]
+        else:
+            node_grp_inputs = node_group.inputs
+            node_grp_outputs = node_group.outputs
+        if len(node_grp_inputs) > 0 or len(node_grp_outputs) > 0:
             out_text.write(line_prefix + "# create new group inputs and outputs\n")
         # write group inputs
-        for ng_input in node_group.inputs:
+        for ng_input in node_grp_inputs:
             # collect lines to be written before writing, to allow for checking if input attributes need to be written
             lines_to_write = []
             # check/write the min, max, default, and 'hide value' data
@@ -242,15 +254,23 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
                 lines_to_write.append(line_prefix + "new_input.hide_value = True\n")
             # create new_input variable only if necessary, i.e. if input attribute values differ from default values
             if len(lines_to_write) > 0:
-                out_text.write("%snew_input = new_node_group.inputs.new(type='%s', name=\"%s\")\n" %
+                out_text.write(line_prefix + "if bpy.app.version >= (4, 0, 0):\n")
+                out_text.write("%s    new_input = new_node_group.interface.new_socket(socket_type='%s', name=\"%s\", " \
+                               "in_out='INPUT')\n" % (line_prefix, ng_input.bl_socket_idname, ng_input.name))
+                out_text.write(line_prefix + "else:\n")
+                out_text.write("%s    new_input = new_node_group.inputs.new(type='%s', name=\"%s\")\n" %
                                (line_prefix, ng_input.bl_socket_idname, ng_input.name))
                 for l in lines_to_write:
                     out_text.write(l)
             else:
-                out_text.write("%snew_node_group.inputs.new(type='%s', name=\"%s\")\n" %
+                out_text.write(line_prefix + "if bpy.app.version >= (4, 0, 0):\n")
+                out_text.write("%s    new_node_group.interface.new_socket(socket_type='%s', name=\"%s\", in_out='INPUT')\n"
+                               % (line_prefix, ng_input.bl_socket_idname, ng_input.name))
+                out_text.write(line_prefix + "else:\n")
+                out_text.write("%s    new_node_group.inputs.new(type='%s', name=\"%s\")\n" %
                                (line_prefix, ng_input.bl_socket_idname, ng_input.name))
         # write group outputs
-        for ng_output in node_group.outputs:
+        for ng_output in node_grp_outputs:
             # collect lines to be written before writing, to allow for checking if input attributes need to be
             # written
             lines_to_write = []
@@ -281,12 +301,20 @@ def create_code_text(context, space_pad, keep_links, make_into_function, delete_
             # create new_output variable only if necessary, i.e. if output attribute values differ from default
             # values
             if len(lines_to_write) > 0:
-                out_text.write("%snew_output = new_node_group.outputs.new(type='%s', name=\"%s\")\n" %
+                out_text.write(line_prefix + "if bpy.app.version >= (4, 0, 0):\n")
+                out_text.write("%s    new_output = new_node_group.interface.new_socket(socket_type='%s', name=\"%s\", " \
+                               "in_out='OUTPUT')\n" % (line_prefix, ng_output.bl_socket_idname, ng_output.name))
+                out_text.write(line_prefix + "else:\n")
+                out_text.write("%s    new_output = new_node_group.outputs.new(type='%s', name=\"%s\")\n" %
                                (line_prefix, ng_output.bl_socket_idname, ng_output.name))
                 for l in lines_to_write:
                     out_text.write(l)
             else:
-                out_text.write("%snew_node_group.outputs.new(type='%s', name=\"%s\")\n" %
+                out_text.write(line_prefix + "if bpy.app.version >= (4, 0, 0):\n")
+                out_text.write("%s    new_node_group.interface.new_socket(socket_type='%s', name=\"%s\", in_out='OUTPUT') \n" %
+                               (line_prefix, ng_output.bl_socket_idname, ng_output.name))
+                out_text.write(line_prefix + "else:\n")
+                out_text.write("%s    new_node_group.outputs.new(type='%s', name=\"%s\")\n" %
                                (line_prefix, ng_output.bl_socket_idname, ng_output.name))
 
         out_text.write(line_prefix + "tree_nodes = new_node_group.nodes\n")

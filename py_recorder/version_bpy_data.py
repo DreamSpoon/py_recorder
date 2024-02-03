@@ -104,7 +104,7 @@ BPY_DATA_TYPE_ITEMS = [
 if bpy.app.version >= (3,10,0):
     BPY_DATA_TYPE_ITEMS += [ ('pointclouds', "Point Cloud", "") ]
 if bpy.app.version >= (3,30,0):
-    BPY_DATA_TYPE_ITEMS += [  ('hair_curves', "Hair Curve", "") ]
+    BPY_DATA_TYPE_ITEMS += [ ('hair_curves', "Hair Curve", "") ]
 # sort alphabetically by first value in each tuple
 BPY_DATA_TYPE_ITEMS = sorted(BPY_DATA_TYPE_ITEMS,  key=lambda x: x[0] )
 
