@@ -3,7 +3,8 @@
     "",
     "\\py_recorder",
     "\\py_recorder\\record",
-    "\\py_recorder\\record\\driver"
+    "\\py_recorder\\record\\node_tree"
   ],
+  "SelectedNode": "\\py_recorder\\record\\node_tree\\func.py",
   "PreviewInSolutionExplorer": false
 }
