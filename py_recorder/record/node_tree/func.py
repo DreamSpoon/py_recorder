@@ -169,39 +169,49 @@ def get_node_io_value_str(node_io_element, write_linked):
 def write_socket_lines(out_text, line_prefix, node_grp_sockets, in_out_str):
     lines_to_write_bl4 = []
     lines_to_write_pre_bl4 = []
-    # write group inputs
-    for ng_socket in node_grp_sockets:
-        # collect lines to be written before writing, to allow for checking if input attributes need to be written
-        def_val_lines_to_write = []
+    lines_to_write_socket_values = []
+    if in_out_str == 'INPUT':
+        new_socket_var_name = "new_in_socket"
+    else:
+        new_socket_var_name = "new_out_socket"
+    # write node group sockets
+    for socket_num, ng_socket in enumerate(node_grp_sockets):
+        # collect lines to be written before writing, to allow for checking if socket attributes need to be written
+        def_val_lines_to_write = 0
         # check/write the min, max, default, and 'hide value' data
         if hasattr(ng_socket, "min_value") and ng_socket.min_value != -340282346638528859811704183484516925440.0:
-            def_val_lines_to_write.append("%s    new_input.min_value = %s\n" %
-                                            (line_prefix, bpy_value_to_string(ng_socket.min_value)))
+            def_val_lines_to_write += 1
+            lines_to_write_socket_values.append("%s%s[%d].min_value = %s\n" % (line_prefix, new_socket_var_name,
+                                                socket_num, bpy_value_to_string(ng_socket.min_value)))
         if hasattr(ng_socket, "max_value") and ng_socket.max_value != 340282346638528859811704183484516925440.0:
-            def_val_lines_to_write.append("%s    new_input.max_value = %s\n" %
-                                            (line_prefix, bpy_value_to_string(ng_socket.max_value)))
+            def_val_lines_to_write += 1
+            lines_to_write_socket_values.append("%s%s[%d].max_value = %s\n" % (line_prefix, new_socket_var_name,
+                                                socket_num, bpy_value_to_string(ng_socket.max_value)))
         if hasattr(ng_socket, "default_value") and ng_socket.default_value != None and \
             ng_socket.default_value != 0.0 and not bpy_compare_to_value(ng_socket.default_value, (0.0, 0.0, 0.0)) and \
                 not ( ng_socket.bl_socket_idname == 'NodeSocketColor' and \
                         bpy_compare_to_value(ng_socket.default_value, (0.0, 0.0, 0.0, 1.0)) ):
-            def_val_lines_to_write.append("%s    new_input.default_value = %s\n" %
-                                            (line_prefix, bpy_value_to_string(ng_socket.default_value)))
+            def_val_lines_to_write += 1
+            lines_to_write_socket_values.append("%s%s[%d].default_value = %s\n" % (line_prefix, new_socket_var_name,
+                                                socket_num, bpy_value_to_string(ng_socket.default_value)))
         if ng_socket.hide_value:
-            def_val_lines_to_write.append(line_prefix + "    new_input.hide_value = True\n")
-        # create new_input variable only if necessary, i.e. if input attribute values differ from default values
-        if len(def_val_lines_to_write) > 0:
-            lines_to_write_bl4.append("%s    new_input = new_node_group.interface.new_socket(socket_type='%s', name=" \
-                                      "\"%s\", in_out='%s')\n" % (line_prefix, ng_socket.bl_socket_idname,
-                                                                  ng_socket.name, in_out_str) )
+            def_val_lines_to_write += 1
+            lines_to_write_socket_values.append("%s%s[%d].hide_value = True\n" % (line_prefix, new_socket_var_name,
+                                                socket_num))
+        # create new socket in/out variable only if necessary, i.e. if socket attribute values differ from default
+        # values
+        if def_val_lines_to_write > 0:
+            lines_to_write_bl4.append("%s    %s[%d] = new_node_group.interface.new_socket(socket_type='%s', name=" \
+                                      "\"%s\", in_out='%s')\n" % (line_prefix, new_socket_var_name, socket_num,
+                                      ng_socket.bl_socket_idname, ng_socket.name, in_out_str) )
             if in_out_str == 'INPUT':
-                lines_to_write_pre_bl4.append("%s    new_input = new_node_group.inputs.new(type='%s', name=\"%s\")\n" %
-                                              (line_prefix, ng_socket.bl_socket_idname, ng_socket.name))
+                lines_to_write_pre_bl4.append("%s    %s[%d] = new_node_group.inputs.new(type='%s', name=\"%s\")\n" %
+                                              (line_prefix, new_socket_var_name, socket_num, ng_socket.bl_socket_idname,
+                                               ng_socket.name))
             else:
-                lines_to_write_pre_bl4.append("%s    new_input = new_node_group.outputs.new(type='%s', name=\"%s\")\n" %
-                                              (line_prefix, ng_socket.bl_socket_idname, ng_socket.name))
-            for l in def_val_lines_to_write:
-                lines_to_write_bl4.append(l)
-                lines_to_write_pre_bl4.append(l)
+                lines_to_write_pre_bl4.append("%s    %s[%d] = new_node_group.outputs.new(type='%s', name=\"%s\")\n" %
+                                              (line_prefix, new_socket_var_name, socket_num, ng_socket.bl_socket_idname,
+                                               ng_socket.name))
         else:
             lines_to_write_bl4.append("%s    new_node_group.interface.new_socket(socket_type='%s', name=\"%s\", " \
                                       "in_out='%s')\n" % (line_prefix, ng_socket.bl_socket_idname, ng_socket.name,
@@ -212,11 +222,14 @@ def write_socket_lines(out_text, line_prefix, node_grp_sockets, in_out_str):
             else:
                 lines_to_write_pre_bl4.append("%s    new_node_group.outputs.new(type='%s', name=\"%s\")\n" %
                                               (line_prefix, ng_socket.bl_socket_idname, ng_socket.name))
+    out_text.write(line_prefix + new_socket_var_name + " = {}\n")
     out_text.write(line_prefix + "if bpy.app.version >= (4, 0, 0):\n")
     for l in lines_to_write_bl4:
         out_text.write(l)
     out_text.write(line_prefix + "else:\n")
     for l in lines_to_write_pre_bl4:
+        out_text.write(l)
+    for l in lines_to_write_socket_values:
         out_text.write(l)
 
 def create_code_text(context, space_pad, keep_links, make_into_function, delete_existing, ng_output_min_max_def,
