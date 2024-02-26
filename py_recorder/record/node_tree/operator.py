@@ -24,9 +24,8 @@
 
 from bpy.types import Operator
 
-from .func import (LOC_DEC_PLACES_UNI_NODE_OPT, WRITE_DEFAULTS_UNI_NODE_OPT, WRITE_LINKED_DEFAULTS_UNI_NODE_OPT,
-    WRITE_ATTR_NAME_UNI_NODE_OPT, WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT, WRITE_ATTR_SELECT_UNI_NODE_OPT,
-    create_code_text)
+from .func import (LOC_DEC_PLACES_UNI_NODE_OPT, WRITE_ATTR_NAME_UNI_NODE_OPT, WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT,
+    WRITE_ATTR_SELECT_UNI_NODE_OPT, create_code_text)
 
 class PYREC_OT_RecordNodetree(Operator):
     bl_idname = "py_rec.node_editor_record_nodetree"
@@ -46,13 +45,10 @@ class PYREC_OT_RecordNodetree(Operator):
         ntr = context.window_manager.py_rec.record_options.nodetree
         uni_node_options = {
             LOC_DEC_PLACES_UNI_NODE_OPT: ntr.write_loc_decimal_places,
-            WRITE_DEFAULTS_UNI_NODE_OPT: ntr.write_default_values,
-            WRITE_LINKED_DEFAULTS_UNI_NODE_OPT: ntr.write_linked_default_values,
             WRITE_ATTR_NAME_UNI_NODE_OPT: ntr.write_attrib_name,
             WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT: ntr.write_attrib_width_and_height,
             WRITE_ATTR_SELECT_UNI_NODE_OPT: ntr.write_attrib_select,
         }
-        text = create_code_text(context, ntr.num_space_pad, ntr.keep_links, ntr.make_function, ntr.delete_existing,
-                                ntr.ng_output_min_max_def, uni_node_options)
+        text = create_code_text(context, ntr.ng_output_min_max_def, uni_node_options)
         self.report({'INFO'}, "Nodetree recorded to Python in Text named '%s'" % text.name)
         return {'FINISHED'}

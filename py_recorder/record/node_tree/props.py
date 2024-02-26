@@ -20,21 +20,8 @@ from bpy.types import PropertyGroup
 from bpy.props import (BoolProperty, IntProperty)
 
 class PYREC_PG_NodetreeRecordOptions(PropertyGroup):
-    num_space_pad: IntProperty(name="Num Space Pad", description="Number of spaces to prepend to each " +
-        "line of code output in text-block", default=4, min=0)
-    keep_links: BoolProperty(name="Keep Links List", description="Add created links to a list variable",
-        default=False)
-    make_function: BoolProperty(name="Make into Function", description="Add lines of Python code to " +
-        "create runnable script (instead of just the bare essential code)", default=True)
-    delete_existing: BoolProperty(name="Delete Existing Nodes",
-        description="Include code in the output that deletes all nodes in Shader Material / Geometry Node Setup " +
-        "before creating new nodes", default=True)
     write_loc_decimal_places: IntProperty(name="Location Decimal Places", description="Number of " +
         "decimal places to use when writing location values", default=0)
-    write_default_values: BoolProperty(name="Write Defaults", description="Write node attributes " +
-        "that are set to default values (e.g. node attributes: label, name)", default=False)
-    write_linked_default_values: BoolProperty(name="Linked Default Values", description="Write default " +
-        "values, of node inputs and outputs, where the input/output is linked to another node", default=False)
     write_attrib_name: BoolProperty(name="Name", description="Include node attribute 'name'", default=False)
     write_attrib_width_and_height: BoolProperty(name="Width and Height", description="Include node " +
         "attributes for width and height", default=False)
