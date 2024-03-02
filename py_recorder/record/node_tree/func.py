@@ -24,11 +24,10 @@ from ...bpy_value_string import bpy_value_to_string
 
 RECORD_NODETREE_TEXT_NAME = "pyrec_nodetree.py"
 
-exclude_attr_default_list = {
+EXCLUDE_ATTR_DEFAULTS = {
     "name": "",
     "label": "",
     "width": 0.0,
-    "width_hidden": 42.0,
     "height": 100.0,
     "color": Color((0.608, 0.608, 0.608)),
     "use_custom_color": False,
@@ -36,16 +35,16 @@ exclude_attr_default_list = {
     "hide": False,
     "select": None,
 }
+EXCLUDE_ATTRIBUTES = [
+    'name', 'label', 'width', 'height', 'color', 'use_custom_color', 'mute', 'hide', 'select', 'inputs', 'outputs',
+    'parent', 'dimensions', 'internal_links', 'location', 'rna_type', 'show_options', 'show_preview', 'show_texture',
+    'type', 'width_hidden', 'is_active_output', 'interface', 'state_items',
+    ]
 
 LOC_DEC_PLACES_UNI_NODE_OPT = "loc_decimal_places"
 WRITE_ATTR_NAME_UNI_NODE_OPT = "write_attr_name"
 WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT = "write_attr_width_height"
 WRITE_ATTR_SELECT_UNI_NODE_OPT = "write_attr_select"
-
-FILTER_OUT_ATTRIBS = ['color', 'dimensions', 'height', 'hide', 'inputs', 'internal_links', 'label', 'location',
-                         'mute', 'name', 'outputs', 'parent', 'rna_type', 'select', 'show_options', 'show_preview',
-                         'show_texture', 'type', 'use_custom_color', 'width', 'width_hidden',
-                         'is_active_output', 'interface']
 
 NODES_WITH_WRITE_OUTPUTS = ['ShaderNodeValue', 'ShaderNodeRGB', 'CompositorNodeValue', 'CompositorNodeRGB']
 
@@ -76,10 +75,10 @@ def write_filtered_attribs(out_text, node, ignore_attribs):
             continue
         # get the attribute's value
         the_attr = getattr(node, attr_name)
-        # filter out attributes that are built-ins (Python/Blender), or callable functions, or
-        # attributes that are ignored/handled elsewhere
+        # exclude attributes that are built-ins (Python/Blender), or callable functions, or
+        # attributes that are handled elsewhere / ignored
         if attr_name.startswith('__') or attr_name.startswith('bl_') or callable(the_attr) or \
-            attr_name in FILTER_OUT_ATTRIBS:
+            attr_name in EXCLUDE_ATTRIBUTES:
             continue
         # if type is Color Ramp
         if type(the_attr) == bpy.types.ColorRamp:
@@ -261,6 +260,111 @@ def get_node_io_name_num_for_socket(is_input, io_socket):
         if sock.name == io_socket.name:
             name_count += 1
 
+def write_tree_node(out_text, tree_node, uni_node_options):
+    out_text.write("    # %s\n" % tree_node.bl_label)
+    out_text.write("    node = tree_nodes.new(type=\"%s\")\n" % tree_node.bl_idname)
+    for attr in EXCLUDE_ATTR_DEFAULTS:
+        # Input Color node will write this value, so ignore it for now
+        if tree_node.bl_idname == 'FunctionNodeInputColor' and attr == 'color':
+            continue
+        if hasattr(tree_node, attr):
+            gotten_attr = getattr(tree_node, attr)
+            # if a default value is found, then skip the default value
+            if gotten_attr == EXCLUDE_ATTR_DEFAULTS[attr]:
+                continue
+            # if not writing 'name' then skip
+            elif attr == 'name' and uni_node_options[WRITE_ATTR_NAME_UNI_NODE_OPT] == False:
+                continue
+            # if not writing width and height then skip
+            elif (attr == 'width' or attr == 'height') and \
+                    uni_node_options[WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT] == False:
+                continue
+            # if not writing select state then skip
+            elif attr == 'select' and uni_node_options[WRITE_ATTR_SELECT_UNI_NODE_OPT] == False:
+                continue
+
+            out_text.write("    node.%s = %s\n" % (attr, bpy_value_to_string(gotten_attr)))
+    # node with parent is special, this node is offset by their parent frame's location
+    parent_loc = Vector((0, 0))
+    if tree_node.parent != None:
+        parent_loc = tree_node.parent.location
+    # do rounding of location values, if needed, and write the values
+    precision = uni_node_options[LOC_DEC_PLACES_UNI_NODE_OPT]
+    loc_x = tree_node.location.x + parent_loc.x
+    loc_y = tree_node.location.y + parent_loc.y
+    out_text.write("    node.location = (%0.*f, %0.*f)\n" % (precision, loc_x, precision, loc_y))
+    # Input Color, this attribute is special because this node type's Color attribute is swapped - very strange!
+    # (maybe a dinosaur left over from old versions of Blender)
+    ignore_attribs = []
+    if tree_node.bl_idname == 'FunctionNodeInputColor':
+        out_text.write("    node.color = %s\n" % (bpy_value_to_string(tree_node.color)))
+        ignore_attribs.append("color")
+
+    write_filtered_attribs(out_text, tree_node, ignore_attribs)
+
+    # if not a Frame or a Reroute or Simulation node, then write tree_node inputs and outputs
+    if tree_node.type not in [ "FRAME", "REROUTE" ]:
+        # get node input(s) default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), shader ]
+        # TODO: this part needs more testing re: different node input default value(s) and type(s)
+        input_name_counts = {}
+        input_values = {}
+        for node_input in tree_node.inputs:
+            name_count = input_name_counts.get(node_input.name)
+            if name_count is None:
+                name_count = 0
+            name_count += 1
+            input_name_counts[node_input.name] = name_count
+            if node_input.hide_value or node_input.is_linked:
+                continue
+            value_str = get_node_io_value_str(node_input)
+            if value_str is None:
+                continue
+            if input_values.get(node_input.name) is None:
+                input_values[node_input.name] = {}
+            input_values[node_input.name][name_count-1] = value_str
+        if len(input_values) > 0:
+            out_text.write("    set_node_io_values(node, True, {\n")
+            for inp_name in input_values:
+                # if only one entry in dictionary then do one line of code
+                if len(input_values[inp_name]) == 1:
+                    first_key = next(iter(input_values[inp_name]))
+                    out_text.write("        \"%s\": { %d: %s },\n" % (inp_name, first_key, input_values[inp_name][first_key]))
+                else:
+                    out_text.write("        \"%s\": {\n" % inp_name)
+                    for inp_name_c in input_values[inp_name]:
+                        out_text.write("            %d: %s,\n" % (inp_name_c, input_values[inp_name][inp_name_c]))
+                    out_text.write("            },\n")
+            out_text.write("        })\n")
+
+        # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
+        # TODO: this part needs more testing re: different node output default value(s) and type(s)
+        if tree_node.bl_idname in NODES_WITH_WRITE_OUTPUTS:
+            output_name_counts = {}
+            output_values = {}
+            for node_output in tree_node.outputs:
+                name_count = output_name_counts.get(node_output.name)
+                if name_count is None:
+                    name_count = 0
+                name_count += 1
+                output_name_counts[node_output.name] = name_count
+                # always write the value, even if linked, because this node is special
+                value_str = get_node_io_value_str(node_output)
+                if value_str is None:
+                    continue
+                if output_values.get(node_output.name) is None:
+                    output_values[node_output.name] = {}
+                output_values[node_output.name][name_count-1] = value_str
+            if len(output_values) > 0:
+                out_text.write("    set_node_io_values(node, False, {\n")
+                for outp_name in output_values:
+                    out_text.write("        \"%s\": {\n" % outp_name)
+                    for outp_name_c in output_values[outp_name]:
+                        out_text.write("            %d: %s,\n" % (outp_name_c, output_values[outp_name][outp_name_c]))
+                    out_text.write("            },\n")
+                out_text.write("        })\n")
+
+    out_text.write("    new_nodes[\"%s\"] = node\n" % tree_node.name)
+
 def create_code_text(context, ng_output_min_max_def, uni_node_options):
     mat = context.space_data
     out_text = bpy.data.texts.new(RECORD_NODETREE_TEXT_NAME)
@@ -332,108 +436,31 @@ def create_code_text(context, ng_output_min_max_def, uni_node_options):
     frame_parenting_text = ""
     # write info about the individual nodes
     for tree_node in mat.edit_tree.nodes:
-        out_text.write("    # %s\n" % tree_node.bl_label)
-        out_text.write("    node = tree_nodes.new(type=\"%s\")\n" % tree_node.bl_idname)
-        ignore_attribs = []
-        for attr in exclude_attr_default_list:
-            # Input Color node will write this value, so ignore it for now
-            if tree_node.bl_idname == 'FunctionNodeInputColor' and attr == 'color':
-                continue
-            if hasattr(tree_node, attr):
-                gotten_attr = getattr(tree_node, attr)
-                # if a default value is found, then skip the default value
-                if gotten_attr == exclude_attr_default_list[attr]:
-                    continue
-                # if not writing 'name' then skip
-                elif attr == 'name' and uni_node_options[WRITE_ATTR_NAME_UNI_NODE_OPT] == False:
-                    continue
-                # if not writing width and height then skip
-                elif (attr == 'width' or attr == 'height') and \
-                        uni_node_options[WRITE_ATTR_WIDTH_HEIGHT_UNI_NODE_OPT] == False:
-                    continue
-                # if not writing select state then skip
-                elif attr == 'select' and uni_node_options[WRITE_ATTR_SELECT_UNI_NODE_OPT] == False:
-                    continue
+        # skip Simulation Output nodes because they will be created along with the paired Simulation Input node
+        if tree_node.type == "SIMULATION_OUTPUT":
+            continue
+        elif tree_node.type == "SIMULATION_INPUT":
+            write_tree_node(out_text, tree_node, uni_node_options)
+            # write paired Simulation Output if it exists
+            if tree_node.paired_output is not None:
+                write_tree_node(out_text, tree_node.paired_output, uni_node_options)
+                out_text.write("    new_nodes[\"%s\"].state_items.clear()\n" % tree_node.paired_output.name)
+                for si in tree_node.paired_output.state_items:
+                    out_text.write("    new_nodes[\"%s\"].state_items.new(\"%s\", \"%s\")\n" %
+                                   (tree_node.paired_output.name, si.socket_type, si.name))
+                out_text.write("    new_nodes[\"%s\"].pair_with_output(new_nodes[\"%s\"])\n" %
+                               (tree_node.name, tree_node.paired_output.name))
+                # save a reference to Simulation Output parent node for later, if parent node exists
+                if tree_node.paired_output.parent != None:
+                    frame_parenting_text = "%s    new_nodes[\"%s\"].parent = new_nodes[\"%s\"]\n" % \
+                        (frame_parenting_text, tree_node.paired_output.name, tree_node.paired_output.parent.name)
+        else:
+            write_tree_node(out_text, tree_node, uni_node_options)
 
-                out_text.write("    node.%s = %s\n" % (attr, bpy_value_to_string(gotten_attr)))
-        # node with parent is special, this node is offset by their parent frame's location
-        parent_loc = Vector((0, 0))
-        if tree_node.parent != None:
-            parent_loc = tree_node.parent.location
-        # do rounding of location values, if needed, and write the values
-        precision = uni_node_options[LOC_DEC_PLACES_UNI_NODE_OPT]
-        loc_x = tree_node.location.x + parent_loc.x
-        loc_y = tree_node.location.y + parent_loc.y
-        out_text.write("    node.location = (%0.*f, %0.*f)\n" % (precision, loc_x, precision, loc_y))
-        # Input Color, this attribute is special because this node type's Color attribute is swapped - very strange!
-        # (maybe a dinosaur left over from old versions of Blender)
-        if tree_node.bl_idname == 'FunctionNodeInputColor':
-            out_text.write("    node.color = %s\n" % (bpy_value_to_string(tree_node.color)))
-            ignore_attribs.append("color")
-
-        write_filtered_attribs(out_text, tree_node, ignore_attribs)
-
-        # if not a Frame or a Reroute, then write tree_node inputs and outputs
-        if tree_node.type not in ["FRAME", "REROUTE"]:
-            # get node input(s) default value(s), each input might be [ float, (R, G, B, A), (X, Y, Z), shader ]
-            # TODO: this part needs more testing re: different node input default value(s) and type(s)
-            input_name_counts = {}
-            input_values = {}
-            for node_input in tree_node.inputs:
-                name_count = input_name_counts.get(node_input.name)
-                if name_count is None:
-                    name_count = 0
-                name_count += 1
-                input_name_counts[node_input.name] = name_count
-                if node_input.hide_value or node_input.is_linked:
-                    continue
-                value_str = get_node_io_value_str(node_input)
-                if value_str is None:
-                    continue
-                if input_values.get(node_input.name) is None:
-                    input_values[node_input.name] = {}
-                input_values[node_input.name][name_count-1] = value_str
-            if len(input_values) > 0:
-                out_text.write("    set_node_io_values(node, True, {\n")
-                for inp_name in input_values:
-                    out_text.write("        \"%s\": {\n" % inp_name)
-                    for inp_name_c in input_values[inp_name]:
-                        out_text.write("            %d: %s,\n" % (inp_name_c, input_values[inp_name][inp_name_c]))
-                    out_text.write("            },\n")
-                out_text.write("        })\n")
-
-            # get node output(s) default value(s), each output might be [ float, (R, G, B, A), (X, Y, Z), shader ]
-            # TODO: this part needs more testing re: different node output default value(s) and type(s)
-            if tree_node.bl_idname in NODES_WITH_WRITE_OUTPUTS:
-                output_name_counts = {}
-                output_values = {}
-                for node_output in tree_node.outputs:
-                    name_count = output_name_counts.get(node_output.name)
-                    if name_count is None:
-                        name_count = 0
-                    name_count += 1
-                    output_name_counts[node_output.name] = name_count
-                    # always write the value, even if linked, because this node is special
-                    value_str = get_node_io_value_str(node_output)
-                    if value_str is None:
-                        continue
-                    if output_values.get(node_output.name) is None:
-                        output_values[node_output.name] = {}
-                    output_values[node_output.name][name_count-1] = value_str
-                if len(output_values) > 0:
-                    out_text.write("    set_node_io_values(node, False, {\n")
-                    for outp_name in output_values:
-                        out_text.write("        \"%s\": {\n" % outp_name)
-                        for outp_name_c in output_values[outp_name]:
-                            out_text.write("            %d: %s,\n" % (outp_name_c, output_values[outp_name][outp_name_c]))
-                        out_text.write("            },\n")
-                    out_text.write("        })\n")
-
-        out_text.write("    new_nodes[\"%s\"] = node\n" % tree_node.name)
         # save a reference to parent node for later, if parent node exists
         if tree_node.parent != None:
             frame_parenting_text = "%s    new_nodes[\"%s\"].parent = new_nodes[\"%s\"]\n" % \
-                                   (frame_parenting_text, tree_node.name, tree_node.parent.name)
+                (frame_parenting_text, tree_node.name, tree_node.parent.name)
 
     # do node parenting if needed
     if frame_parenting_text != "":
@@ -449,8 +476,7 @@ def create_code_text(context, ng_output_min_max_def, uni_node_options):
         to_name_num = get_node_io_name_num_for_socket(True, tree_link.to_socket)
         out_text.write("    create_nodetree_link(tree_links, new_nodes[\"%s\"], \"%s\", %d, new_nodes[\"%s\"], " \
                        "\"%s\", %d)\n" % (tree_link.from_socket.node.name, tree_link.from_socket.name, from_name_num,
-                                         tree_link.to_socket.node.name, tree_link.to_socket.name, to_name_num))
-        
+                                          tree_link.to_socket.node.name, tree_link.to_socket.name, to_name_num))
 
     # created nodes are selected by default so deselect them
     out_text.write("    # deselect all new nodes\n    for n in new_nodes.values(): n.select = False\n")
